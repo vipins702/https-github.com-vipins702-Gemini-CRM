@@ -88,11 +88,23 @@ export interface ComponentStyle {
   fontSize?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
+export interface ValidationRule {
+  required?: boolean;
+  requiredMessage?: string;
+  pattern?: string;          // regex source, e.g. "^[^@]+@[^@]+\\.[^@]+$"
+  patternMessage?: string;   // shown when pattern fails
+  minLength?: number;
+  maxLength?: number;
+  min?: number;              // numeric fields
+  max?: number;              // numeric fields
+}
+
 export interface LayoutFieldConfig {
   visibilityRule?: VisibilityRule;
   styles?: ComponentStyle;
   labelOverride?: string;
   hidden?: boolean;
+  validation?: ValidationRule;
   // Instance specific overrides
   lookupTarget?: EntityType;
   urlTemplate?: string;
@@ -131,7 +143,7 @@ export interface FlowNodeData {
 export type FlowNode = Node<FlowNodeData>;
 export type FlowEdge = Edge;
 
-export type ViewState = 'dashboard' | 'autoflow' | 'layout' | 'settings' | 'web-presenter' | 'users' | 'object-manager' | 'campaigns' | 'menu-manager' | EntityType;
+export type ViewState = 'dashboard' | 'autoflow' | 'layout' | 'settings' | 'web-presenter' | 'users' | 'object-manager' | 'campaigns' | 'menu-manager' | 'lookups' | 'customer-360' | 'lead-rules' | 'lead-capture' | 'agent-console' | EntityType;
 
 // Web Presenter / Data Sources
 export type DataSourceType = 'iframe' | 'api' | 'database';
@@ -141,21 +153,21 @@ export interface DataSourceConfig {
   name: string;
   type: DataSourceType;
   status: 'Active' | 'Inactive';
-  
+
   // Connection Details
   endpoint?: string; // Base URL or Host
   port?: string;
   databaseName?: string;
-  
+
   // Auth
   authType?: 'none' | 'basic' | 'bearer' | 'apikey';
   username?: string;
   password?: string;
   apiKey?: string;
   token?: string;
-  
+
   // Query / Usage
-  method?: 'GET' | 'POST' | 'PUT'; 
+  method?: 'GET' | 'POST' | 'PUT';
   query?: string; // SQL query or JSON body
   headers?: { key: string; value: string }[];
 }
@@ -183,6 +195,8 @@ export interface Role {
   name: string;
   description: string;
   permissions: Record<string, ModulePermissions>; // Keyed by EntityType
+  isSystem?: boolean;
+  createdAt?: string;
 }
 
 export interface User {
@@ -192,6 +206,7 @@ export interface User {
   roleId: string;
   isActive: boolean;
   avatar?: string;
+  permissions?: any; // Full permission tree
 }
 
 export interface AuthSession {
@@ -227,8 +242,8 @@ export interface Campaign {
 }
 
 export interface ObjectManagerProps {
-   onNavigate?: (view: ViewState, params?: any) => void;
-   onRefreshSchemas: () => Promise<void>;
+  onNavigate?: (view: ViewState, params?: any) => void;
+  onRefreshSchemas: () => Promise<void>;
 }
 
 // --- SYSTEM SETTINGS ---
@@ -237,6 +252,67 @@ export interface SystemSettings {
   primaryColor: 'indigo' | 'blue' | 'purple' | 'emerald' | 'rose' | 'orange';
   density: 'comfortable' | 'compact';
   fontFamily: 'sans' | 'serif' | 'mono';
+  fontSize?: 'sm' | 'md' | 'lg';
   organizationName: string;
   logoUrl?: string;
+  defaultCurrency?: string; // ISO 4217 code, e.g. 'USD', 'INR', 'EUR'
+  locale?: string;          // BCP-47 locale for number/currency formatting, e.g. 'en-IN'
+  // 2025 UI options
+  glassmorphism?: boolean;
+  animationIntensity?: 'none' | 'subtle' | 'full';
+  accentGradient?: { from: string; to: string };
 }
+
+// --- LEAD GENERATION RULES ---
+export type LeadRuleOperator = '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not_contains' | 'is_empty' | 'is_not_empty';
+
+export interface LeadRuleCondition {
+  field: string;
+  operator: LeadRuleOperator;
+  value?: string | number;
+}
+
+export interface LeadRuleConditions {
+  match: 'all' | 'any';
+  rules: LeadRuleCondition[];
+}
+
+export interface LeadRule {
+  id: string;
+  name: string;
+  description?: string;
+  sourceEntity: EntityType;
+  targetEntity: EntityType;
+  conditions: LeadRuleConditions;
+  fieldMapping: Record<string, string>;
+  defaultValues: Record<string, any>;
+  assignTo?: string;
+  dedupe: boolean;
+  isActive: boolean;
+  schedule: 'manual' | 'realtime' | 'interval';
+  intervalMinutes?: number;
+  nextRunAt?: string;
+  lastRunAt?: string;
+  lastRunCount?: number;
+}
+
+export interface LeadRuleRunResult {
+  matched: number;
+  created: number;
+  skipped: number;
+  preview: Array<{ sourceId: string; primaryDisplay: string; leadData: Record<string, any> }>;
+}
+
+// --- RELATIONSHIPS ---
+export interface Relationship {
+  id: string;
+  name: string;
+  source_entity: EntityType;
+  target_entity: EntityType;
+  source_field: string;
+  target_field: string;
+  relationship_type: 'lookup' | 'master-detail';
+  cascade_delete: boolean;
+  display_field?: string;
+}
+

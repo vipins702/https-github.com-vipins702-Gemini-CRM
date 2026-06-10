@@ -6,11 +6,14 @@ import { Card } from '../components/ui/Card';
 import { MenuItem, Role, ViewState } from '../types';
 import { api } from '../services/api';
 import { Menu, Plus, Trash2, Edit2, GripVertical, Check, Folder, File, Shield, ChevronRight, ChevronDown } from 'lucide-react';
+import * as Icons from 'lucide-react';
+import { useToast } from '../components/ui/Toast';
 
 export const MenuManager: React.FC = () => {
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
+  const { addToast } = useToast();
   
   // Edit State
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
@@ -32,7 +35,7 @@ export const MenuManager: React.FC = () => {
   const handleSave = async () => {
     await api.saveMenu(menu);
     setIsDirty(false);
-    alert('Menu Configuration Saved!');
+    addToast('Menu Configuration Saved!', 'success');
   };
 
   const handleCreate = (type: 'group' | 'item') => {
@@ -129,7 +132,7 @@ export const MenuManager: React.FC = () => {
         >
            <GripVertical className="w-4 h-4 text-gray-300"/>
            {item.type === 'group' ? <Folder className="w-4 h-4 text-gray-400"/> : <File className="w-4 h-4 text-gray-400"/>}
-           <span className={`text-sm font-medium ${isSelected ? 'text-indigo-900' : 'text-gray-700'}`}>{item.label}</span>
+           <span className="text-sm font-medium text-gray-700">{item.label}</span>
            <div className="ml-auto flex gap-1">
               {item.type === 'group' && (
                  <button 
@@ -155,6 +158,14 @@ export const MenuManager: React.FC = () => {
         )}
       </div>
     );
+  };
+
+  // Icon preview rendering
+  const renderIconPreview = () => {
+    if (!selectedItem || !selectedItem.icon) return null;
+    const IconComponent = (Icons as any)[selectedItem.icon];
+    if (!IconComponent) return null;
+    return <IconComponent className="w-5 h-5" />;
   };
 
   return (
@@ -209,12 +220,19 @@ export const MenuManager: React.FC = () => {
                          </div>
                          <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Icon (Lucide Name)</label>
-                            <input 
-                               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                               value={selectedItem.icon || ''}
-                               onChange={e => updateItem({ icon: e.target.value })}
-                               placeholder="e.g. Users, Home"
-                            />
+                            <div className="flex gap-2">
+                               <input 
+                                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                  value={selectedItem.icon || ''}
+                                  onChange={e => updateItem({ icon: e.target.value })}
+                                  placeholder="e.g. Users, Home"
+                               />
+                               {selectedItem.icon && (Icons as any)[selectedItem.icon] && (
+                                  <div className="w-10 h-10 border border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center text-indigo-600 shrink-0 shadow-sm animate-in zoom-in duration-200">
+                                     {renderIconPreview()}
+                                  </div>
+                               )}
+                            </div>
                          </div>
                       </div>
 

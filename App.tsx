@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
+import { TopBar } from './components/TopBar';
 import { Dashboard } from './pages/Dashboard';
 import { ModuleView } from './pages/ModuleView';
 import { WorkflowBuilder } from './pages/WorkflowBuilder';
@@ -11,21 +12,30 @@ import { UserManagement } from './pages/UserManagement';
 import { ObjectManager } from './pages/ObjectManager';
 import { Campaigns } from './pages/Campaigns';
 import { MenuManager } from './pages/MenuManager';
+import { LookupManager } from './pages/LookupManager';
 import { PublicWebForm } from './pages/PublicWebForm';
 import { Settings } from './pages/Settings';
+import { Customer360 } from './pages/Customer360';
+import { LeadRules } from './pages/LeadRules';
+import { LeadCapture } from './pages/LeadCapture';
+import { AgentConsole } from './pages/AgentConsole';
 import { Login } from './pages/Login';
 import { ViewState, WidgetConfig, EntityDefinition, EntityType, AuthSession } from './types';
 import { api } from './services/api';
+import { applySettings } from './services/theme';
+
+import { ToastProvider } from './components/ui/Toast';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [viewParams, setViewParams] = useState<any>(null); // State to hold navigation parameters
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isPublicRoute, setIsPublicRoute] = useState(false);
-  
+
   // System Metadata State
   const [isReady, setIsReady] = useState(false);
   const [schemas, setSchemas] = useState<Record<string, EntityDefinition>>({});
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     // Check for Public Routes (e.g., /form/:id)
@@ -37,14 +47,30 @@ const App: React.FC = () => {
     }
 
     const bootstrap = async () => {
-      await api.initialize();
-      const existingSession = await api.getSession();
-      setSession(existingSession);
-      
-      // Load schemas
-      await refreshSchemas();
-      
-      setIsReady(true);
+      try {
+        await api.initialize();
+        const existingSession = await api.getSession();
+
+        // Only load schemas if user has a session
+        if (existingSession) {
+          try {
+            await refreshSchemas();
+            // Apply per-tenant theme/appearance settings
+            try { applySettings(await api.getSettings()); } catch (e) { /* keep defaults */ }
+            setSession(existingSession); // Session is valid
+          } catch (error: any) {
+            // Session token is invalid/expired, clear it
+            console.warn('Session expired, clearing...');
+            await api.logout();
+            setSession(null);
+          }
+        }
+
+        setIsReady(true);
+      } catch (error) {
+        console.error("Failed to bootstrap application:", error);
+        setIsReady(true); // Allow app to render login page even on error
+      }
     };
     bootstrap();
   }, []);
@@ -54,8 +80,12 @@ const App: React.FC = () => {
     setSchemas(loadedSchemas);
   };
 
-  const handleLogin = (newSession: AuthSession) => {
+  const handleLogin = async (newSession: AuthSession) => {
     setSession(newSession);
+    // Load schemas after login
+    await refreshSchemas();
+    // Apply per-tenant theme/appearance settings
+    try { applySettings(await api.getSettings()); } catch (e) { /* keep defaults */ }
   };
 
   const handleNavigate = (view: ViewState, params?: any) => {
@@ -73,10 +103,18 @@ const App: React.FC = () => {
 
   if (!isReady) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50 text-indigo-600">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <div className="font-semibold animate-pulse">Bootstrapping FlowCRM...</div>
+      <div className="h-screen flex items-center justify-center bg-slate-950 font-sans">
+        <div className="flex flex-col items-center gap-6 animate-in fade-in duration-700">
+          <div className="relative">
+            <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-2xl shadow-indigo-500/30 animate-pulse">
+              <span className="text-white font-black text-2xl tracking-tighter">F</span>
+            </div>
+            <div className="absolute inset-0 w-16 h-16 rounded-2xl bg-indigo-500/30 blur-xl animate-ping -z-10"></div>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <div className="text-white font-extrabold text-base tracking-widest animate-pulse">BOOSTING FLOWCRM</div>
+            <div className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Metadata Engine Initializing</div>
+          </div>
         </div>
       </div>
     );
@@ -110,27 +148,47 @@ const App: React.FC = () => {
         return <ObjectManager onNavigate={handleNavigate} onRefreshSchemas={refreshSchemas} />;
       case 'menu-manager':
         return <MenuManager />;
+      case 'lookups':
+        return <LookupManager />;
+      case 'lead-rules':
+        return <LeadRules />;
+      case 'lead-capture':
+        return <LeadCapture />;
+      case 'agent-console':
+        return <AgentConsole onNavigate={handleNavigate} />;
+      case 'customer-360':
+        return <Customer360 customerId={viewParams?.customerId} onBack={() => setCurrentView('customer')} onNavigate={handleNavigate} />;
       case 'settings':
         return <Settings />;
       default:
         // Check if the current view matches an entity type
         if (schemas[currentView]) {
-          return <ModuleView entityType={currentView as EntityType} />;
+          return <ModuleView entityType={currentView as EntityType} onNavigate={handleNavigate} />;
         }
         return <Dashboard />;
     }
   };
 
+
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans text-gray-900">
-      <Sidebar 
-        currentView={currentView} 
-        onChangeView={handleSidebarChange}
-      />
-      <main className="ml-64 w-full min-h-screen transition-all duration-300">
-        {renderContent()}
-      </main>
-    </div>
+    <ToastProvider>
+      <div className="flex min-h-screen bg-slate-50 font-sans text-slate-800">
+        <Sidebar
+          currentView={currentView}
+          onChangeView={handleSidebarChange}
+          isCollapsed={isSidebarCollapsed}
+          onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onLogout={() => {
+            api.logout();
+            setSession(null);
+          }}
+        />
+        <main className={`${isSidebarCollapsed ? 'ml-[72px]' : 'ml-64'} w-full min-h-screen transition-[margin] duration-300 ease-in-out`}>
+          <TopBar currentView={currentView} schemas={schemas} onNavigate={handleNavigate} />
+          {renderContent()}
+        </main>
+      </div>
+    </ToastProvider>
   );
 };
 

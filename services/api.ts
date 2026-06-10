@@ -1,325 +1,167 @@
 
+import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult } from '../types';
 
-import { 
-  SCHEMAS, 
-  INITIAL_LAYOUTS, 
-  MOCK_DB, 
-  INITIAL_FLOW_NODES, 
-  INITIAL_FLOW_EDGES,
-  DEFAULT_WIDGETS,
-  MOCK_ACTIVITIES
-} from '../constants';
-import { 
-  EntityDefinition, 
-  LayoutDefinition, 
-  CRMRecord, 
-  EntityType, 
-  FlowNode, 
-  FlowEdge,
-  User,
-  Role,
-  AuthSession,
-  WidgetConfig,
-  Activity,
-  FieldDefinition,
-  Campaign,
-  MenuItem,
-  SystemSettings
-} from '../types';
+const API_BASE = '/api';
 
-const STORAGE_KEYS = {
-  SCHEMAS: 'flowcrm_schemas',
-  LAYOUTS: 'flowcrm_layouts',
-  DB: 'flowcrm_db',
-  FLOW_NODES: 'flowcrm_flow_nodes',
-  FLOW_EDGES: 'flowcrm_flow_edges',
-  USERS: 'flowcrm_users',
-  ROLES: 'flowcrm_roles',
-  SESSION: 'flowcrm_session',
-  DASHBOARD: 'flowcrm_dashboard',
-  CAMPAIGNS: 'flowcrm_campaigns',
-  MENU: 'flowcrm_menu',
-  SETTINGS: 'flowcrm_settings'
+const getAuthHeaders = () => {
+  const sessionStr = localStorage.getItem('flowcrm_session');
+  if (sessionStr) {
+    const session = JSON.parse(sessionStr);
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.token}`
+    };
+  }
+  return { 'Content-Type': 'application/json' };
 };
 
-// Seed Data for RBAC
-const INITIAL_ROLES: Role[] = [
-  {
-    id: 'admin',
-    name: 'System Administrator',
-    description: 'Full access to all modules and system settings.',
-    permissions: {
-      lead: { read: true, create: true, edit: true, delete: true, scope: 'all' },
-      customer: { read: true, create: true, edit: true, delete: true, scope: 'all' },
-      case: { read: true, create: true, edit: true, delete: true, scope: 'all' },
-      task: { read: true, create: true, edit: true, delete: true, scope: 'all' },
-      product: { read: true, create: true, edit: true, delete: true, scope: 'all' }
-    }
-  },
-  {
-    id: 'sales_rep',
-    name: 'Sales Representative',
-    description: 'Can manage own leads and view all customers.',
-    permissions: {
-      lead: { read: true, create: true, edit: true, delete: false, scope: 'own' },
-      customer: { read: true, create: false, edit: false, delete: false, scope: 'all' },
-      case: { read: true, create: true, edit: true, delete: false, scope: 'own' },
-      task: { read: true, create: true, edit: true, delete: true, scope: 'own' },
-      product: { read: true, create: false, edit: false, delete: false, scope: 'all' }
-    }
-  },
-  {
-    id: 'support_agent',
-    name: 'Support Agent',
-    description: 'Focus on Cases and Customers.',
-    permissions: {
-      lead: { read: false, create: false, edit: false, delete: false, scope: 'all' },
-      customer: { read: true, create: false, edit: true, delete: false, scope: 'all' },
-      case: { read: true, create: true, edit: true, delete: false, scope: 'team' },
-      task: { read: true, create: true, edit: true, delete: false, scope: 'own' },
-      product: { read: true, create: false, edit: false, delete: false, scope: 'all' }
-    }
+const handleResponse = async (res: Response) => {
+  if (res.status === 401) {
+    localStorage.removeItem('flowcrm_session');
+    window.location.href = '/login'; // Redirect to login
+    throw new Error('Unauthorized');
   }
-];
-
-const INITIAL_USERS: User[] = [
-  { id: 'u1', name: 'John Admin', email: 'admin@flowcrm.com', roleId: 'admin', isActive: true, avatar: 'https://ui-avatars.com/api/?name=John+Admin&background=random' },
-  { id: 'u2', name: 'Sarah Sales', email: 'sarah@flowcrm.com', roleId: 'sales_rep', isActive: true, avatar: 'https://ui-avatars.com/api/?name=Sarah+Sales&background=random' },
-  { id: 'u3', name: 'Mike Support', email: 'mike@flowcrm.com', roleId: 'support_agent', isActive: false, avatar: 'https://ui-avatars.com/api/?name=Mike+Support&background=random' },
-];
-
-const INITIAL_CAMPAIGNS: Campaign[] = [
-  {
-    id: 'c1',
-    name: 'Summer Sale 2024',
-    subject: 'Exclusive Early Access to Summer Styles',
-    status: 'Active',
-    targetProduct: 'p1',
-    templateHtml: '<p>Welcome to our sale!</p>',
-    stats: { sent: 1200, opened: 450, clicked: 120, submissions: 15 }
+  if (res.status === 403) {
+    throw new Error('Forbidden: Access is denied');
   }
-];
-
-const INITIAL_MENU: MenuItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', type: 'item', view: 'dashboard', allowedRoles: ['*'] },
-  { id: 'campaigns', label: 'Campaigns', icon: 'Megaphone', type: 'item', view: 'campaigns', allowedRoles: ['*'] },
-  { 
-    id: 'crm_modules', 
-    label: 'CRM Modules', 
-    type: 'group', 
-    allowedRoles: ['*'],
-    children: [
-      { id: 'lead', label: 'Leads', icon: 'FolderOpen', type: 'item', view: 'lead', allowedRoles: ['*'] },
-      { id: 'customer', label: 'Customers', icon: 'FolderOpen', type: 'item', view: 'customer', allowedRoles: ['*'] },
-      { id: 'case', label: 'Cases', icon: 'FolderOpen', type: 'item', view: 'case', allowedRoles: ['*'] },
-      { id: 'task', label: 'Tasks', icon: 'FolderOpen', type: 'item', view: 'task', allowedRoles: ['*'] },
-      { id: 'product', label: 'Products', icon: 'FolderOpen', type: 'item', view: 'product', allowedRoles: ['*'] }
-    ]
-  },
-  { 
-    id: 'tools', 
-    label: 'Configuration', 
-    type: 'group', 
-    allowedRoles: ['admin'],
-    children: [
-      { id: 'object-manager', label: 'Object Manager', icon: 'Database', type: 'item', view: 'object-manager', allowedRoles: ['admin'] },
-      { id: 'menu-manager', label: 'Menu Builder', icon: 'Menu', type: 'item', view: 'menu-manager', allowedRoles: ['admin'] },
-      { id: 'autoflow', label: 'Journeys', icon: 'Workflow', type: 'item', view: 'autoflow', allowedRoles: ['admin'] },
-      { id: 'layout', label: 'Form Designer', icon: 'PaintBucket', type: 'item', view: 'layout', allowedRoles: ['admin'] },
-      { id: 'web-presenter', label: 'Web Presenter', icon: 'Globe', type: 'item', view: 'web-presenter', allowedRoles: ['admin'] },
-      { id: 'users', label: 'Users & Roles', icon: 'Users', type: 'item', view: 'users', allowedRoles: ['admin'] },
-    ]
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = error.error || `Request failed with status ${res.status}`;
+    const errorDetails = error.details ? ` Details: ${error.details}` : '';
+    throw new Error(errorMessage + errorDetails);
   }
-];
-
-const DEFAULT_SETTINGS: SystemSettings = {
-  theme: 'light',
-  primaryColor: 'indigo',
-  density: 'comfortable',
-  fontFamily: 'sans',
-  organizationName: 'FlowCRM Inc.'
+  return res.json();
 };
 
-// Simulation of network delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+  const headers = { ...getAuthHeaders(), ...(options.headers || {}) };
+  const res = await fetch(url, { ...options, headers });
+  return handleResponse(res);
+};
+
 
 export const api = {
   // --- BOOTSTRAP ---
   async initialize() {
-    // Check if data exists, if not, seed it from constants
-    if (!localStorage.getItem(STORAGE_KEYS.SCHEMAS)) {
-      localStorage.setItem(STORAGE_KEYS.SCHEMAS, JSON.stringify(SCHEMAS));
-      localStorage.setItem(STORAGE_KEYS.LAYOUTS, JSON.stringify(INITIAL_LAYOUTS));
-      localStorage.setItem(STORAGE_KEYS.DB, JSON.stringify(MOCK_DB));
-      localStorage.setItem(STORAGE_KEYS.FLOW_NODES, JSON.stringify(INITIAL_FLOW_NODES));
-      localStorage.setItem(STORAGE_KEYS.FLOW_EDGES, JSON.stringify(INITIAL_FLOW_EDGES));
-      localStorage.setItem(STORAGE_KEYS.DASHBOARD, JSON.stringify(DEFAULT_WIDGETS));
-      
-      // RBAC Seeds
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
-      localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(INITIAL_ROLES));
-      localStorage.setItem(STORAGE_KEYS.CAMPAIGNS, JSON.stringify(INITIAL_CAMPAIGNS));
-      localStorage.setItem(STORAGE_KEYS.MENU, JSON.stringify(INITIAL_MENU));
-      
-      console.log('System initialized with seed data.');
-    }
-    await delay(300); // Simulate startup time
+    console.log('Backend initialized');
   },
 
   // --- AUTH ---
-  async login(email: string): Promise<AuthSession> {
-    await delay(500);
-    const users = await this.getUsers();
-    const user = users.find(u => u.email === email);
-    if (!user) throw new Error('User not found');
-    
-    const session: AuthSession = {
-      user,
-      token: 'fake-jwt-token-123'
-    };
-    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(session));
+  async login(email: string, password: string): Promise<AuthSession> {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    if (!res.ok) throw new Error('Login failed');
+
+    const data = await res.json();
+    const session: AuthSession = { ...data, user: data.user };
+    localStorage.setItem('flowcrm_session', JSON.stringify(session));
     return session;
   },
 
   async logout() {
-    localStorage.removeItem(STORAGE_KEYS.SESSION);
+    localStorage.removeItem('flowcrm_session');
   },
 
   async getSession(): Promise<AuthSession | null> {
-    const s = localStorage.getItem(STORAGE_KEYS.SESSION);
+    const s = localStorage.getItem('flowcrm_session');
     return s ? JSON.parse(s) : null;
   },
 
   // --- SETTINGS ---
   async getSettings(): Promise<SystemSettings> {
-    await delay(100);
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) || JSON.stringify(DEFAULT_SETTINGS));
+    return fetchWithAuth(`${API_BASE}/settings`);
   },
-
   async saveSettings(settings: SystemSettings) {
-    await delay(200);
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    return fetchWithAuth(`${API_BASE}/settings`, {
+      method: 'POST',
+      body: JSON.stringify(settings)
+    });
   },
 
   // --- METADATA ---
   async getSchemas(): Promise<Record<string, EntityDefinition>> {
-    await delay(100);
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.SCHEMAS) || '{}');
+    return fetchWithAuth(`${API_BASE}/metadata/schemas`);
   },
 
   async saveSchema(entityType: string, schema: EntityDefinition) {
-    const schemas = await this.getSchemas();
-    schemas[entityType] = schema;
-    localStorage.setItem(STORAGE_KEYS.SCHEMAS, JSON.stringify(schemas));
+    await fetchWithAuth(`${API_BASE}/metadata/schemas`, {
+      method: 'POST',
+      body: JSON.stringify({ entityType, config: schema })
+    });
   },
 
   async createEntity(label: string, pluralLabel: string, icon: string = 'box') {
-     await delay(400);
-     const schemas = await this.getSchemas();
-     const layouts = await this.getLayouts();
-     const roles = await this.getRoles();
-     const menu = await this.getMenu();
-     
-     // 1. Create Schema
-     const id = label.toLowerCase().replace(/\s+/g, '_');
-     if (schemas[id]) throw new Error('Object with this name already exists.');
-
-     const newSchema: EntityDefinition = {
-        id: id as EntityType,
-        label,
-        pluralLabel,
-        fields: [
-           { name: 'name', label: `${label} Name`, type: 'text', required: true, system: true },
-           { name: 'created_at', label: 'Created At', type: 'date', system: true },
-           { name: 'owner', label: 'Owner', type: 'text', system: true },
-        ]
-     };
-     schemas[id] = newSchema;
-
-     // 2. Create Default Layout
-     const newLayout: LayoutDefinition = {
-        entityType: id as EntityType,
-        sections: [
-           {
-              id: 's1',
-              title: 'General Information',
-              columns: [{ id: 'c1', width: 12, fields: ['name', 'owner'] }]
-           }
-        ],
-        fieldConfigs: {}
-     };
-     layouts[id] = newLayout;
-
-     // 3. Update Admin Role Permissions
-     const adminRoleIdx = roles.findIndex(r => r.id === 'admin');
-     if (adminRoleIdx >= 0) {
-        roles[adminRoleIdx].permissions[id] = {
-           read: true, create: true, edit: true, delete: true, scope: 'all'
-        };
-     }
-     
-     // 4. Update Menu: Add to "CRM Modules" group if exists
-     const crmGroup = menu.find(m => m.id === 'crm_modules');
-     if (crmGroup && crmGroup.children) {
-        crmGroup.children.push({
-           id: id,
-           label: pluralLabel,
-           type: 'item',
-           view: id as EntityType,
-           icon: 'FolderOpen',
-           allowedRoles: ['*']
-        });
-        localStorage.setItem(STORAGE_KEYS.MENU, JSON.stringify(menu));
-     }
-
-     // Save all
-     localStorage.setItem(STORAGE_KEYS.SCHEMAS, JSON.stringify(schemas));
-     localStorage.setItem(STORAGE_KEYS.LAYOUTS, JSON.stringify(layouts));
-     localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(roles));
-
-     return newSchema;
+    throw new Error("Create Entity via API not fully implemented yet");
   },
 
   async createRelation(sourceId: string, targetId: string, fieldName: string, label: string) {
-     await delay(300);
-     const schemas = await this.getSchemas();
-     
-     if (!schemas[sourceId] || !schemas[targetId]) throw new Error('Invalid entities');
-
-     const newField: FieldDefinition = {
-        name: fieldName,
-        label: label,
-        type: 'lookup',
-        lookupTarget: targetId as EntityType,
-        required: false
-     };
-
-     schemas[sourceId].fields.push(newField);
-     localStorage.setItem(STORAGE_KEYS.SCHEMAS, JSON.stringify(schemas));
+    return fetchWithAuth(`${API_BASE}/relationships`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: `${sourceId}_${targetId}_${fieldName}`,
+        sourceEntity: sourceId,
+        targetEntity: targetId,
+        sourceField: fieldName,
+        targetField: 'id',
+        displayField: 'name'
+      })
+    });
   },
 
+  // --- RELATIONSHIPS ---
+  async getRelationships(): Promise<Relationship[]> {
+    return fetchWithAuth(`${API_BASE}/relationships`);
+  },
+
+  async createRelationship(config: {
+    name: string;
+    sourceEntity: string;
+    targetEntity: string;
+    sourceField: string;
+    targetField: string;
+    relationshipType?: string;
+    cascadeDelete?: boolean;
+    displayField?: string;
+  }) {
+    return fetchWithAuth(`${API_BASE}/relationships`, {
+      method: 'POST',
+      body: JSON.stringify(config)
+    });
+  },
+
+  async deleteRelationship(id: string) {
+    return fetchWithAuth(`${API_BASE}/relationships/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async getRelatedRecords(entityType: string, recordId: string, targetEntity: string): Promise<CRMRecord[]> {
+    return fetchWithAuth(`${API_BASE}/data/${entityType}/${recordId}/related/${targetEntity}`);
+  },
+
+  // --- LAYOUTS ---
   async getLayout(entityType: string): Promise<LayoutDefinition> {
-    await delay(100);
-    const layouts = JSON.parse(localStorage.getItem(STORAGE_KEYS.LAYOUTS) || '{}');
-    return layouts[entityType];
+    return fetchWithAuth(`${API_BASE}/metadata/layouts/${entityType}`);
   },
-  
+
   async getLayouts(): Promise<Record<string, LayoutDefinition>> {
-     return JSON.parse(localStorage.getItem(STORAGE_KEYS.LAYOUTS) || '{}');
+    return {};
   },
 
   async saveLayout(entityType: string, layout: LayoutDefinition) {
-    await delay(200);
-    const layouts = JSON.parse(localStorage.getItem(STORAGE_KEYS.LAYOUTS) || '{}');
-    layouts[entityType] = layout;
-    localStorage.setItem(STORAGE_KEYS.LAYOUTS, JSON.stringify(layouts));
+    return fetchWithAuth(`${API_BASE}/metadata/layouts/${entityType}`, {
+      method: 'POST',
+      body: JSON.stringify(layout)
+    });
   },
 
   // --- DATA / RECORDS ---
   async getRecords(entityType: string): Promise<CRMRecord[]> {
-    await delay(200);
-    const db = JSON.parse(localStorage.getItem(STORAGE_KEYS.DB) || '{}');
-    return db[entityType] || [];
+    return fetchWithAuth(`${API_BASE}/data/${entityType}`);
   },
 
   async getRecord(entityType: string, id: string): Promise<CRMRecord | undefined> {
@@ -328,155 +170,318 @@ export const api = {
   },
 
   async saveRecord(entityType: string, record: CRMRecord) {
-    await delay(300);
-    const db = JSON.parse(localStorage.getItem(STORAGE_KEYS.DB) || '{}');
-    const records: CRMRecord[] = db[entityType] || [];
-    
-    const existingIdx = records.findIndex(r => r.id === record.id);
-    if (existingIdx >= 0) {
-      records[existingIdx] = record;
-    } else {
-      // New record
-      if (!record.id) record.id = `rec_${Date.now()}`;
-      records.unshift(record);
-    }
-    
-    db[entityType] = records;
-    localStorage.setItem(STORAGE_KEYS.DB, JSON.stringify(db));
-    return record;
+    return fetchWithAuth(`${API_BASE}/data/${entityType}`, {
+      method: 'POST',
+      body: JSON.stringify(record)
+    });
   },
 
   async deleteRecord(entityType: string, id: string) {
-    await delay(200);
-    const db = JSON.parse(localStorage.getItem(STORAGE_KEYS.DB) || '{}');
-    const records: CRMRecord[] = db[entityType] || [];
-    db[entityType] = records.filter(r => r.id !== id);
-    localStorage.setItem(STORAGE_KEYS.DB, JSON.stringify(db));
+    return fetchWithAuth(`${API_BASE}/data/${entityType}/${id}`, {
+      method: 'DELETE'
+    });
   },
 
-  async getActivities(entityId: string): Promise<Activity[]> {
-    await delay(150);
-    return MOCK_ACTIVITIES;
+  async getActivities(recordId: string, entityType: string = 'customer'): Promise<Activity[]> {
+    return fetchWithAuth(`${API_BASE}/audit/${entityType}/${recordId}`);
+  },
+
+  async getRecentActivity(): Promise<Activity[]> {
+    return fetchWithAuth(`${API_BASE}/audit/recent`);
+  },
+
+  async createActivity(recordId: string, details: any, entityType: string = 'customer', action: string = 'note') {
+    return fetchWithAuth(`${API_BASE}/audit`, {
+      method: 'POST',
+      body: JSON.stringify({ entityType, recordId, action, details })
+    });
   },
 
   // --- WORKFLOWS ---
   async getWorkflow() {
-    await delay(100);
-    const nodes = JSON.parse(localStorage.getItem(STORAGE_KEYS.FLOW_NODES) || '[]');
-    const edges = JSON.parse(localStorage.getItem(STORAGE_KEYS.FLOW_EDGES) || '[]');
-    return { nodes, edges };
+    return fetchWithAuth(`${API_BASE}/workflows`);
   },
-
-  async saveWorkflow(nodes: FlowNode[], edges: FlowEdge[]) {
-    await delay(300);
-    localStorage.setItem(STORAGE_KEYS.FLOW_NODES, JSON.stringify(nodes));
-    localStorage.setItem(STORAGE_KEYS.FLOW_EDGES, JSON.stringify(edges));
+  async saveWorkflow(nodes: any[], edges: any[]) {
+    return fetchWithAuth(`${API_BASE}/workflows`, {
+      method: 'POST',
+      body: JSON.stringify({ nodes, edges })
+    });
   },
 
   // --- USER MANAGEMENT ---
   async getUsers(): Promise<User[]> {
-    await delay(100);
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+    return fetchWithAuth(`${API_BASE}/users`);
   },
-
-  async saveUser(user: User) {
-    await delay(200);
-    const users: User[] = await this.getUsers();
-    const idx = users.findIndex(u => u.id === user.id);
-    if (idx >= 0) users[idx] = user;
-    else users.push({ ...user, id: user.id || `u_${Date.now()}` });
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  async saveUser(user: Partial<User>) {
+    return fetchWithAuth(`${API_BASE}/users`, {
+      method: 'POST',
+      body: JSON.stringify(user)
+    });
   },
-
   async getRoles(): Promise<Role[]> {
-    await delay(100);
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.ROLES) || '[]');
+    return fetchWithAuth(`${API_BASE}/roles`);
   },
-
   async saveRole(role: Role) {
-    await delay(200);
-    const roles: Role[] = await this.getRoles();
-    const idx = roles.findIndex(r => r.id === role.id);
-    if (idx >= 0) roles[idx] = role;
-    else roles.push({ ...role, id: role.id || `r_${Date.now()}` });
-    localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(roles));
+    return fetchWithAuth(`${API_BASE}/roles`, {
+      method: 'POST',
+      body: JSON.stringify(role)
+    });
+  },
+  async deleteRole(id: string) {
+    return fetchWithAuth(`${API_BASE}/roles/${id}`, {
+      method: 'DELETE'
+    });
   },
 
-  // --- MENU MANAGEMENT ---
+  // --- WEB PRESENTER ---
+  async getWebContent() {
+    return fetchWithAuth(`${API_BASE}/web-content`);
+  },
+  async getWebContentItem(slug: string) {
+    return fetchWithAuth(`${API_BASE}/web-content/${slug}`);
+  },
+  async saveWebContent(data: { slug: string; type: string; title: string; content: string; metadata?: any }) {
+    return fetchWithAuth(`${API_BASE}/web-content`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  async executeSQLView(query: string) {
+    return fetchWithAuth(`${API_BASE}/web-presenter/execute-sql`, {
+      method: 'POST',
+      body: JSON.stringify({ query })
+    });
+  },
+
+  // --- MENU ---
   async getMenu(): Promise<MenuItem[]> {
-    await delay(100);
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.MENU) || JSON.stringify(INITIAL_MENU));
+    return fetchWithAuth(`${API_BASE}/metadata/menu`);
   },
-
   async saveMenu(menu: MenuItem[]) {
-    await delay(200);
-    localStorage.setItem(STORAGE_KEYS.MENU, JSON.stringify(menu));
-  },
-
-  // --- DASHBOARD ---
-  async getDashboardConfig(): Promise<WidgetConfig[]> {
-     await delay(100);
-     return JSON.parse(localStorage.getItem(STORAGE_KEYS.DASHBOARD) || JSON.stringify(DEFAULT_WIDGETS));
-  },
-
-  async saveDashboardConfig(config: WidgetConfig[]) {
-     await delay(200);
-     localStorage.setItem(STORAGE_KEYS.DASHBOARD, JSON.stringify(config));
+    return fetchWithAuth(`${API_BASE}/metadata/menu`, {
+      method: 'POST',
+      body: JSON.stringify(menu)
+    });
   },
 
   // --- CAMPAIGNS ---
   async getCampaigns(): Promise<Campaign[]> {
-    await delay(100);
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.CAMPAIGNS) || '[]');
+    const records = await this.getRecords('campaign');
+    return records.map(r => {
+      try {
+        return {
+          id: r.id,
+          name: r.primary_display || '',
+          ...JSON.parse(r.data)
+        };
+      } catch (e) {
+        return {
+          id: r.id,
+          name: r.primary_display || '',
+          subject: '',
+          status: 'Draft',
+          templateHtml: '',
+          stats: { sent: 0, opened: 0, clicked: 0, submissions: 0 }
+        } as Campaign;
+      }
+    });
   },
-
   async saveCampaign(campaign: Campaign) {
-    await delay(300);
-    const campaigns: Campaign[] = await this.getCampaigns();
-    const idx = campaigns.findIndex(c => c.id === campaign.id);
-    if (idx >= 0) campaigns[idx] = campaign;
-    else campaigns.push({ ...campaign, id: campaign.id || `cmp_${Date.now()}` });
-    localStorage.setItem(STORAGE_KEYS.CAMPAIGNS, JSON.stringify(campaigns));
+    const record = {
+      id: campaign.id,
+      tenant_id: 'default',
+      entity_type: 'campaign',
+      primary_display: campaign.name,
+      status: campaign.status,
+      data: JSON.stringify(campaign)
+    };
+    await this.saveRecord('campaign', record as any);
     return campaign;
   },
-
-  // --- PUBLIC WEB FORM SUBMISSION ---
   async submitWebForm(campaignId: string, data: any) {
-     // 1. Simulate API Latency
-     await delay(800);
+    // Form submission could create a Lead record linked to campaign
+    const leadRecord = {
+      id: `lead_${Date.now()}`,
+      tenant_id: 'default',
+      entity_type: 'lead',
+      primary_display: `${data.firstName || ''} ${data.lastName || ''}`.trim(),
+      status: 'New',
+      data: JSON.stringify({
+        ...data,
+        source: 'Web',
+        score: 10,
+        value: 0
+      })
+    };
+    await this.saveRecord('lead', leadRecord as any);
+  },
 
-     // 2. Validate Data against Lead Schema
-     const schemas = await this.getSchemas();
-     const leadSchema = schemas['lead'];
-     if (!leadSchema) throw new Error('System configuration error: Lead schema missing');
+  // --- DASHBOARD ---
+  async getDashboardConfig(): Promise<WidgetConfig[]> {
+    return fetchWithAuth(`${API_BASE}/dashboard/widgets`);
+  },
+  async saveDashboardConfig(config: WidgetConfig[]) {
+    return fetchWithAuth(`${API_BASE}/dashboard/widgets`, {
+      method: 'POST',
+      body: JSON.stringify(config)
+    });
+  },
+  async getDashboardStats() {
+    return fetchWithAuth(`${API_BASE}/dashboard/stats`);
+  },
+  async getDashboardChartData() {
+    return fetchWithAuth(`${API_BASE}/dashboard/chart-data`);
+  },
 
-     // Simple required check
-     const missingFields = leadSchema.fields
-        .filter(f => f.required && !data[f.name])
-        .map(f => f.label);
-     
-     if (missingFields.length > 0) {
-        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
-     }
+  // --- LOOKUPS ---
+  async getLookups(): Promise<string[]> {
+    return fetchWithAuth(`${API_BASE}/lookups`);
+  },
 
-     // 3. Create Lead Record
-     const newLead: CRMRecord = {
-        id: `web_${Date.now()}`,
-        status: 'New',
-        source: 'Web Form',
-        ...data
-     };
+  async getLookupValues(lookupId: string): Promise<{ id: string; lookup_id: string; value_id: string; value: string; sort_order: number }[]> {
+    return fetchWithAuth(`${API_BASE}/lookups/${lookupId}`);
+  },
 
-     await this.saveRecord('lead', newLead);
+  async saveLookupValue(lookupId: string, valueId: string, value: string, sortOrder: number = 0) {
+    return fetchWithAuth(`${API_BASE}/lookups/${lookupId}`, {
+      method: 'POST',
+      body: JSON.stringify({ valueId, value, sortOrder })
+    });
+  },
 
-     // 4. Update Campaign Stats
-     const campaigns = await this.getCampaigns();
-     const campaignIdx = campaigns.findIndex(c => c.id === campaignId);
-     if (campaignIdx >= 0) {
-        campaigns[campaignIdx].stats.submissions += 1;
-        localStorage.setItem(STORAGE_KEYS.CAMPAIGNS, JSON.stringify(campaigns));
-     }
+  async importLookupValues(lookupId: string, values: { valueId?: string, value: string, sortOrder?: number }[]) {
+    return fetchWithAuth(`${API_BASE}/lookups/${lookupId}/import`, {
+      method: 'POST',
+      body: JSON.stringify({ values })
+    });
+  },
 
-     return { success: true, id: newLead.id };
+  async deleteLookupValue(lookupId: string, valueId: string) {
+    return fetchWithAuth(`${API_BASE}/lookups/${lookupId}/${valueId}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // --- IMPORT SOURCES ---
+  async getImportSources(): Promise<{ id: string; label: string; valueField: string; labelField: string; description: string }[]> {
+    return fetchWithAuth(`${API_BASE}/lookups/import-sources`);
+  },
+
+  async importFromSource(lookupId: string, source: string): Promise<{ success: boolean; count: number; message?: string }> {
+    return fetchWithAuth(`${API_BASE}/lookups/${lookupId}/import-from-source`, {
+      method: 'POST',
+      body: JSON.stringify({ source })
+    });
+  },
+
+  async importFromSQL(lookupId: string, query: string, valueColumn?: string, labelColumn?: string): Promise<{ success: boolean; count: number; message?: string }> {
+    return fetchWithAuth(`${API_BASE}/lookups/${lookupId}/import-from-sql`, {
+      method: 'POST',
+      body: JSON.stringify({ query, valueColumn, labelColumn })
+    });
+  },
+
+  // --- LIVE LOOKUP SOURCES ---
+  async getLiveSource(lookupId: string): Promise<{ source_type: string; source_entity?: string; value_field: string; label_field: string; sql_query?: string } | null> {
+    return fetchWithAuth(`${API_BASE}/lookups/${lookupId}/live-source`);
+  },
+
+  async setLiveSource(lookupId: string, sourceType: string, sourceEntity?: string, valueField?: string, labelField?: string, sqlQuery?: string): Promise<{ success: boolean }> {
+    return fetchWithAuth(`${API_BASE}/lookups/${lookupId}/live-source`, {
+      method: 'POST',
+      body: JSON.stringify({ sourceType, sourceEntity, valueField, labelField, sqlQuery })
+    });
+  },
+
+  async removeLiveSource(lookupId: string): Promise<{ success: boolean }> {
+    return fetchWithAuth(`${API_BASE}/lookups/${lookupId}/live-source`, {
+      method: 'DELETE'
+    });
+  },
+
+  // --- LEAD GENERATION RULES ---
+  async getLeadRules(): Promise<LeadRule[]> {
+    return fetchWithAuth(`${API_BASE}/lead-rules`);
+  },
+  async saveLeadRule(rule: Partial<LeadRule>): Promise<LeadRule> {
+    return fetchWithAuth(`${API_BASE}/lead-rules`, {
+      method: 'POST',
+      body: JSON.stringify(rule)
+    });
+  },
+  async deleteLeadRule(id: string): Promise<{ success: boolean }> {
+    return fetchWithAuth(`${API_BASE}/lead-rules/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  async previewLeadRule(id: string): Promise<LeadRuleRunResult> {
+    return fetchWithAuth(`${API_BASE}/lead-rules/${id}/preview`, {
+      method: 'POST'
+    });
+  },
+  async runLeadRule(id: string): Promise<LeadRuleRunResult> {
+    return fetchWithAuth(`${API_BASE}/lead-rules/${id}/run`, {
+      method: 'POST'
+    });
+  },
+  async runAllLeadRules(): Promise<{ results: Array<LeadRuleRunResult & { ruleId: string; name: string }> }> {
+    return fetchWithAuth(`${API_BASE}/lead-rules/run-all`, {
+      method: 'POST'
+    });
+  },
+
+  // --- GLOBAL SEARCH ---
+  async globalSearch(q: string, limit: number = 10): Promise<Array<{ id: string; entityType: string; primaryDisplay: string; status?: string }>> {
+    if (!q || !q.trim()) return [];
+    return fetchWithAuth(`${API_BASE}/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+  },
+
+  // --- CTI / TELEPHONY + CONVERSION ---
+  async ctiLookup(phone: string): Promise<{ match: string | null; entityType?: string; recordId?: string; name?: string; status?: string; data?: any }> {
+    return fetchWithAuth(`${API_BASE}/cti/lookup?phone=${encodeURIComponent(phone)}`);
+  },
+  async getRecentCalls(): Promise<any[]> {
+    return fetchWithAuth(`${API_BASE}/cti/calls`);
+  },
+  async logCall(payload: { from?: string; to?: string; entityType?: string; recordId?: string; name?: string; outcome?: string; notes?: string; direction?: string; status?: string }) {
+    return fetchWithAuth(`${API_BASE}/cti/log-call`, { method: 'POST', body: JSON.stringify(payload) });
+  },
+  async convertLead(leadId: string): Promise<{ customerId?: string; customerName?: string; upsell?: { product: string; reason: string; source: string }; taskId?: string; alreadyConverted?: boolean }> {
+    return fetchWithAuth(`${API_BASE}/leads/${leadId}/convert`, { method: 'POST' });
+  },
+  async simulateIncomingCall(phone: string): Promise<{ ok: boolean; matched: boolean; entityType?: string; recordId?: string; name?: string; isNew?: boolean; created?: any }> {
+    const res = await fetch(`${API_BASE}/cti/incoming`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ From: phone, Direction: 'inbound', CallStatus: 'ringing' }),
+    });
+    return res.json();
+  },
+  async routeInbound(payload: { recordId?: string; entityType?: string; name?: string; text?: string; manualIntent?: 'support' | 'sales' }): Promise<{ created: 'case' | 'opportunity'; id: string; title: string; intent: { intent: string; product: string; reason: string; source: string } }> {
+    return fetchWithAuth(`${API_BASE}/cti/route`, { method: 'POST', body: JSON.stringify(payload) });
+  },
+
+  // --- LEAD CAPTURE / INGESTION ---
+  async ingestLead(source: string, payload: Record<string, any>, opts?: { dedupe?: boolean; ai?: boolean }): Promise<{ success: boolean; id?: string; deduped?: boolean; primaryDisplay?: string; aiUsed?: boolean }> {
+    const params = new URLSearchParams();
+    if (opts?.dedupe === false) params.set('dedupe', '0');
+    if (opts?.ai) params.set('ai', '1');
+    const qs = params.toString();
+    const res = await fetch(`${API_BASE}/ingest/${encodeURIComponent(source)}${qs ? `?${qs}` : ''}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+
+  // --- AI (Gemini) ---
+  async getAIStatus(): Promise<{ enabled: boolean }> {
+    return fetchWithAuth(`${API_BASE}/ai/status`);
+  },
+  async getCustomerInsight(context: Record<string, any>): Promise<{ enabled: boolean; insight: { title: string; description: string; action: string; source: string } | null }> {
+    return fetchWithAuth(`${API_BASE}/ai/customer-insight`, {
+      method: 'POST',
+      body: JSON.stringify(context)
+    });
   }
 };

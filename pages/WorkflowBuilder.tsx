@@ -119,6 +119,7 @@ export const WorkflowBuilder: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [schemas, setSchemas] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -130,7 +131,7 @@ export const WorkflowBuilder: React.FC = () => {
   useEffect(() => {
     const loadFlow = async () => {
         setLoading(true);
-        const flow = await api.getWorkflow();
+        const [flow, loadedSchemas] = await Promise.all([api.getWorkflow(), api.getSchemas().catch(() => ({}))]);
         // Transform loaded nodes to use correct types if needed
         const formattedNodes = flow.nodes.map((n: any) => ({
            ...n,
@@ -138,6 +139,7 @@ export const WorkflowBuilder: React.FC = () => {
         }));
         setNodes(formattedNodes);
         setEdges(flow.edges);
+        setSchemas(loadedSchemas || {});
         setLoading(false);
     };
     loadFlow();
@@ -255,6 +257,47 @@ export const WorkflowBuilder: React.FC = () => {
      { label: 'Wait/Delay', category: 'wait', icon: 'clock' },
      { label: 'Check Condition', category: 'condition', icon: 'git-branch' },
   ];
+
+  // --- Node config wiring ---
+  const selected = selectedNode ? (nodes.find((n) => n.id === selectedNode.id) || selectedNode) : null;
+  const cfg = (selected?.data?.config || {}) as any;
+
+  const updateNodeData = (patch: any) => {
+    if (!selectedNode) return;
+    setNodes((nds) => nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, ...patch } } : n)));
+  };
+  const updateNodeConfig = (patch: any) => {
+    if (!selectedNode) return;
+    setNodes((nds) => nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, config: { ...(n.data.config || {}), ...patch } } } : n)));
+  };
+
+  const fieldsToText = (fields: Record<string, any> = {}) =>
+    Object.entries(fields).map(([k, v]) => `${k} = ${v}`).join('\n');
+  const textToFields = (text: string) => {
+    const o: Record<string, string> = {};
+    text.split('\n').forEach((line) => {
+      const i = line.indexOf('=');
+      if (i > 0) {
+        const k = line.slice(0, i).trim();
+        const v = line.slice(i + 1).trim();
+        if (k) o[k] = v;
+      }
+    });
+    return o;
+  };
+
+  const ACTION_TYPES = [
+    { value: 'email', label: 'Send Email' },
+    { value: 'create_task', label: 'Create Task' },
+    { value: 'update_record', label: 'Update Record' },
+    { value: 'create_lead', label: 'Create Lead' },
+  ];
+  const OPERATORS = ['==', '!=', '>', '<', '>=', '<=', 'contains', 'not_contains', 'is_empty', 'is_not_empty'];
+
+  const entityOptions = Object.values(schemas) as any[];
+  const triggerEntityFields = (schemas[cfg.entityType]?.fields || []) as any[];
+
+  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600"/></div>;
 
@@ -400,18 +443,11 @@ export const WorkflowBuilder: React.FC = () => {
              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
                <div>
                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Step Label</label>
-                 <input 
-                   type="text" 
-                   value={selectedNode.data.label} 
-                   onChange={(e) => {
-                     setNodes((nds) => nds.map((n) => {
-                       if (n.id === selectedNode.id) {
-                         n.data = { ...n.data, label: e.target.value };
-                       }
-                       return n;
-                     }));
-                   }}
-                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
+                 <input
+                   type="text"
+                   value={selected?.data?.label || ''}
+                   onChange={(e) => updateNodeData({ label: e.target.value })}
+                   className={inputCls}
                  />
                </div>
                
@@ -420,22 +456,65 @@ export const WorkflowBuilder: React.FC = () => {
                   <div className="space-y-4">
                      <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Trigger Entity</label>
-                        <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none">
-                           <option>Lead</option>
-                           <option>Customer</option>
-                           <option>Case</option>
+                        <select className={inputCls} value={cfg.entityType || ''} onChange={(e) => updateNodeConfig({ entityType: e.target.value, conditions: { match: 'all', rules: [] } })}>
+                           <option value="">Select entity…</option>
+                           {entityOptions.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                         </select>
                      </div>
                      <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Event</label>
-                        <div className="space-y-2">
-                           {['Created', 'Updated', 'Deleted'].map(evt => (
-                              <label key={evt} className="flex items-center gap-2 text-sm text-gray-700">
-                                 <input type="radio" name="evt" defaultChecked={evt === 'Created'} className="text-indigo-600 focus:ring-indigo-500" />
-                                 {evt}
-                              </label>
-                           ))}
+                        <select className={inputCls} value={cfg.triggerType || 'create'} onChange={(e) => updateNodeConfig({ triggerType: e.target.value })}>
+                           <option value="create">Record Created</option>
+                           <option value="update">Record Updated</option>
+                           <option value="delete">Record Deleted</option>
+                        </select>
+                        {cfg.triggerType === 'delete' && (
+                           <p className="text-[11px] text-amber-600 mt-1.5">Note: delete triggers are not yet wired in the engine.</p>
+                        )}
+                     </div>
+
+                     {/* Conditions */}
+                     <div>
+                        <div className="flex items-center justify-between mb-2">
+                           <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Conditions</label>
+                           <select
+                              className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white"
+                              value={(cfg.conditions?.match) || 'all'}
+                              onChange={(e) => updateNodeConfig({ conditions: { match: e.target.value, rules: cfg.conditions?.rules || [] } })}
+                           >
+                              <option value="all">Match ALL</option>
+                              <option value="any">Match ANY</option>
+                           </select>
                         </div>
+                        {!cfg.entityType ? (
+                           <p className="text-[11px] text-gray-400">Select an entity to add conditions.</p>
+                        ) : (
+                           <div className="space-y-2">
+                              {(cfg.conditions?.rules || []).map((r: any, i: number) => (
+                                 <div key={i} className="flex items-center gap-1.5">
+                                    <select className="flex-1 min-w-0 border border-gray-200 rounded px-1.5 py-1 text-xs bg-white"
+                                       value={r.field}
+                                       onChange={(e) => { const c = cfg.conditions || { match: 'all', rules: [] }; updateNodeConfig({ conditions: { match: c.match || 'all', rules: c.rules.map((x: any, idx: number) => idx === i ? { ...x, field: e.target.value } : x) } }); }}>
+                                       {triggerEntityFields.map((f) => <option key={f.name} value={f.name}>{f.label}</option>)}
+                                    </select>
+                                    <select className="border border-gray-200 rounded px-1 py-1 text-xs bg-white"
+                                       value={r.operator}
+                                       onChange={(e) => { const c = cfg.conditions || { match: 'all', rules: [] }; updateNodeConfig({ conditions: { match: c.match || 'all', rules: c.rules.map((x: any, idx: number) => idx === i ? { ...x, operator: e.target.value } : x) } }); }}>
+                                       {OPERATORS.map((o) => <option key={o} value={o}>{o}</option>)}
+                                    </select>
+                                    {!['is_empty', 'is_not_empty'].includes(r.operator) && (
+                                       <input className="w-16 border border-gray-200 rounded px-1.5 py-1 text-xs" value={r.value ?? ''} placeholder="val"
+                                          onChange={(e) => { const c = cfg.conditions || { match: 'all', rules: [] }; updateNodeConfig({ conditions: { match: c.match || 'all', rules: c.rules.map((x: any, idx: number) => idx === i ? { ...x, value: e.target.value } : x) } }); }} />
+                                    )}
+                                    <button onClick={() => { const c = cfg.conditions || { match: 'all', rules: [] }; updateNodeConfig({ conditions: { match: c.match || 'all', rules: c.rules.filter((_: any, idx: number) => idx !== i) } }); }} className="text-rose-400 hover:text-rose-600 p-0.5"><X className="w-3.5 h-3.5" /></button>
+                                 </div>
+                              ))}
+                              <button
+                                 onClick={() => { const c = cfg.conditions || { match: 'all', rules: [] }; updateNodeConfig({ conditions: { match: c.match || 'all', rules: [...(c.rules || []), { field: triggerEntityFields[0]?.name || '', operator: '==', value: '' }] } }); }}
+                                 className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                              >+ Add condition</button>
+                           </div>
+                        )}
                      </div>
                   </div>
                )}
@@ -444,42 +523,79 @@ export const WorkflowBuilder: React.FC = () => {
                  <div className="space-y-4">
                     <div>
                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Action Type</label>
-                       <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none">
-                         <option>Send Email</option>
-                         <option>Create Task</option>
-                         <option>Update Field</option>
-                         <option>Webhook</option>
+                       <select className={inputCls} value={cfg.type || ''} onChange={(e) => updateNodeConfig({ type: e.target.value })}>
+                         <option value="">Select action…</option>
+                         {ACTION_TYPES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
                        </select>
                     </div>
-                    {/* Dynamic based on selection */}
-                    <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-                       <AlertCircle className="w-4 h-4 inline mr-1 mb-0.5"/>
-                       Configure the specific template or field values in the settings tab.
-                    </div>
+
+                    {cfg.type === 'email' && (
+                       <>
+                          <div>
+                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">To</label>
+                             <input className={inputCls} value={cfg.to ?? '{email}'} onChange={(e) => updateNodeConfig({ to: e.target.value })} placeholder="{email}" />
+                          </div>
+                          <div>
+                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Subject</label>
+                             <input className={inputCls} value={cfg.subject ?? ''} onChange={(e) => updateNodeConfig({ subject: e.target.value })} placeholder="Welcome {firstName}" />
+                          </div>
+                          <div>
+                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Body</label>
+                             <textarea className={inputCls} rows={4} value={cfg.body ?? ''} onChange={(e) => updateNodeConfig({ body: e.target.value })} placeholder="Hi {firstName}, …" />
+                          </div>
+                       </>
+                    )}
+
+                    {cfg.type === 'create_task' && (
+                       <>
+                          <div>
+                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Task Subject</label>
+                             <input className={inputCls} value={cfg.subject ?? ''} onChange={(e) => updateNodeConfig({ subject: e.target.value })} placeholder="Follow up with {firstName}" />
+                          </div>
+                          <div>
+                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Due in (days)</label>
+                             <input type="number" min={0} className={inputCls} value={cfg.dueInDays ?? ''} onChange={(e) => updateNodeConfig({ dueInDays: e.target.value })} placeholder="2" />
+                          </div>
+                       </>
+                    )}
+
+                    {(cfg.type === 'update_record' || cfg.type === 'create_lead') && (
+                       <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                             {cfg.type === 'update_record' ? 'Fields to set' : 'Lead fields'}
+                          </label>
+                          <textarea
+                             className={`${inputCls} font-mono`}
+                             rows={4}
+                             value={fieldsToText(cfg.fields)}
+                             onChange={(e) => updateNodeConfig({ fields: textToFields(e.target.value) })}
+                             placeholder={'status = Contacted\nscore = 50'}
+                          />
+                          <p className="text-[11px] text-gray-400 mt-1.5">One per line: <code>field = value</code>. Use {'{token}'} to pull from the record.</p>
+                       </div>
+                    )}
+
+                    {!cfg.type && (
+                       <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
+                          <AlertCircle className="w-4 h-4 inline mr-1 mb-0.5"/>
+                          Pick an action type to configure what this step does.
+                       </div>
+                    )}
                  </div>
                )}
                
                {selectedNode.type === 'condition' && (
-                 <div className="space-y-4">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Condition Logic</label>
-                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-xs text-gray-600">
-                       (Lead.Score &gt; 50) AND (Lead.Status == 'New')
-                    </div>
-                    <Button variant="secondary" size="sm" className="w-full">Edit Logic Expression</Button>
+                 <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-700">
+                    <AlertCircle className="w-4 h-4 inline mr-1 mb-0.5"/>
+                    Conditions are evaluated on the <strong>Trigger</strong> step. Select the trigger node to add match conditions. (Branch nodes are visual only for now.)
                  </div>
                )}
 
                {selectedNode.type === 'wait' && (
                   <div>
-                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Duration</label>
-                     <div className="flex gap-2">
-                        <input type="number" className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none" defaultValue={2} />
-                        <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none">
-                           <option>Minutes</option>
-                           <option>Hours</option>
-                           <option>Days</option>
-                        </select>
-                     </div>
+                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Duration (seconds)</label>
+                     <input type="number" min={0} className={inputCls} value={cfg.seconds ?? ''} onChange={(e) => updateNodeConfig({ type: 'wait', seconds: e.target.value })} placeholder="60" />
+                     <p className="text-[11px] text-amber-600 mt-1.5">Note: timed delays are saved but not yet executed (needs the scheduler).</p>
                   </div>
                )}
              </div>
