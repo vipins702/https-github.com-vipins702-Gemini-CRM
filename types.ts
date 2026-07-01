@@ -4,7 +4,12 @@ import { Edge, Node } from 'reactflow';
 
 export type EntityType = 'lead' | 'customer' | 'case' | 'task' | 'product' | string;
 
-export type FieldType = 'text' | 'number' | 'currency' | 'email' | 'phone' | 'select' | 'status' | 'textarea' | 'lookup' | 'attachment' | 'image' | 'iframe' | 'date';
+export type FieldType = 'text' | 'number' | 'currency' | 'email' | 'phone' | 'select' | 'status' | 'textarea' | 'lookup' | 'attachment' | 'image' | 'iframe' | 'date' | 'cascade';
+
+export interface CategoryNode {
+  name: string;
+  children?: { name: string }[];
+}
 
 export enum LeadStatus {
   NEW = 'New',
@@ -25,6 +30,7 @@ export interface FieldDefinition {
   // New config props
   lookupTarget?: EntityType;
   urlTemplate?: string;
+  categorySet?: string; // for type 'cascade' — which category tree to use
 }
 
 export interface EntityDefinition {
@@ -64,10 +70,91 @@ export interface Activity {
 export interface WidgetConfig {
   id: string;
   title: string;
-  type: 'stat' | 'chart' | 'list';
+  type: 'stat' | 'chart' | 'list' | 'report' | 'pack';
   visible: boolean;
   order: number;
   width?: 'full' | 'half' | 'third';
+  /** legacy single-report tiles */
+  reportId?: string;
+  reportParams?: Record<string, string>;
+  vizOverride?: 'bar' | 'line' | 'pie' | 'number' | 'table';
+  /** pack-backed tiles */
+  packId?: string;
+  datasetId?: string;
+  kpiColumn?: string;           // for kpi dataset: which column to feature; omit = show all columns
+  packParams?: Record<string, string>;
+}
+
+// ─── Report Pack types ────────────────────────────────────────────────────────
+
+export interface KpiColumnMeta {
+  key: string;
+  label: string;
+  type: 'currency' | 'number' | 'percent' | 'text';
+  accent?: 'green' | 'blue' | 'orange';
+}
+
+export interface PackDatasetMeta {
+  id: string;
+  label: string;
+  type: 'kpi' | 'timeseries' | 'aggregate' | 'table';
+  viz?: string;
+  accent?: string;
+  columns?: KpiColumnMeta[];
+  measures?: Array<{ key: string; label: string; type: string; color?: string }>;
+}
+
+export interface PackDefinition {
+  id: string;
+  name: string;
+  description: string;
+  params: ReportParam[];
+  datasets: PackDatasetMeta[];
+}
+
+export interface KpiDataset {
+  type: 'kpi';
+  columns: KpiColumnMeta[];
+  row: Record<string, number | string | null>;
+  _cached?: boolean;
+  _cacheAge?: number;
+}
+
+export interface TimeseriesDataset {
+  type: 'timeseries';
+  measures: Array<{ key: string; label: string; type: string; color: string }>;
+  rows: Record<string, any>[];
+  _cached?: boolean;
+}
+
+export interface AggregateDataset {
+  type: 'aggregate';
+  viz: string;
+  accent: string;
+  columns: Array<{ key: string; label: string; type: string }>;
+  rows: Record<string, any>[];
+  _cached?: boolean;
+}
+
+export interface TableDataset {
+  type: 'table';
+  columns: ReportColumn[];
+  rows: Record<string, any>[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  _cached?: boolean;
+}
+
+export type PackDataset = KpiDataset | TimeseriesDataset | AggregateDataset | TableDataset;
+
+export interface PackResult {
+  packId: string;
+  params: Record<string, any>;
+  generatedAt: string;
+  datasets: Record<string, PackDataset>;
+  meta: { cacheHits: number; cacheMisses: number; totalMs: number };
 }
 
 // --- Layout Engine & Rules ---
@@ -143,7 +230,214 @@ export interface FlowNodeData {
 export type FlowNode = Node<FlowNodeData>;
 export type FlowEdge = Edge;
 
-export type ViewState = 'dashboard' | 'autoflow' | 'layout' | 'settings' | 'web-presenter' | 'users' | 'object-manager' | 'campaigns' | 'menu-manager' | 'lookups' | 'customer-360' | 'lead-rules' | 'lead-capture' | 'agent-console' | EntityType;
+export type ViewState = 'dashboard' | 'autoflow' | 'layout' | 'settings' | 'web-presenter' | 'users' | 'object-manager' | 'campaigns' | 'menu-manager' | 'lookups' | 'customer-360' | 'lead-rules' | 'lead-capture' | 'agent-console' | 'reports' | 'whatsapp' | 'email-inbox' | 'calendar' | 'quotes' | 'pipeline' | 'processes' | 'lead-360' | 'categories' | 'integrations' | 'platform' | EntityType;
+
+// --- Integrations (per-tenant credentials) ---
+export interface IntegrationConfig {
+  provider: 'whatsapp' | 'facebook' | 'instagram' | 'email';
+  enabled: boolean;
+  config: Record<string, any>;        // secrets arrive masked (e.g. "••••1234")
+  secretSet: Record<string, boolean>; // which secret fields currently have a stored value
+}
+
+// --- WhatsApp Business ---
+export interface WaConversation {
+  phone: string;
+  last_at: string;
+  last_body: string;
+  last_direction: 'inbound' | 'outbound';
+  profile_name: string;
+  matched_entity?: 'lead' | 'customer';
+  matched_id?: string;
+  message_count: number;
+}
+
+export interface WaMessage {
+  id: string;
+  tenant_id: string;
+  wa_message_id?: string;
+  direction: 'inbound' | 'outbound';
+  phone: string;
+  profile_name?: string;
+  body: string;
+  msg_type: string;
+  matched_entity?: string;
+  matched_id?: string;
+  status: 'received' | 'sent' | 'simulated' | 'failed';
+  created_at: string;
+}
+
+// --- Configurable processes / stages ---
+export interface ProcessStageAction {
+  type: 'create_task' | 'email' | 'webhook';
+  [key: string]: any;
+}
+export interface ProcessStage {
+  id: string;
+  name: string;
+  order: number;
+  color: string;
+  type: 'open' | 'won' | 'lost';
+  requiredFields: string[];
+  entryActions: ProcessStageAction[];
+  requireNote?: boolean;
+}
+export interface ProcessDefinition {
+  entityType: string;
+  name: string;
+  stages: ProcessStage[];
+  source?: 'custom' | 'default' | 'none';
+}
+
+// --- Campaigns (bulk outreach) ---
+export interface CampaignFilter { field: string; op: 'eq' | 'neq' | 'contains' | 'gt' | 'lt'; value: string }
+
+export interface FormField {
+  id: string;
+  name: string;
+  label: string;
+  type: 'text' | 'email' | 'phone' | 'number' | 'textarea' | 'select' | 'checkbox';
+  placeholder?: string;
+  required?: boolean;
+  options?: string[]; // for select/radio
+  mapTo?: string; // entity field name (e.g., 'firstName', 'email')
+  hidden?: boolean;
+}
+
+export interface WebFormTemplate {
+  id: string;
+  title: string;
+  description?: string;
+  fields: FormField[];
+  theme?: {
+    backgroundColor?: string;
+    buttonColor?: string;
+    buttonText?: string;
+  };
+  successMessage?: string;
+  redirectUrl?: string;
+}
+
+export interface BulkCampaign {
+  id: string;
+  name: string;
+  channel: 'email' | 'whatsapp' | 'web_form';
+  entityType: string;
+  filters: CampaignFilter[];
+  subject?: string;
+  body?: string;
+  formTemplate?: WebFormTemplate;
+  status: 'Draft' | 'Sending' | 'Sent';
+  audienceCount: number;
+  sentCount: number;
+  failedCount: number;
+  openedCount: number;
+  submissionCount?: number;
+  created_at?: string;
+  sent_at?: string;
+}
+
+// --- Attachments ---
+export interface Attachment {
+  id: string;
+  entityType: string;
+  recordId: string;
+  filename: string;
+  mime: string;
+  size: number;
+  kind: 'image' | 'file';
+  url: string;
+  uploadedBy?: string;
+  created_at: string;
+}
+
+// --- Related activity (Customer 360 / lead profile) ---
+export interface RelatedActivity {
+  tasks: { id: string; subject: string; status: string; priority: string; dueDate: string; assignee: string }[];
+  quotes: { id: string; quoteNumber: string; total: number; currency: string; status: string }[];
+  emails: { id: string; direction: string; subject: string; status: string; created_at: string }[];
+  whatsapp: { id: string; direction: string; body: string; status: string; created_at: string }[];
+  calls: { id: string; direction: string; from_number: string; to_number: string; outcome: string; status: string; created_at: string }[];
+  stageHistory?: { id: string; from: string; to: string; note: string; actor: string; created_at: string }[];
+}
+
+// --- Quotes ---
+export interface QuoteLineItem {
+  description: string;
+  qty: number;
+  unitPrice: number;
+  lineTotal?: number;
+  productId?: string;
+  sku?: string;
+}
+
+export type QuoteStatus = 'Draft' | 'Sent' | 'Accepted' | 'Declined' | 'Expired';
+
+export interface Quote {
+  id: string;
+  quoteNumber: string;
+  title: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  status: QuoteStatus;
+  currency: string;
+  items: QuoteLineItem[];
+  taxRate: number;
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  validUntil: string;
+  notes: string;
+  convertedDealId?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// --- Tasks (calendar / my work) ---
+export interface TaskItem {
+  id: string;
+  subject: string;
+  status: string;
+  priority: string;
+  assignee: string;
+  assigneeId: string;
+  dueDate: string;
+  dueTime?: string;   // HH:MM (24h), e.g. "14:30"
+  startDate: string;
+  category: string;
+  customerId: string;
+  relatedEntity: string;
+  relatedId: string;
+  relatedName: string;
+  created_at: string;
+}
+
+// --- Email ---
+export interface EmailConversation {
+  contact_email: string;
+  last_at: string;
+  last_subject: string;
+  matched_entity?: 'lead' | 'customer';
+  matched_id?: string;
+  message_count: number;
+}
+
+export interface EmailMessage {
+  id: string;
+  tenant_id: string;
+  direction: 'outbound' | 'inbound';
+  contact_email: string;
+  from_address?: string;
+  to_address?: string;
+  subject: string;
+  body: string;
+  matched_entity?: string;
+  matched_id?: string;
+  status: 'queued' | 'sent' | 'simulated' | 'failed';
+  error?: string;
+  created_at: string;
+}
 
 // Web Presenter / Data Sources
 export type DataSourceType = 'iframe' | 'api' | 'database';
@@ -206,7 +500,18 @@ export interface User {
   roleId: string;
   isActive: boolean;
   avatar?: string;
+  isSuperadmin?: boolean; // platform owner — bypasses tenant scoping
   permissions?: any; // Full permission tree
+}
+
+// --- Platform (superadmin) ---
+export interface Tenant {
+  id: string;
+  name: string;
+  status: 'active' | 'suspended';
+  created_at?: string;
+  userCount?: number;
+  recordCount?: number;
 }
 
 export interface AuthSession {
@@ -257,10 +562,138 @@ export interface SystemSettings {
   logoUrl?: string;
   defaultCurrency?: string; // ISO 4217 code, e.g. 'USD', 'INR', 'EUR'
   locale?: string;          // BCP-47 locale for number/currency formatting, e.g. 'en-IN'
+  // Organization Details
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  timezone?: string;
+  businessHoursStart?: string; // e.g., "09:00"
+  businessHoursEnd?: string;   // e.g., "18:00"
+  emailFooter?: string;
+  websiteUrl?: string;
+  taxId?: string;
+  industry?: string;
   // 2025 UI options
   glassmorphism?: boolean;
   animationIntensity?: 'none' | 'subtle' | 'full';
   accentGradient?: { from: string; to: string };
+}
+
+// --- RECORD NOTES ---
+export interface RecordNote {
+  id: string;
+  entity_type: string;
+  record_id: string;
+  stage_name?: string;
+  note: string;
+  kind: 'comment' | 'stage_change' | 'call' | 'email';
+  actor_id?: string;
+  actor_name?: string;
+  created_at: string;
+}
+
+// --- NOTIFICATIONS ---
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  body?: string;
+  kind: 'info' | 'reminder' | 'alert' | 'task_due';
+  record_id?: string;
+  entity_type?: string;
+  is_read: number;
+  scheduled_at?: string;
+  created_at: string;
+}
+
+// --- CONFIGURABLE REPORTS ---
+export interface ReportColumnDef {
+  field: string;
+  label: string;
+  aggregate?: 'sum' | 'count' | 'avg' | 'max' | 'min';
+}
+export interface ReportFilterDef {
+  field: string;
+  op: 'eq' | 'neq' | 'contains' | 'gt' | 'lt';
+  value: string;
+  logic?: 'and' | 'or';
+}
+export interface SavedReport {
+  id?: string;
+  name: string;
+  description?: string;
+  entityType: string;
+  columns: ReportColumnDef[];
+  filters: ReportFilterDef[];
+  groupBy: string[];
+  sortBy: { field: string; dir: 'asc' | 'desc' }[];
+  vizType: 'table' | 'bar' | 'line' | 'pie' | 'metric';
+  created_at?: string;
+}
+
+// --- REPORTING ENGINE ---
+export type ReportVizType = 'table' | 'bar' | 'line' | 'pie' | 'metric';
+export type ReportAccent = 'blue' | 'green' | 'orange';
+
+export interface ReportParam {
+  name: string;
+  label: string;
+  type: 'date' | 'text' | 'number' | 'select';
+  options?: string[];
+  default?: string | number;
+  required?: boolean;
+}
+
+export interface ReportColumn {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'currency' | 'date' | 'status';
+}
+
+export interface ReportDefinition {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  mode: 'aggregate' | 'table';
+  viz: ReportVizType;
+  accent: ReportAccent;
+  params: ReportParam[];
+  columns: ReportColumn[];
+  filters: { key: string; label: string; type: string }[];
+}
+
+export interface ReportFilter {
+  key: string;
+  op?: 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains';
+  value: string | number;
+}
+
+export interface RunReportOptions {
+  params?: Record<string, string | number>;
+  filters?: ReportFilter[];
+  sort?: { key: string; dir: 'asc' | 'desc' };
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ReportResult {
+  mode: 'aggregate' | 'table';
+  viz: ReportVizType;
+  accent?: ReportAccent;
+  rows: any[];
+  total: number;
+  // aggregate
+  dimensionLabel?: string;
+  measureLabel?: string;
+  measureType?: 'number' | 'currency';
+  // table
+  columns?: ReportColumn[];
+  page?: number;
+  pageSize?: number;
+  pageCount?: number;
 }
 
 // --- LEAD GENERATION RULES ---

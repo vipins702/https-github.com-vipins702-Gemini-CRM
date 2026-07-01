@@ -1,5 +1,5 @@
 
-import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult } from '../types';
+import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult, ReportDefinition, RunReportOptions, ReportResult, PackDefinition, PackResult, WaConversation, WaMessage, EmailConversation, EmailMessage, TaskItem, Quote, RelatedActivity, ProcessDefinition, Attachment, CategoryNode, BulkCampaign, IntegrationConfig, Tenant } from '../types';
 
 const API_BASE = '/api';
 
@@ -173,6 +173,74 @@ export const api = {
     return fetchWithAuth(`${API_BASE}/data/${entityType}`, {
       method: 'POST',
       body: JSON.stringify(record)
+    });
+  },
+
+  async getRelatedActivity(entityType: string, id: string): Promise<RelatedActivity> {
+    return fetchWithAuth(`${API_BASE}/records/${entityType}/${id}/related-activity`);
+  },
+
+  // --- ATTACHMENTS ---
+  async getAttachments(entityType: string, id: string): Promise<Attachment[]> {
+    return fetchWithAuth(`${API_BASE}/attachments/${entityType}/${id}`);
+  },
+  async uploadAttachment(entityType: string, id: string, file: File): Promise<Attachment> {
+    const form = new FormData();
+    form.append('file', file);
+    const session = localStorage.getItem('flowcrm_session');
+    const token = session ? JSON.parse(session).token : '';
+    const res = await fetch(`${API_BASE}/attachments/${entityType}/${id}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Upload failed');
+    return res.json();
+  },
+  async deleteAttachment(id: string): Promise<{ success: boolean }> {
+    return fetchWithAuth(`${API_BASE}/attachments/${id}`, { method: 'DELETE' });
+  },
+
+  // --- CAMPAIGNS (bulk outreach) ---
+  async getBulkCampaigns(): Promise<BulkCampaign[]> {
+    return fetchWithAuth(`${API_BASE}/campaigns`);
+  },
+  async getBulkCampaign(id: string): Promise<BulkCampaign> {
+    return fetchWithAuth(`${API_BASE}/campaigns/${id}`);
+  },
+  async saveBulkCampaign(payload: Partial<BulkCampaign>): Promise<BulkCampaign> {
+    return fetchWithAuth(`${API_BASE}/campaigns`, { method: 'POST', body: JSON.stringify(payload) });
+  },
+  async previewCampaignAudience(payload: Partial<BulkCampaign>): Promise<{ count: number; sample: { name: string; contact: string }[] }> {
+    return fetchWithAuth(`${API_BASE}/campaigns/preview`, { method: 'POST', body: JSON.stringify(payload) });
+  },
+  async sendBulkCampaign(id: string): Promise<BulkCampaign> {
+    return fetchWithAuth(`${API_BASE}/campaigns/${id}/send`, { method: 'POST' });
+  },
+
+  // --- CATEGORY TREES (cascading) ---
+  async getCategoryTree(setKey: string): Promise<CategoryNode[]> {
+    return fetchWithAuth(`${API_BASE}/categories/${setKey}`);
+  },
+  async saveCategoryTree(setKey: string, tree: CategoryNode[]): Promise<CategoryNode[]> {
+    return fetchWithAuth(`${API_BASE}/categories/${setKey}`, { method: 'POST', body: JSON.stringify({ tree }) });
+  },
+
+  // --- CONFIGURABLE PROCESSES ---
+  async getProcessEntities(): Promise<{ entities: string[] }> {
+    return fetchWithAuth(`${API_BASE}/processes`);
+  },
+  async getProcess(entityType: string): Promise<ProcessDefinition> {
+    return fetchWithAuth(`${API_BASE}/processes/${entityType}`);
+  },
+  async saveProcess(entityType: string, config: { name: string; stages: any[] }): Promise<ProcessDefinition> {
+    return fetchWithAuth(`${API_BASE}/processes/${entityType}`, { method: 'POST', body: JSON.stringify(config) });
+  },
+
+  async setRecordStatus(entityType: string, id: string, status: string, note?: string): Promise<{ id: string; status: string }> {
+    return fetchWithAuth(`${API_BASE}/data/${entityType}/${id}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status, note }),
     });
   },
 
@@ -460,6 +528,119 @@ export const api = {
     return fetchWithAuth(`${API_BASE}/cti/route`, { method: 'POST', body: JSON.stringify(payload) });
   },
 
+  // --- REPORTING ENGINE ---
+  async listReports(): Promise<ReportDefinition[]> {
+    return fetchWithAuth(`${API_BASE}/reports`);
+  },
+  async runReport(id: string, opts: RunReportOptions = {}): Promise<ReportResult> {
+    return fetchWithAuth(`${API_BASE}/reports/${id}/run`, { method: 'POST', body: JSON.stringify(opts) });
+  },
+
+  // --- REPORT PACKS ---
+  async listReportPacks(): Promise<PackDefinition[]> {
+    return fetchWithAuth(`${API_BASE}/reports/packs`);
+  },
+  async runReportPack(
+    packId: string,
+    opts: { params?: Record<string, string>; datasets?: string[]; page?: number; pageSize?: number } = {}
+  ): Promise<PackResult> {
+    return fetchWithAuth(`${API_BASE}/reports/packs/${packId}/run`, {
+      method: 'POST', body: JSON.stringify(opts),
+    });
+  },
+  async invalidateReportCache(packId?: string): Promise<{ invalidated: number }> {
+    const qs = packId ? `?packId=${packId}` : '';
+    return fetchWithAuth(`${API_BASE}/reports/cache${qs}`, { method: 'DELETE' });
+  },
+
+  // --- WHATSAPP BUSINESS ---
+  async getWhatsAppStatus(): Promise<{ configured: boolean; mode: 'live' | 'simulated' }> {
+    return fetchWithAuth(`${API_BASE}/whatsapp/status`);
+  },
+  async getWhatsAppConversations(): Promise<WaConversation[]> {
+    return fetchWithAuth(`${API_BASE}/whatsapp/conversations`);
+  },
+  async getWhatsAppThread(phone: string): Promise<WaMessage[]> {
+    return fetchWithAuth(`${API_BASE}/whatsapp/thread/${encodeURIComponent(phone)}`);
+  },
+  async sendWhatsAppMessage(to: string, body: string): Promise<{ id: string; status: string; phone: string }> {
+    return fetchWithAuth(`${API_BASE}/whatsapp/send`, { method: 'POST', body: JSON.stringify({ to, body }) });
+  },
+  async simulateWhatsAppIncoming(from: string, body: string, profileName?: string): Promise<{ ok: boolean; matchedEntity?: string; matchedId?: string; isNewLead?: boolean }> {
+    return fetchWithAuth(`${API_BASE}/whatsapp/simulate-incoming`, { method: 'POST', body: JSON.stringify({ from, body, profileName }) });
+  },
+
+  // --- PLATFORM (superadmin) ---
+  async getTenants(): Promise<Tenant[]> {
+    return fetchWithAuth(`${API_BASE}/platform/tenants`);
+  },
+  async createTenant(payload: { name: string; adminEmail: string; adminPassword: string; adminName?: string }): Promise<Tenant> {
+    return fetchWithAuth(`${API_BASE}/platform/tenants`, { method: 'POST', body: JSON.stringify(payload) });
+  },
+  async updateTenant(id: string, payload: { name?: string; status?: 'active' | 'suspended' }): Promise<Tenant> {
+    return fetchWithAuth(`${API_BASE}/platform/tenants/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+  },
+
+  // --- INTEGRATIONS (per-tenant credentials) ---
+  async getIntegrations(): Promise<IntegrationConfig[]> {
+    return fetchWithAuth(`${API_BASE}/integrations`);
+  },
+  async getIntegration(provider: string): Promise<IntegrationConfig> {
+    return fetchWithAuth(`${API_BASE}/integrations/${provider}`);
+  },
+  async saveIntegration(provider: string, payload: { config?: Record<string, any>; enabled?: boolean }): Promise<IntegrationConfig> {
+    return fetchWithAuth(`${API_BASE}/integrations/${provider}`, { method: 'POST', body: JSON.stringify(payload) });
+  },
+
+  // --- EMAIL ---
+  async getEmailStatus(): Promise<{ configured: boolean; mode: 'live' | 'simulated' }> {
+    return fetchWithAuth(`${API_BASE}/email/status`);
+  },
+  async getEmailConversations(): Promise<EmailConversation[]> {
+    return fetchWithAuth(`${API_BASE}/email/conversations`);
+  },
+  async getEmailThread(email: string): Promise<EmailMessage[]> {
+    return fetchWithAuth(`${API_BASE}/email/thread/${encodeURIComponent(email)}`);
+  },
+  async sendEmail(to: string, subject: string, body: string): Promise<{ success: boolean; id?: string; status: string; error?: string }> {
+    return fetchWithAuth(`${API_BASE}/email/send`, { method: 'POST', body: JSON.stringify({ to, subject, body }) });
+  },
+
+  // --- TASKS / CALENDAR ---
+  async getTasks(filters: { mine?: boolean; assigneeId?: string; status?: string; from?: string; to?: string } = {}): Promise<TaskItem[]> {
+    const p = new URLSearchParams();
+    if (filters.mine) p.set('mine', '1');
+    if (filters.assigneeId) p.set('assigneeId', filters.assigneeId);
+    if (filters.status) p.set('status', filters.status);
+    if (filters.from) p.set('from', filters.from);
+    if (filters.to) p.set('to', filters.to);
+    const qs = p.toString();
+    return fetchWithAuth(`${API_BASE}/tasks${qs ? `?${qs}` : ''}`);
+  },
+  async assignTask(id: string, payload: { assigneeId?: string; assigneeName?: string; dueDate?: string; status?: string }): Promise<TaskItem> {
+    return fetchWithAuth(`${API_BASE}/tasks/${id}/assign`, { method: 'POST', body: JSON.stringify(payload) });
+  },
+
+  // --- QUOTES ---
+  async getQuotes(): Promise<Quote[]> {
+    return fetchWithAuth(`${API_BASE}/quotes`);
+  },
+  async getQuote(id: string): Promise<Quote> {
+    return fetchWithAuth(`${API_BASE}/quotes/${id}`);
+  },
+  async saveQuote(payload: Partial<Quote>): Promise<Quote> {
+    return fetchWithAuth(`${API_BASE}/quotes`, { method: 'POST', body: JSON.stringify(payload) });
+  },
+  async setQuoteStatus(id: string, status: string): Promise<Quote> {
+    return fetchWithAuth(`${API_BASE}/quotes/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
+  },
+  async emailQuote(id: string): Promise<{ success: boolean; status: string; quoteNumber: string }> {
+    return fetchWithAuth(`${API_BASE}/quotes/${id}/email`, { method: 'POST' });
+  },
+  async convertQuote(id: string): Promise<{ customerId: string; customerName: string; dealId: string; dealName: string; dealValue: number; alreadyConverted?: boolean }> {
+    return fetchWithAuth(`${API_BASE}/quotes/${id}/convert`, { method: 'POST' });
+  },
+
   // --- LEAD CAPTURE / INGESTION ---
   async ingestLead(source: string, payload: Record<string, any>, opts?: { dedupe?: boolean; ai?: boolean }): Promise<{ success: boolean; id?: string; deduped?: boolean; primaryDisplay?: string; aiUsed?: boolean }> {
     const params = new URLSearchParams();
@@ -483,5 +664,84 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(context)
     });
-  }
+  },
+  async generateLeadFollowupTasks(leadId: string, force: boolean = false): Promise<{ success: boolean; created: number; skipped?: boolean; reason?: string }> {
+    return fetchWithAuth(`${API_BASE}/ai/lead-tasks/${leadId}${force ? '?force=1' : ''}`, { method: 'POST' });
+  },
+
+  // --- RECORD NOTES (Pipeline Timeline Comments) ---
+  async getNotes(entityType: string, recordId: string): Promise<any[]> {
+    return fetchWithAuth(`${API_BASE}/notes/${entityType}/${recordId}`);
+  },
+  async addNote(entityType: string, recordId: string, note: string, stageName?: string, kind?: string): Promise<any> {
+    return fetchWithAuth(`${API_BASE}/notes/${entityType}/${recordId}`, {
+      method: 'POST',
+      body: JSON.stringify({ note, stageName, kind }),
+    });
+  },
+  async deleteNote(noteId: string): Promise<void> {
+    return fetchWithAuth(`${API_BASE}/notes/${noteId}`, { method: 'DELETE' });
+  },
+
+  // --- NOTIFICATIONS ---
+  async getNotifications(): Promise<any[]> {
+    return fetchWithAuth(`${API_BASE}/notifications`);
+  },
+  async getUnreadNotificationCount(): Promise<{ count: number }> {
+    return fetchWithAuth(`${API_BASE}/notifications/unread-count`);
+  },
+  async markNotificationsRead(ids: string[] | 'all'): Promise<void> {
+    return fetchWithAuth(`${API_BASE}/notifications/mark-read`, {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
+  },
+  async createNotification(payload: { userId?: string; title: string; body?: string; kind?: string; recordId?: string; entityType?: string; scheduledAt?: string }): Promise<any> {
+    return fetchWithAuth(`${API_BASE}/notifications`, { method: 'POST', body: JSON.stringify(payload) });
+  },
+
+  // --- SAVED REPORTS ---
+  async getSavedReports(): Promise<any[]> {
+    return fetchWithAuth(`${API_BASE}/saved-reports`);
+  },
+  async saveReport(report: any): Promise<any> {
+    return fetchWithAuth(`${API_BASE}/saved-reports`, { method: 'POST', body: JSON.stringify(report) });
+  },
+  async deleteReport(id: string): Promise<void> {
+    return fetchWithAuth(`${API_BASE}/saved-reports/${id}`, { method: 'DELETE' });
+  },
+  async runBuilderReport(params: { entityType: string; columns: any[]; filters: any[]; groupBy: string[]; sortBy: any[] }): Promise<{ rows: any[]; total: number }> {
+    return fetchWithAuth(`${API_BASE}/saved-reports/run`, { method: 'POST', body: JSON.stringify(params) });
+  },
+
+  // --- PROFILE IMAGE UPLOAD ---
+  async uploadProfileImage(entityType: string, recordId: string, file: File): Promise<{ url: string }> {
+    const sessionStr = localStorage.getItem('flowcrm_session');
+    const token = sessionStr ? JSON.parse(sessionStr).token : '';
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/upload/profile/${entityType}/${recordId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    return handleResponse(res);
+  },
+
+  // --- CAMPAIGN FORM SUBMISSIONS ---
+  async getCampaignSubmissions(campaignId: string): Promise<any[]> {
+    return fetchWithAuth(`${API_BASE}/campaigns/${campaignId}/submissions`);
+  },
+  async getPublicForm(campaignId: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/public/form/${campaignId}`);
+    return res.json();
+  },
+  async submitPublicForm(campaignId: string, data: Record<string, any>): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/public/form/${campaignId}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
 };

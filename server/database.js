@@ -69,6 +69,17 @@ export async function initDB() {
             console.error('Migration error (users.must_change_password):', e);
         }
 
+        // Migration: Add is_superadmin (platform owner — bypasses tenant scoping)
+        try {
+            const columns = await dbInstance.all(`PRAGMA table_info(users)`);
+            if (!columns.some(c => c.name === 'is_superadmin')) {
+                console.log('Migrating users table: Adding is_superadmin column...');
+                await dbInstance.run(`ALTER TABLE users ADD COLUMN is_superadmin INTEGER DEFAULT 0`);
+            }
+        } catch (e) {
+            console.error('Migration error (users.is_superadmin):', e);
+        }
+
         // 3. Entity Definitions
         await dbInstance.exec(`
             CREATE TABLE IF NOT EXISTS entity_definitions (
@@ -91,11 +102,31 @@ export async function initDB() {
                 primary_display TEXT, 
                 status TEXT,
                 data TEXT NOT NULL,
+                owner_id TEXT,
+                normalized_phone TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+                FOREIGN KEY (owner_id) REFERENCES users(id)
             )
         `);
+
+        // Migration: Add owner_id and normalized_phone if missing
+        try {
+            const columns = await dbInstance.all(`PRAGMA table_info(records)`);
+            if (!columns.some(c => c.name === 'owner_id')) {
+                console.log('Migrating records table: Adding owner_id column...');
+                await dbInstance.run(`ALTER TABLE records ADD COLUMN owner_id TEXT REFERENCES users(id)`);
+            }
+            if (!columns.some(c => c.name === 'normalized_phone')) {
+                console.log('Migrating records table: Adding normalized_phone column...');
+                await dbInstance.run(`ALTER TABLE records ADD COLUMN normalized_phone TEXT`);
+                console.log('Migrating records table: Creating unique index for normalized_phone on customers...');
+                await dbInstance.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_records_customer_phone ON records(tenant_id, normalized_phone) WHERE entity_type = 'customer' AND normalized_phone IS NOT NULL AND normalized_phone != ''`);
+            }
+        } catch (e) {
+            console.error('Migration error (records):', e);
+        }
 
         // 5. Layouts
         await dbInstance.exec(`
@@ -326,7 +357,221 @@ export async function initDB() {
             )
         `);
 
+        // 17. WhatsApp Messages (Business Cloud API conversations)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS wa_messages (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                wa_message_id TEXT,            -- Meta message id (dedupe inbound webhooks)
+                direction TEXT NOT NULL,       -- 'inbound' | 'outbound'
+                phone TEXT NOT NULL,           -- normalized counterparty number
+                profile_name TEXT,             -- WhatsApp display name (inbound only)
+                body TEXT,
+                msg_type TEXT DEFAULT 'text',  -- text | image | audio | unsupported
+                matched_entity TEXT,           -- lead | customer
+                matched_id TEXT,
+                status TEXT DEFAULT 'received',-- received | sent | simulated | failed
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+
+        // 18b. Processes (configurable per-entity stage definitions / pipelines)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS processes (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                config TEXT NOT NULL,          -- JSON: { name, stages: [{id,name,order,color,type,requiredFields,entryActions}] }
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+                UNIQUE(tenant_id, entity_type)
+            )
+        `);
+
+        // 18. Email Messages (sent/received email, logged to contact timelines)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS email_messages (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                direction TEXT NOT NULL,       -- 'outbound' | 'inbound'
+                contact_email TEXT NOT NULL,    -- the lead/customer address (counterparty)
+                from_address TEXT,
+                to_address TEXT,
+                subject TEXT,
+                body TEXT,
+                matched_entity TEXT,            -- lead | customer
+                matched_id TEXT,
+                status TEXT DEFAULT 'queued',   -- queued | sent | simulated | failed
+                error TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+
+        // 21. Campaigns (bulk outreach via email/whatsapp to a segment) + per-recipient sends
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS campaigns (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                channel TEXT NOT NULL DEFAULT 'email',  -- 'email' | 'whatsapp' | 'web_form'
+                entity_type TEXT NOT NULL DEFAULT 'lead',
+                filters TEXT,                            -- JSON [{field,op,value}]
+                subject TEXT,
+                body TEXT,
+                form_template TEXT,                      -- JSON for web_form channel
+                status TEXT DEFAULT 'Draft',             -- Draft | Sending | Sent
+                audience_count INTEGER DEFAULT 0,
+                sent_count INTEGER DEFAULT 0,
+                failed_count INTEGER DEFAULT 0,
+                opened_count INTEGER DEFAULT 0,
+                submission_count INTEGER DEFAULT 0,      -- for web_form
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                sent_at DATETIME,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS campaign_sends (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                campaign_id TEXT NOT NULL,
+                record_id TEXT,
+                contact TEXT,                            -- email or phone
+                status TEXT DEFAULT 'sent',              -- sent | simulated | failed
+                opened INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_campaign_sends_campaign ON campaign_sends(campaign_id)`);
+
+        // 20. Category trees (configurable cascading picklists, e.g. Product matrix)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS category_trees (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                set_key TEXT NOT NULL,
+                tree TEXT NOT NULL,            -- JSON: [{ name, children:[{name}] }]
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+                UNIQUE(tenant_id, set_key)
+            )
+        `);
+
+        // 19. Attachments (files/images linked to any record)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS attachments (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                record_id TEXT NOT NULL,
+                filename TEXT NOT NULL,        -- original name
+                stored_name TEXT NOT NULL,     -- uuid name on disk
+                mime TEXT,
+                size INTEGER,
+                kind TEXT DEFAULT 'file',      -- 'image' | 'file'
+                uploaded_by TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+
+        // 22. Record Notes (timeline comments per lead/customer/case, date-stamped, linked to stage)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS record_notes (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                record_id TEXT NOT NULL,
+                stage_name TEXT,               -- which stage the lead was in when note was added
+                note TEXT NOT NULL,
+                kind TEXT DEFAULT 'comment',   -- 'comment' | 'stage_change' | 'call' | 'email'
+                actor_id TEXT,
+                actor_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_notes_record ON record_notes(tenant_id, entity_type, record_id, created_at)`);
+
+        // 23. Notifications (in-app bell + browser push)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS notifications (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT,
+                kind TEXT DEFAULT 'info',      -- 'info' | 'reminder' | 'alert' | 'task_due'
+                record_id TEXT,
+                entity_type TEXT,
+                is_read INTEGER DEFAULT 0,
+                scheduled_at DATETIME,         -- when to fire (for reminders)
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_notifs_user ON notifications(tenant_id, user_id, is_read, created_at)`);
+
+        // 24. Saved Reports (configurable report definitions)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS saved_reports (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                entity_type TEXT NOT NULL,
+                columns TEXT NOT NULL,          -- JSON [{field, label, aggregate?}]
+                filters TEXT,                   -- JSON [{field, op, value, logic}]
+                group_by TEXT,                  -- JSON [field]
+                sort_by TEXT,                   -- JSON [{field, dir}]
+                viz_type TEXT DEFAULT 'table',  -- table | bar | line | pie | metric
+                is_shared INTEGER DEFAULT 0,
+                created_by TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+
+        // 25. Campaign Form Submissions
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS form_submissions (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                campaign_id TEXT NOT NULL,
+                record_id TEXT,                -- the created/matched record id
+                data TEXT NOT NULL,            -- JSON of submitted field values
+                submitter_ip TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_form_submissions_campaign ON form_submissions(tenant_id, campaign_id, created_at)`);
+
+        // 26. Per-tenant integration credentials (WhatsApp / Facebook / Instagram / Email / etc.)
+        // config is JSON holding provider-specific keys (tokens, ids). enabled gates live use;
+        // when disabled or absent, services fall back to global env config (single-tenant dev).
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS integrations (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                provider TEXT NOT NULL,        -- whatsapp | facebook | instagram | email
+                config TEXT NOT NULL DEFAULT '{}',
+                enabled INTEGER NOT NULL DEFAULT 0,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(tenant_id, provider),
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_integrations_tenant ON integrations(tenant_id, provider)`);
+
         // Indexes
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_attachments_record ON attachments(tenant_id, entity_type, record_id)`);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_email_messages_tenant_contact ON email_messages(tenant_id, contact_email, created_at)`);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_wa_messages_tenant_phone ON wa_messages(tenant_id, phone, created_at)`);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_wa_messages_waid ON wa_messages(wa_message_id)`);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_call_logs_tenant ON call_logs(tenant_id, created_at)`);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_lead_rules_tenant ON lead_rules(tenant_id)`);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_tenant_entity ON records(tenant_id, entity_type)`);

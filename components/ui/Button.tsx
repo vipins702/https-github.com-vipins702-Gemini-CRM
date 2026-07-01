@@ -17,21 +17,21 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
-  const baseStyles = "inline-flex items-center justify-center font-medium rounded-lg transition-[background-color,box-shadow,transform,filter] duration-150 ease-out focus:outline-none disabled:opacity-50 disabled:pointer-events-none [touch-action:manipulation] select-none active:scale-[0.985] tnum";
+  const baseStyles = "inline-flex items-center justify-center font-semibold rounded-full transition-[background-color,box-shadow,transform,filter] duration-200 [transition-timing-function:cubic-bezier(.22,1,.36,1)] focus:outline-none disabled:opacity-50 disabled:pointer-events-none [touch-action:manipulation] select-none active:translate-y-0 tnum";
 
   const variants = {
-    primary: "btn-primary-brand text-white shadow-[var(--elev-1)] hover:brightness-[1.07]",
-    secondary: "bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50 hover:ring-slate-300 shadow-[var(--elev-1)]",
-    outline: "bg-transparent text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:ring-slate-400",
-    danger: "bg-rose-600 text-white shadow-[var(--elev-1)] hover:bg-rose-700",
-    ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-    gradient: "btn-gradient text-white shadow-[var(--elev-1)] hover:brightness-[1.07]",
+    primary: "btn-tri-primary",
+    secondary: "btn-glass",
+    outline: "btn-glass",
+    danger: "text-white border border-[#DC2626]/40 bg-[linear-gradient(180deg,#ef4444,#DC2626)] shadow-[0_10px_22px_-10px_rgba(220,38,38,0.7),inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-[1.05] hover:-translate-y-px",
+    ghost: "text-ink-soft hover:bg-white/60 hover:text-ink",
+    gradient: "btn-tri-primary",
   };
 
   const sizes = {
-    sm: "h-8 px-3 text-[13px] gap-1.5",
-    md: "h-10 px-4 text-sm gap-2",
-    lg: "h-11 px-5 text-[15px] gap-2",
+    sm: "h-8 px-3.5 text-[13px] gap-1.5",
+    md: "h-10 px-[18px] text-sm gap-2",
+    lg: "h-11 px-[22px] text-[15px] gap-2",
   };
 
   return (

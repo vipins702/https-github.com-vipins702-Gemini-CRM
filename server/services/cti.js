@@ -2,6 +2,7 @@ import db from '../database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { logAudit } from './audit.js';
 import { generateUpsellSuggestion, classifyCallIntent } from './ai.js';
+import { normalizePhoneE164 } from '../utils/phone.js';
 
 /**
  * CTI (Computer Telephony Integration) + Lead→Customer conversion service.
@@ -84,26 +85,70 @@ export async function convertLeadToCustomer(tenantId, leadId, actorId = 'system'
         return { alreadyConverted: true, customerId: lead._converted_to_customer };
     }
 
-    // Build the customer from the lead
-    const customerId = uuidv4();
-    const customerName = lead.company || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || leadRow.primary_display || 'New Customer';
-    const customerData = {
-        name: customerName,
-        email: lead.email,
-        phone: phoneOf(lead),
-        industry: lead.industry,
-        status: 'Active',
-        type: 'Customer',
-        contactFirstName: lead.firstName,
-        contactLastName: lead.lastName,
-        _converted_from_lead: leadId,
-        _converted_at: new Date().toISOString(),
-    };
-    await db.run(
-        'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)',
-        customerId, tenantId, 'customer', customerName, 'Active', JSON.stringify(customerData)
-    );
-    await logAudit({ tenantId, entityType: 'customer', recordId: customerId, action: 'create', actorId, details: { ...customerData, _via: 'lead_conversion' } });
+    const rawPhone = phoneOf(lead);
+    const normalized = normalizePhoneE164(rawPhone, 'US'); // Using US as default, adjust as needed
+
+    // Check for existing customer
+    let customerId = null;
+    let customerName = '';
+    
+    if (normalized) {
+        const existing = await db.get(
+            `SELECT id, primary_display FROM records WHERE tenant_id = ? AND entity_type = 'customer' AND normalized_phone = ?`,
+            tenantId, normalized
+        );
+        if (existing) {
+            customerId = existing.id;
+            customerName = existing.primary_display;
+            console.log(`[cti] Matched existing customer ${customerId} via normalized phone ${normalized}`);
+        }
+    }
+
+    if (!customerId) {
+        // Build new customer
+        customerId = uuidv4();
+        customerName = lead.company || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || leadRow.primary_display || 'New Customer';
+        const customerData = {
+            name: customerName,
+            email: lead.email,
+            phone: rawPhone,
+            industry: lead.industry,
+            status: 'Active',
+            type: 'Customer',
+            contactFirstName: lead.firstName,
+            contactLastName: lead.lastName,
+            _converted_from_lead: leadId,
+            _converted_at: new Date().toISOString(),
+        };
+
+        try {
+            await db.run('BEGIN TRANSACTION');
+            await db.run(
+                'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data, normalized_phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                customerId, tenantId, 'customer', customerName, 'Active', JSON.stringify(customerData), normalized
+            );
+            await logAudit({ tenantId, entityType: 'customer', recordId: customerId, action: 'create', actorId, details: { ...customerData, _via: 'lead_conversion' } });
+            await db.run('COMMIT');
+        } catch (error) {
+            await db.run('ROLLBACK');
+            // Race condition check: Did someone else just insert this customer?
+            if (error.message.includes('UNIQUE constraint failed') && normalized) {
+                const raceWinner = await db.get(
+                    `SELECT id, primary_display FROM records WHERE tenant_id = ? AND entity_type = 'customer' AND normalized_phone = ?`,
+                    tenantId, normalized
+                );
+                if (raceWinner) {
+                    customerId = raceWinner.id;
+                    customerName = raceWinner.primary_display;
+                    console.log(`[cti] Recovered from race condition, matched winner ${customerId}`);
+                } else {
+                    throw error;
+                }
+            } else {
+                throw error;
+            }
+        }
+    }
 
     // Mark the lead converted/won
     const updatedLead = { ...lead, status: 'Won', _converted_to_customer: customerId };

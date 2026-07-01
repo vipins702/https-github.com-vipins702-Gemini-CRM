@@ -16,7 +16,10 @@ export const authenticateToken = async (req, res, next) => {
         req.tenantId = user.tenantId;
 
         // Fetch Role Permissions
-        if (req.user.role === 'admin') {
+        if (req.user.isSuperadmin) {
+            req.user.permissions = { admin: true };
+            req.user.roleName = 'Superadmin';
+        } else if (req.user.role === 'admin') {
             req.user.permissions = { admin: true };
             req.user.roleName = 'Admin';
         } else {
@@ -54,6 +57,11 @@ export const requireRole = (role) => {
             res.status(403).json({ error: 'Insufficient permissions' });
         }
     };
+};
+
+export const requireSuperadmin = (req, res, next) => {
+    if (req.user?.isSuperadmin) return next();
+    res.status(403).json({ error: 'Superadmin access required' });
 };
 
 export const requirePermission = (resource, action) => {

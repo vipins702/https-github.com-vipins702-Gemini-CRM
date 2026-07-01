@@ -21,6 +21,24 @@ const LOCALES = [
    { id: 'ar-AE', label: 'Arabic (UAE)' },
 ];
 
+const TIMEZONES = [
+   'UTC',
+   'America/New_York',
+   'America/Chicago',
+   'America/Denver',
+   'America/Los_Angeles',
+   'Europe/London',
+   'Europe/Paris',
+   'Europe/Berlin',
+   'Asia/Dubai',
+   'Asia/Kolkata',
+   'Asia/Bangkok',
+   'Asia/Singapore',
+   'Asia/Tokyo',
+   'Australia/Sydney',
+   'Australia/Melbourne',
+];
+
 export const Settings: React.FC = () => {
    const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'notifications'>('appearance');
    const [settings, setSettings] = useState<SystemSettings | null>(null);
@@ -65,12 +83,12 @@ export const Settings: React.FC = () => {
    if (!settings) return <div>Error loading settings</div>;
 
    return (
-      <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+      <div className="h-screen flex flex-col overflow-hidden">
          {/* Header */}
-         <div className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between shrink-0">
+         <div className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between shrink-0">
             <div>
-               <h1 className="text-xl font-bold text-gray-900">System Preferences</h1>
-               <p className="text-xs text-gray-500">Customize the look and feel of your CRM.</p>
+               <h1 className="font-heading text-xl font-extrabold tracking-tight text-ink">System Preferences</h1>
+               <p className="text-xs text-ink-muted">Customize the look and feel of your CRM.</p>
             </div>
             <Button
                onClick={handleSave}
@@ -108,60 +126,197 @@ export const Settings: React.FC = () => {
             <div className="flex-1 max-w-3xl space-y-6 overflow-y-auto pb-20">
 
                {activeTab === 'general' && (
-                  <Card title="Organization Details" className="animate-in fade-in slide-in-from-bottom-2">
-                     <div className="space-y-6">
-                        <div>
-                           <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-                           <input
-                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                              value={settings.organizationName}
-                              onChange={(e) => updateSetting('organizationName', e.target.value)}
-                           />
-                        </div>
-                        <div>
-                           <label className="block text-sm font-medium text-gray-700 mb-1">Company Logo URL</label>
-                           <div className="flex gap-4">
-                              {settings.logoUrl && <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 rounded object-contain border" />}
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                     <Card title="Organization Profile">
+                        <div className="space-y-6">
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
                               <input
-                                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                 value={settings.logoUrl || ''}
-                                 onChange={(e) => updateSetting('logoUrl', e.target.value)}
-                                 placeholder="https://..."
+                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                 value={settings.organizationName}
+                                 onChange={(e) => updateSetting('organizationName', e.target.value)}
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Company Logo URL</label>
+                              <div className="flex gap-4">
+                                 {settings.logoUrl && <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 rounded object-contain border" />}
+                                 <input
+                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={settings.logoUrl || ''}
+                                    onChange={(e) => updateSetting('logoUrl', e.target.value)}
+                                    placeholder="https://..."
+                                 />
+                              </div>
+                           </div>
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+                              <input
+                                 type="url"
+                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                 value={settings.websiteUrl || ''}
+                                 onChange={(e) => updateSetting('websiteUrl', e.target.value)}
+                                 placeholder="https://example.com"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                              <input
+                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                 value={settings.industry || ''}
+                                 onChange={(e) => updateSetting('industry', e.target.value)}
+                                 placeholder="e.g. Financial Services, Retail, Healthcare"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Tax ID / Registration Number</label>
+                              <input
+                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                 value={settings.taxId || ''}
+                                 onChange={(e) => updateSetting('taxId', e.target.value)}
+                                 placeholder="e.g. GST ID, Tax ID"
                               />
                            </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     </Card>
+
+                     <Card title="Location & Hours">
+                        <div className="space-y-6">
                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Default Currency</label>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                              <input
+                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                 value={settings.address || ''}
+                                 onChange={(e) => updateSetting('address', e.target.value)}
+                                 placeholder="123 Main St"
+                              />
+                           </div>
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                                 <input
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={settings.city || ''}
+                                    onChange={(e) => updateSetting('city', e.target.value)}
+                                    placeholder="New York"
+                                 />
+                              </div>
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">State / Province</label>
+                                 <input
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={settings.state || ''}
+                                    onChange={(e) => updateSetting('state', e.target.value)}
+                                    placeholder="NY"
+                                 />
+                              </div>
+                           </div>
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Zip / Postal Code</label>
+                                 <input
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={settings.zipCode || ''}
+                                    onChange={(e) => updateSetting('zipCode', e.target.value)}
+                                    placeholder="10001"
+                                 />
+                              </div>
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                                 <input
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={settings.country || ''}
+                                    onChange={(e) => updateSetting('country', e.target.value)}
+                                    placeholder="United States"
+                                 />
+                              </div>
+                           </div>
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
                               <select
                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                                 value={settings.defaultCurrency || 'USD'}
-                                 onChange={(e) => updateSetting('defaultCurrency', e.target.value)}
+                                 value={settings.timezone || 'UTC'}
+                                 onChange={(e) => updateSetting('timezone', e.target.value)}
                               >
-                                 {CURRENCIES.map((c) => (
-                                    <option key={c.code} value={c.code}>{c.code} — {c.name} ({c.symbol})</option>
+                                 {TIMEZONES.map((tz) => (
+                                    <option key={tz} value={tz}>{tz}</option>
                                  ))}
                               </select>
                            </div>
-                           <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Number / Currency Format</label>
-                              <select
-                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                                 value={settings.locale || ''}
-                                 onChange={(e) => updateSetting('locale', e.target.value)}
-                              >
-                                 {LOCALES.map((l) => (
-                                    <option key={l.id} value={l.id}>{l.label}</option>
-                                 ))}
-                              </select>
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Business Hours Start</label>
+                                 <input
+                                    type="time"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={settings.businessHoursStart || '09:00'}
+                                    onChange={(e) => updateSetting('businessHoursStart', e.target.value)}
+                                 />
+                              </div>
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Business Hours End</label>
+                                 <input
+                                    type="time"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={settings.businessHoursEnd || '18:00'}
+                                    onChange={(e) => updateSetting('businessHoursEnd', e.target.value)}
+                                 />
+                              </div>
                            </div>
                         </div>
-                        <div className="text-xs text-gray-500 -mt-2">
-                           Preview: <span className="font-semibold text-gray-700">{formatCurrency(1234567.89, settings.defaultCurrency || 'USD', settings.locale || undefined)}</span>
-                           <span className="ml-1">— applies to all currency fields across records, lists and dashboards.</span>
+                     </Card>
+
+                     <Card title="Communication">
+                        <div className="space-y-6">
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Email Footer / Signature</label>
+                              <textarea
+                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                 value={settings.emailFooter || ''}
+                                 onChange={(e) => updateSetting('emailFooter', e.target.value)}
+                                 placeholder="Added to all outgoing emails and communications"
+                                 rows={4}
+                              />
+                              <p className="text-xs text-gray-500 mt-1">Applied to all outbound emails, campaigns, and notifications.</p>
+                           </div>
                         </div>
-                     </div>
-                  </Card>
+                     </Card>
+
+                     <Card title="Regional Settings">
+                        <div className="space-y-6">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Default Currency</label>
+                                 <select
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                    value={settings.defaultCurrency || 'USD'}
+                                    onChange={(e) => updateSetting('defaultCurrency', e.target.value)}
+                                 >
+                                    {CURRENCIES.map((c) => (
+                                       <option key={c.code} value={c.code}>{c.code} — {c.name} ({c.symbol})</option>
+                                    ))}
+                                 </select>
+                              </div>
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Number / Date Format</label>
+                                 <select
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                    value={settings.locale || ''}
+                                    onChange={(e) => updateSetting('locale', e.target.value)}
+                                 >
+                                    {LOCALES.map((l) => (
+                                       <option key={l.id} value={l.id}>{l.label}</option>
+                                    ))}
+                                 </select>
+                              </div>
+                           </div>
+                           <div className="text-xs text-gray-500">
+                              Preview: <span className="font-semibold text-gray-700">{formatCurrency(1234567.89, settings.defaultCurrency || 'USD', settings.locale || undefined)}</span>
+                              <span className="ml-1">— applies to all currency fields across records, lists and dashboards.</span>
+                           </div>
+                        </div>
+                     </Card>
+                  </div>
                )}
 
                {activeTab === 'appearance' && (

@@ -16,9 +16,20 @@ import { LookupManager } from './pages/LookupManager';
 import { PublicWebForm } from './pages/PublicWebForm';
 import { Settings } from './pages/Settings';
 import { Customer360 } from './pages/Customer360';
+import { Lead360 } from './pages/Lead360';
+import { CategoryManager } from './pages/CategoryManager';
+import { Integrations } from './pages/Integrations';
+import { Platform } from './pages/Platform';
 import { LeadRules } from './pages/LeadRules';
 import { LeadCapture } from './pages/LeadCapture';
 import { AgentConsole } from './pages/AgentConsole';
+import { Reports } from './pages/Reports';
+import { WhatsAppInbox } from './pages/WhatsAppInbox';
+import { EmailInbox } from './pages/EmailInbox';
+import { CalendarTasks } from './pages/CalendarTasks';
+import { Quotes } from './pages/Quotes';
+import { Pipeline } from './pages/Pipeline';
+import { ProcessBuilder } from './pages/ProcessBuilder';
 import { Login } from './pages/Login';
 import { ViewState, WidgetConfig, EntityDefinition, EntityType, AuthSession } from './types';
 import { api } from './services/api';
@@ -35,7 +46,16 @@ const App: React.FC = () => {
   // System Metadata State
   const [isReady, setIsReady] = useState(false);
   const [schemas, setSchemas] = useState<Record<string, EntityDefinition>>({});
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    typeof window !== 'undefined' && window.innerWidth < 1280
+  );
+
+  // Responsive: auto-collapse the sidebar to icons below 1280px
+  useEffect(() => {
+    const onResize = () => setIsSidebarCollapsed(window.innerWidth < 1280);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     // Check for Public Routes (e.g., /form/:id)
@@ -156,8 +176,30 @@ const App: React.FC = () => {
         return <LeadCapture />;
       case 'agent-console':
         return <AgentConsole onNavigate={handleNavigate} />;
+      case 'reports':
+        return <Reports schemas={schemas} />;
+      case 'whatsapp':
+        return <WhatsAppInbox onNavigate={handleNavigate} />;
+      case 'email-inbox':
+        return <EmailInbox onNavigate={handleNavigate} />;
+      case 'calendar':
+        return <CalendarTasks onNavigate={handleNavigate} />;
+      case 'quotes':
+        return <Quotes onNavigate={handleNavigate} />;
+      case 'pipeline':
+        return <Pipeline onNavigate={handleNavigate} />;
+      case 'processes':
+        return <ProcessBuilder />;
       case 'customer-360':
         return <Customer360 customerId={viewParams?.customerId} onBack={() => setCurrentView('customer')} onNavigate={handleNavigate} />;
+      case 'lead-360':
+        return <Lead360 leadId={viewParams?.leadId} onBack={() => setCurrentView('pipeline')} onNavigate={handleNavigate} />;
+      case 'categories':
+        return <CategoryManager />;
+      case 'integrations':
+        return <Integrations onNavigate={handleNavigate} />;
+      case 'platform':
+        return <Platform onNavigate={handleNavigate} />;
       case 'settings':
         return <Settings />;
       default:
@@ -172,7 +214,7 @@ const App: React.FC = () => {
 
   return (
     <ToastProvider>
-      <div className="flex min-h-screen bg-slate-50 font-sans text-slate-800">
+      <div className="relative z-[1] flex min-h-screen font-sans text-ink">
         <Sidebar
           currentView={currentView}
           onChangeView={handleSidebarChange}

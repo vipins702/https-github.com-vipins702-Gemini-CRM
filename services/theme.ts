@@ -26,9 +26,9 @@ const BRAND_PALETTES: Record<string, { c500: string; c600: string; c700: string 
 };
 
 const FONT_FAMILIES: Record<string, string> = {
-  sans: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  sans: "'Figtree', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   serif: "'Merriweather', Georgia, 'Times New Roman', serif",
-  mono: "'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace",
+  mono: "'Spline Sans Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace",
 };
 
 const FONT_SIZES: Record<string, string> = {
@@ -42,7 +42,7 @@ export function applySettings(settings: Partial<SystemSettings> | null | undefin
   const root = document.documentElement;
 
   // Brand color -> CSS variables (used by .btn-primary-brand and focus rings)
-  const palette = BRAND_PALETTES[settings?.primaryColor || 'indigo'] || BRAND_PALETTES.indigo;
+  const palette = BRAND_PALETTES[settings?.primaryColor || 'blue'] || BRAND_PALETTES.blue;
   root.style.setProperty('--brand-500', palette.c500);
   root.style.setProperty('--brand-600', palette.c600);
   root.style.setProperty('--brand-700', palette.c700);

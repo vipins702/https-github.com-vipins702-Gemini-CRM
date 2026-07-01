@@ -97,6 +97,10 @@ export async function ingestLead({ tenantId = 'default', source = 'webhook', pay
     await logAudit({ tenantId, entityType: 'lead', recordId: id, action: 'create', actorId, details: { ...leadData } });
     console.log(`[ingest] captured lead ${id} from "${source}"${aiUsed ? ' (AI-normalized)' : ''}`);
 
+    // Auto-assignment engine
+    const { assignLead } = await import('./assignment.js');
+    await assignLead(tenantId, id, leadData);
+
     // 4. Fire create-trigger journeys for the captured lead
     await evaluateWorkflows({ tenantId, entityType: 'lead', triggerType: 'create', record: { ...leadData, id }, actorId });
 

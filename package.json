@@ -11,7 +11,10 @@
     "dev:all": "npx concurrently \"npm run server\" \"npm run dev\" --names \"BACKEND,FRONTEND\" --prefix-colors \"blue,green\""
   },
   "dependencies": {
+    "libphonenumber-js": "^1.13.7",
     "lucide-react": "^0.555.0",
+    "multer": "^2.2.0",
+    "nodemailer": "^8.0.11",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "reactflow": "^11.11.4",

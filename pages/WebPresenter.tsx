@@ -3,9 +3,22 @@
 import React, { useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { ExternalLink, Globe, Lock, Database, Code, Plus, Trash2, Play, CheckCircle, AlertCircle, Edit2, Server, Key, Shield, Wifi, Save, Loader2, Table as TableIcon } from 'lucide-react';
+import { ExternalLink, Globe, Lock, Database, Code, Plus, Trash2, Play, CheckCircle, AlertCircle, Edit2, Server, Key, Shield, Wifi, Save, Loader2, Table as TableIcon, Filter, Layers } from 'lucide-react';
 import { DataSourceConfig, DataSourceType } from '../types';
 import { api } from '../services/api';
+
+const CRM_ENTITIES = ['lead','customer','case','task','product','quote'];
+const FILTER_OPS   = [
+  { value: 'eq', label: 'equals' },
+  { value: 'neq', label: 'not equals' },
+  { value: 'contains', label: 'contains' },
+  { value: 'gt', label: '>' },
+  { value: 'lt', label: '<' },
+  { value: 'starts', label: 'starts with' },
+];
+
+type CRMFilter = { field: string; op: string; value: string };
+type CRMParam  = { name: string; label: string; type: 'text'|'number'|'date'; defaultValue: string };
 
 export const WebPresenter: React.FC = () => {
    // --- STATE ---
@@ -26,6 +39,9 @@ export const WebPresenter: React.FC = () => {
    const [isRunningQuery, setIsRunningQuery] = useState(false);
    const [queryResult, setQueryResult] = useState<any>(null);
    const [queryError, setQueryError] = useState<string | null>(null);
+
+   // CRM test parameter values for preview
+   const [crmTestParams, setCrmTestParams] = useState<Record<string, string>>({});
 
    React.useEffect(() => {
       loadContent();
@@ -93,12 +109,12 @@ export const WebPresenter: React.FC = () => {
             slug: editConfig.slug,
             type: editConfig.type,
             title: editConfig.name,
-            content: editConfig.query,
-            metadata: {
-               endpoint: editConfig.endpoint,
-               method: editConfig.method,
-               authType: editConfig.authType
-            }
+            content: editConfig.type === 'crm'
+               ? JSON.stringify({ entity: editConfig.crmEntity, filters: editConfig.crmFilters || [] })
+               : editConfig.query,
+            metadata: editConfig.type === 'crm'
+               ? { crmEntity: editConfig.crmEntity, crmFilters: editConfig.crmFilters, crmParams: editConfig.crmParams }
+               : { endpoint: editConfig.endpoint, method: editConfig.method, authType: editConfig.authType }
          });
          setIsDirty(false);
          alert('Saved successfully!');
@@ -132,6 +148,26 @@ export const WebPresenter: React.FC = () => {
          if (editConfig.type === 'sql') {
             const data = await api.executeSQLView(editConfig.query);
             setQueryResult(data);
+         } else if (editConfig.type === 'crm') {
+            const entity = editConfig.crmEntity || 'lead';
+            const allRecords: any[] = await api.getRecords(entity);
+            const filters: CRMFilter[] = editConfig.crmFilters || [];
+            const testVals: Record<string, string> = crmTestParams;
+            const filtered = allRecords.filter(r => {
+               return filters.every(f => {
+                  if (!f.field) return true;
+                  const resolvedVal = f.value.replace(/\{(\w+)\}/g, (_, k) => testVals[k] ?? '');
+                  const rv = String(r[f.field] ?? '');
+                  if (f.op === 'eq')       return rv === resolvedVal;
+                  if (f.op === 'neq')      return rv !== resolvedVal;
+                  if (f.op === 'contains') return rv.toLowerCase().includes(resolvedVal.toLowerCase());
+                  if (f.op === 'starts')   return rv.toLowerCase().startsWith(resolvedVal.toLowerCase());
+                  if (f.op === 'gt')       return Number(rv) > Number(resolvedVal);
+                  if (f.op === 'lt')       return Number(rv) < Number(resolvedVal);
+                  return true;
+               });
+            });
+            setQueryResult(filtered);
          } else if (editConfig.type === 'json' || editConfig.type === 'api') {
             // If it's a static JSON content
             try {
@@ -176,12 +212,36 @@ export const WebPresenter: React.FC = () => {
 
    // --- RENDER HELPERS ---
 
-   const getTypeIcon = (type: DataSourceType) => {
+   const getTypeIcon = (type: string) => {
       switch (type) {
          case 'api': return <Code className="w-4 h-4 text-blue-500" />;
          case 'database': return <Database className="w-4 h-4 text-amber-500" />;
+         case 'crm': return <Layers className="w-4 h-4 text-violet-500" />;
          default: return <Globe className="w-4 h-4 text-indigo-500" />;
       }
+   };
+
+   // Helpers for CRM filter builder
+   const crmFilters: CRMFilter[] = editConfig?.crmFilters || [];
+   const crmParams: CRMParam[] = editConfig?.crmParams || [];
+
+   // Auto-detect {paramName} placeholders from filter values
+   const detectedParamNames = Array.from(
+      new Set(crmFilters.flatMap(f => [...(f.value.match(/\{(\w+)\}/g) || [])].map(m => m.slice(1, -1))))
+   );
+
+   const addCrmFilter = () => handleChange('crmFilters', [...crmFilters, { field: '', op: 'eq', value: '' }]);
+   const removeCrmFilter = (i: number) => handleChange('crmFilters', crmFilters.filter((_, idx) => idx !== i));
+   const updateCrmFilter = (i: number, key: keyof CRMFilter, val: string) => {
+      const updated = crmFilters.map((f, idx) => idx === i ? { ...f, [key]: val } : f);
+      handleChange('crmFilters', updated);
+   };
+
+   const addCrmParam = () => handleChange('crmParams', [...crmParams, { name: '', label: '', type: 'text', defaultValue: '' }]);
+   const removeCrmParam = (i: number) => handleChange('crmParams', crmParams.filter((_, idx) => idx !== i));
+   const updateCrmParam = (i: number, key: keyof CRMParam, val: string) => {
+      const updated = crmParams.map((p, idx) => idx === i ? { ...p, [key]: val } : p);
+      handleChange('crmParams', updated);
    };
 
    return (
@@ -255,6 +315,7 @@ export const WebPresenter: React.FC = () => {
                                        value={editConfig.type}
                                        onChange={(e) => handleChange('type', e.target.value)}
                                     >
+                                       <option value="crm">CRM Data View</option>
                                        <option value="api">REST API</option>
                                        <option value="database">Database (SQL)</option>
                                        <option value="iframe">Web/IFrame</option>
@@ -302,7 +363,7 @@ export const WebPresenter: React.FC = () => {
                                  }`}
                            >
                               {tab === 'config' && 'Connection Settings'}
-                              {tab === 'query' && (editConfig.type === 'database' ? 'SQL Query' : 'Endpoint Configuration')}
+                              {tab === 'query' && (editConfig.type === 'database' ? 'SQL Query' : editConfig.type === 'crm' ? 'Filters & Parameters' : 'Endpoint Configuration')}
                               {tab === 'preview' && 'Data Preview'}
                            </button>
                         ))}
@@ -378,11 +439,66 @@ export const WebPresenter: React.FC = () => {
                                              />
                                           </div>
                                        )}
+
+                                       {editConfig.type === 'crm' && (
+                                          <div className="col-span-2">
+                                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">CRM Entity</label>
+                                             <select
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                                value={editConfig.crmEntity || 'lead'}
+                                                onChange={(e) => handleChange('crmEntity', e.target.value)}
+                                             >
+                                                {CRM_ENTITIES.map(e => (
+                                                   <option key={e} value={e}>{e.charAt(0).toUpperCase() + e.slice(1)}</option>
+                                                ))}
+                                             </select>
+                                          </div>
+                                       )}
                                     </div>
                                  </Card>
 
-                                 {editConfig.type !== 'iframe' && (
+                                 {editConfig.type === 'crm' && (
+                                    <Card title="Filter Rules">
+                                       <div className="space-y-3">
+                                          <p className="text-xs text-gray-500">
+                                             Add filter conditions. Use <span className="font-mono bg-blue-100 px-1 rounded text-blue-700">{'{paramName}'}</span> in the value to accept dynamic query parameters (e.g. <span className="font-mono bg-blue-100 px-1 rounded text-blue-700">{'{city}'}</span>).
+                                          </p>
+                                          {crmFilters.map((f, i) => (
+                                             <div key={i} className="flex gap-2 items-center">
+                                                <input
+                                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                                   placeholder="field name (e.g. status)"
+                                                   value={f.field}
+                                                   onChange={(e) => updateCrmFilter(i, 'field', e.target.value)}
+                                                />
+                                                <select
+                                                   className="px-2 py-2 border border-gray-300 rounded-lg text-sm"
+                                                   value={f.op}
+                                                   onChange={(e) => updateCrmFilter(i, 'op', e.target.value)}
+                                                >
+                                                   {FILTER_OPS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                                </select>
+                                                <input
+                                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                                   placeholder="value or {param}"
+                                                   value={f.value}
+                                                   onChange={(e) => updateCrmFilter(i, 'value', e.target.value)}
+                                                />
+                                                <button onClick={() => removeCrmFilter(i)} className="p-2 text-red-400 hover:text-red-600">
+                                                   <Trash2 className="w-4 h-4" />
+                                                </button>
+                                             </div>
+                                          ))}
+                                          <Button variant="secondary" icon={<Plus className="w-4 h-4" />} onClick={addCrmFilter}>
+                                             Add Filter
+                                          </Button>
+                                       </div>
+                                    </Card>
+                                 )}
+
+                                 {editConfig.type !== 'iframe' && editConfig.type !== 'crm' && (
                                     <Card title="Authentication">
+
                                        <div className="space-y-4">
                                           <div>
                                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Auth Type</label>
@@ -449,8 +565,8 @@ export const WebPresenter: React.FC = () => {
                                     </Card>
                                  )}
 
-                                 {/* Test Connection Zone */}
-                                 <div className="flex items-center gap-4 bg-gray-100 p-4 rounded-xl border border-gray-200">
+                                 {/* Test Connection Zone — hidden for CRM type */}
+                                 {editConfig.type !== 'crm' && <div className="flex items-center gap-4 bg-gray-100 p-4 rounded-xl border border-gray-200">
                                     <Button
                                        onClick={testConnection}
                                        disabled={isTestingConnection}
@@ -472,7 +588,7 @@ export const WebPresenter: React.FC = () => {
                                           <span className="text-sm font-medium">{connectionMessage}</span>
                                        </div>
                                     )}
-                                 </div>
+                                 </div>}
                               </div>
                            )}
 
@@ -481,17 +597,91 @@ export const WebPresenter: React.FC = () => {
                               <div className="space-y-6 animate-in slide-in-from-bottom-2 fade-in duration-300 h-full flex flex-col">
                                  <div className="flex justify-between items-center">
                                     <h3 className="text-sm font-bold text-gray-700 uppercase">
-                                       {editConfig.type === 'database' ? 'SQL Editor' : 'Request Builder'}
+                                       {editConfig.type === 'database' ? 'SQL Editor' : editConfig.type === 'crm' ? 'Parameters & Preview' : 'Request Builder'}
                                     </h3>
-                                    <Button
-                                       onClick={runQuery}
-                                       icon={<Play className="w-4 h-4" />}
-                                    >
-                                       Run Query
+                                    <Button onClick={runQuery} icon={<Play className="w-4 h-4" />}>
+                                       {editConfig.type === 'crm' ? 'Preview Results' : 'Run Query'}
                                     </Button>
                                  </div>
 
-                                 <div className="flex-1 border border-gray-300 rounded-xl overflow-hidden shadow-sm flex flex-col">
+                                 {/* CRM: parameter definition + test values */}
+                                 {editConfig.type === 'crm' && (
+                                    <div className="space-y-4">
+                                       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                                          <h4 className="text-xs font-bold text-blue-700 uppercase flex items-center gap-1.5">
+                                             <Filter className="w-3.5 h-3.5" /> Parameter Definitions
+                                          </h4>
+                                          {crmParams.map((p, i) => (
+                                             <div key={i} className="flex gap-2 items-center">
+                                                <input
+                                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                                                   placeholder="paramName (no braces)"
+                                                   value={p.name}
+                                                   onChange={(e) => updateCrmParam(i, 'name', e.target.value)}
+                                                />
+                                                <input
+                                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                                                   placeholder="Label"
+                                                   value={p.label}
+                                                   onChange={(e) => updateCrmParam(i, 'label', e.target.value)}
+                                                />
+                                                <select
+                                                   className="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                                                   value={p.type}
+                                                   onChange={(e) => updateCrmParam(i, 'type', e.target.value as any)}
+                                                >
+                                                   <option value="text">Text</option>
+                                                   <option value="number">Number</option>
+                                                   <option value="date">Date</option>
+                                                </select>
+                                                <input
+                                                   className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                                                   placeholder="default"
+                                                   value={p.defaultValue}
+                                                   onChange={(e) => updateCrmParam(i, 'defaultValue', e.target.value)}
+                                                />
+                                                <button onClick={() => removeCrmParam(i)} className="p-2 text-red-400 hover:text-red-600">
+                                                   <Trash2 className="w-4 h-4" />
+                                                </button>
+                                             </div>
+                                          ))}
+                                          <Button variant="secondary" icon={<Plus className="w-4 h-4" />} onClick={addCrmParam}>
+                                             Add Parameter
+                                          </Button>
+                                       </div>
+
+                                       {detectedParamNames.length > 0 && (
+                                          <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-3">
+                                             <h4 className="text-xs font-bold text-amber-700 uppercase">Test Values (for Preview)</h4>
+                                             <div className="grid grid-cols-2 gap-3">
+                                                {detectedParamNames.map(name => (
+                                                   <div key={name}>
+                                                      <label className="block text-xs text-amber-800 font-medium mb-1">
+                                                         <span className="font-mono">{'{' + name + '}'}</span>
+                                                      </label>
+                                                      <input
+                                                         className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm bg-white"
+                                                         placeholder={`Test value for ${name}`}
+                                                         value={crmTestParams[name] ?? ''}
+                                                         onChange={(e) => setCrmTestParams(prev => ({ ...prev, [name]: e.target.value }))}
+                                                      />
+                                                   </div>
+                                                ))}
+                                             </div>
+                                          </div>
+                                       )}
+
+                                       <div className="text-xs text-gray-500 bg-violet-50 p-3 rounded-lg border border-violet-100 flex items-start gap-2">
+                                          <Layers className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
+                                          <p>
+                                             This view is exposed as a parameterized endpoint at:
+                                             <span className="font-mono ml-1 bg-violet-100 px-1 rounded">/api/web-content/{editConfig.slug}/data?param=value</span>
+                                          </p>
+                                       </div>
+                                    </div>
+                                 )}
+
+                                 <div className={`flex-1 border border-gray-300 rounded-xl overflow-hidden shadow-sm flex flex-col ${editConfig.type === 'crm' ? 'hidden' : ''}`}>
                                     {editConfig.type === 'api' && (
                                        <div className="bg-gray-50 border-b border-gray-200 p-2 flex gap-2">
                                           <select

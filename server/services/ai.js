@@ -223,3 +223,59 @@ export async function generateLeadNormalization(payload = {}) {
         clearTimeout(timeout);
     }
 }
+
+/**
+ * Generate actionable follow-up tasks from lead notes/call logs.
+ * Returns an array of task objects.
+ */
+export async function generateLeadFollowupTasks(notesContext = '') {
+    if (!isAIEnabled() || !notesContext.trim()) return [];
+
+    const prompt = [
+        'You are a CRM sales assistant. Review the recent notes and call logs for this lead.',
+        'Identify specific actionable follow-up tasks that the sales rep needs to do next (e.g. "Send pricing pdf", "Call back to discuss discount").',
+        'Respond ONLY with a strict JSON array of objects using these keys:',
+        '[{"subject": string (max 8 words), "dueInDays": number (e.g. 0 for today, 1 for tomorrow, etc), "priority": "High" | "Normal" | "Low"}]',
+        'Do not invent tasks if none are implied. If no follow-up is needed, return [].',
+        '',
+        'Recent notes/timeline:',
+        String(notesContext).slice(0, 4000),
+    ].join('\n');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+        const res = await fetch(`${GEMINI_URL(GEMINI_MODEL)}?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.2, maxOutputTokens: 300, responseMimeType: 'application/json' },
+            }),
+        });
+        
+        if (!res.ok) {
+            console.error(`[ai] Lead task generation error ${res.status}`);
+            return [];
+        }
+        
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const parsed = parseJsonLoose(text);
+        
+        if (Array.isArray(parsed)) {
+            return parsed.map(t => ({
+                subject: String(t.subject || 'Follow up').slice(0, 100),
+                dueInDays: Number(t.dueInDays) || 0,
+                priority: ['High', 'Normal', 'Low'].includes(t.priority) ? t.priority : 'Normal'
+            }));
+        }
+        return [];
+    } catch (error) {
+        console.error('[ai] Lead task generation failed:', error.message);
+        return [];
+    } finally {
+        clearTimeout(timeout);
+    }
+}

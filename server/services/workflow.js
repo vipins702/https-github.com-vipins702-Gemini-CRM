@@ -126,6 +126,8 @@ async function runEmail(action, ctx) {
         to: interpolate(action.to, ctx.record),
         subject: interpolate(action.subject, ctx.record),
         html: interpolate(action.body, ctx.record),
+        tenantId: ctx.tenantId,
+        actorId: ctx.actorId || 'workflow',
     });
 }
 

@@ -1,12 +1,13 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { EntityType, LayoutDefinition, EntityDefinition, CRMRecord, FieldDefinition, VisibilityRule, LayoutFieldConfig, Activity } from '../types';
+import { EntityType, LayoutDefinition, EntityDefinition, CRMRecord, FieldDefinition, VisibilityRule, LayoutFieldConfig, Activity, RelatedActivity } from '../types';
 import { formatCurrency, getCurrencySymbol } from '../services/currency';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Plus, Filter, Download, Search, MoreHorizontal, ArrowLeft, Save, Upload, ExternalLink, Paperclip, Loader2, Phone, Mail, MapPin, Calendar, Clock, MessageSquare, Briefcase, User, Link, Image as ImageIcon, X, CloudUpload, Check, Eye, AlertCircle } from 'lucide-react';
+import { Attachments } from '../components/Attachments';
+import { Plus, Filter, Download, Search, MoreHorizontal, ArrowLeft, Save, Upload, ExternalLink, Paperclip, Loader2, Phone, Mail, MapPin, Calendar, Clock, MessageSquare, Briefcase, User, Link, Image as ImageIcon, X, CloudUpload, Check, Eye, AlertCircle, FileText, Activity as ActivityIcon } from 'lucide-react';
 import { api } from '../services/api';
 import { useToast } from '../components/ui/Toast';
 
@@ -22,6 +23,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
    const [data, setData] = useState<CRMRecord[]>([]);
    const [activities, setActivities] = useState<Activity[]>([]);
    const [relatedRecords, setRelatedRecords] = useState<Record<string, CRMRecord[]>>({});
+   const [activity, setActivity] = useState<RelatedActivity | null>(null);
+   const [categoryTrees, setCategoryTrees] = useState<Record<string, { name: string; children?: { name: string }[] }[]>>({});
    const [loading, setLoading] = useState(true);
 
    // UI State
@@ -66,6 +69,16 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                }
             }
             setLookupValues(lookupValuesMap);
+
+            // Fetch category trees for any cascade-type fields
+            const cascadeFields = loadedSchema[entityType]?.fields?.filter((f: FieldDefinition) => f.type === 'cascade') || [];
+            const trees: Record<string, { name: string; children?: { name: string }[] }[]> = {};
+            for (const f of cascadeFields) {
+               const setKey = f.categorySet || 'product';
+               if (trees[setKey]) continue;
+               try { trees[setKey] = await api.getCategoryTree(setKey); } catch { trees[setKey] = []; }
+            }
+            setCategoryTrees(trees);
          } catch (e) {
             console.error("Failed to load module data", e);
          } finally {
@@ -81,6 +94,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
    };
 
    const loadRelatedRecords = async (recordId: string) => {
+      // Reliable cross-channel activity (joined server-side)
+      api.getRelatedActivity(entityType, recordId).then(setActivity).catch(() => setActivity(null));
       try {
          const [allCases, allTasks, allLeads, allProducts] = await Promise.all([
             api.getRecords('case'),
@@ -233,6 +248,30 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                   {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                </select>
             );
+         case 'cascade': {
+            const tree = categoryTrees[field.categorySet || 'product'] || [];
+            const catVal = value || '';
+            const subVal = record?.['subcategory'] || '';
+            const children = tree.find(n => n.name === catVal)?.children || [];
+            if (tree.length === 0) return (
+               <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  No categories configured.{' '}
+                  <button type="button" onClick={() => onNavigate?.('categories')} className="underline font-medium">Set up categories</button>
+               </div>
+            );
+            return (
+               <div className="grid grid-cols-2 gap-2">
+                  <select className={baseClasses} value={catVal} onChange={e => { updateRecordField(field.name, e.target.value); updateRecordField('subcategory', ''); }}>
+                     <option value="">- Category -</option>
+                     {tree.map(n => <option key={n.name} value={n.name}>{n.name}</option>)}
+                  </select>
+                  <select className={baseClasses} value={subVal} onChange={e => updateRecordField('subcategory', e.target.value)} disabled={!children.length}>
+                     <option value="">{children.length ? '- Subcategory -' : '(no sub)'}</option>
+                     {children.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                  </select>
+               </div>
+            );
+         }
          case 'currency':
             return (
                <div className="relative">
@@ -412,6 +451,16 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                               360° View
                            </Button>
                         )}
+                        {entityType === 'lead' && onNavigate && (
+                           <Button
+                              variant="secondary"
+                              className="bg-white/20 border-white/30 text-white hover:bg-white/30"
+                              icon={<Eye className="w-4 h-4" />}
+                              onClick={() => onNavigate('lead-360', { leadId: selectedRecord.id })}
+                           >
+                              360° View
+                           </Button>
+                        )}
                         <Button variant="secondary" className="bg-white/20 border-white/30 text-white hover:bg-white/30" onClick={() => setView('list')}>Cancel</Button>
                         <Button
                            className="bg-white text-indigo-600 hover:bg-white/90"
@@ -566,6 +615,88 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
 
                   {detailTab === 'related' && (
                      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                        {selectedRecord.id && (
+                           <Card title="Attachments">
+                              <Attachments entityType={entityType} recordId={selectedRecord.id} />
+                           </Card>
+                        )}
+                        {activity && (activity.quotes.length + activity.emails.length + activity.whatsapp.length + activity.calls.length + (activity.stageHistory?.length || 0) > 0) && (
+                           <Card title="Activity across channels">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                 {activity.stageHistory && activity.stageHistory.length > 0 && (
+                                    <div className="md:col-span-2">
+                                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><ActivityIcon className="w-3.5 h-3.5" /> Stage History ({activity.stageHistory.length})</p>
+                                       <div className="space-y-1.5">
+                                          {activity.stageHistory.slice(0, 6).map(hs => (
+                                             <div key={hs.id} className="flex items-start gap-2 p-2 rounded-lg bg-slate-50/60">
+                                                <span className="text-xs text-slate-600">
+                                                   {hs.from && <span className="text-slate-400">{hs.from} → </span>}
+                                                   <span className="font-semibold text-ink">{hs.to}</span>
+                                                   {hs.note && <span className="text-ink-soft"> — “{hs.note}”</span>}
+                                                </span>
+                                                <span className="ml-auto text-[10px] text-slate-400 shrink-0">{hs.actor} · {new Date(hs.created_at).toLocaleDateString()}</span>
+                                             </div>
+                                          ))}
+                                       </div>
+                                    </div>
+                                 )}
+                                 {activity.quotes.length > 0 && (
+                                    <div>
+                                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Quotes ({activity.quotes.length})</p>
+                                       <div className="space-y-1.5">
+                                          {activity.quotes.slice(0, 5).map(q => (
+                                             <button key={q.id} onClick={() => onNavigate?.('quotes', { recordId: q.id })} className="w-full flex items-center justify-between gap-2 p-2 rounded-lg hover:bg-slate-50 text-left">
+                                                <span className="text-xs font-semibold text-slate-700 truncate">{q.quoteNumber}</span>
+                                                <span className="flex items-center gap-2 shrink-0"><span className="text-xs font-bold text-emerald-600 tnum">{formatCurrency(q.total, q.currency)}</span><Badge status={q.status} /></span>
+                                             </button>
+                                          ))}
+                                       </div>
+                                    </div>
+                                 )}
+                                 {activity.emails.length > 0 && (
+                                    <div>
+                                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Emails ({activity.emails.length})</p>
+                                       <div className="space-y-1.5">
+                                          {activity.emails.slice(0, 5).map(em => (
+                                             <div key={em.id} className="flex items-center gap-2 p-2 rounded-lg">
+                                                <Mail className={`w-3.5 h-3.5 shrink-0 ${em.direction === 'outbound' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                                <span className="text-xs text-slate-700 truncate flex-1">{em.subject}</span>
+                                                <span className="text-[10px] text-slate-400">{new Date(em.created_at).toLocaleDateString()}</span>
+                                             </div>
+                                          ))}
+                                       </div>
+                                    </div>
+                                 )}
+                                 {activity.whatsapp.length > 0 && (
+                                    <div>
+                                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> WhatsApp ({activity.whatsapp.length})</p>
+                                       <div className="space-y-1.5">
+                                          {activity.whatsapp.slice(0, 5).map(w => (
+                                             <div key={w.id} className="flex items-center gap-2 p-2 rounded-lg">
+                                                <MessageSquare className={`w-3.5 h-3.5 shrink-0 ${w.direction === 'outbound' ? 'text-emerald-500' : 'text-slate-400'}`} />
+                                                <span className="text-xs text-slate-700 truncate flex-1">{w.body}</span>
+                                             </div>
+                                          ))}
+                                       </div>
+                                    </div>
+                                 )}
+                                 {activity.calls.length > 0 && (
+                                    <div>
+                                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Calls ({activity.calls.length})</p>
+                                       <div className="space-y-1.5">
+                                          {activity.calls.slice(0, 5).map(c => (
+                                             <div key={c.id} className="flex items-center gap-2 p-2 rounded-lg">
+                                                <Phone className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                                                <span className="text-xs text-slate-700 truncate flex-1">{c.direction} · {c.from_number || '—'}</span>
+                                                <span className="text-[10px] text-slate-400">{c.outcome || c.status}</span>
+                                             </div>
+                                          ))}
+                                       </div>
+                                    </div>
+                                 )}
+                              </div>
+                           </Card>
+                        )}
                         {Object.entries(relatedRecords).map(([type, list]: [string, CRMRecord[]]) => {
                            if (list.length === 0) return null;
                            return (
@@ -642,22 +773,22 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
    return (
       <div className="min-h-screen">
          {/* Page Header */}
-         <div className="bg-white border-b border-slate-200/70">
+         <div className="bg-white border-b border-slate-200">
             <div className="max-w-7xl mx-auto px-6 py-5">
                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
-                     <h1 className="text-xl font-semibold tracking-tight text-slate-900 flex items-center gap-2.5">
+                     <h1 className="font-heading text-xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
                         {schema.pluralLabel}
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-semibold rounded-md tnum">
+                        <span className="px-2 py-0.5 bg-[#2563EB]/10 text-[#1E40AF] text-xs font-semibold rounded-md tnum">
                            {totalRecords}
                         </span>
                      </h1>
-                     <p className="text-slate-500 text-sm mt-1">Manage and track your {schema.pluralLabel.toLowerCase()}.</p>
+                     <p className="text-ink-muted text-sm mt-1">Manage and track your {schema.pluralLabel.toLowerCase()}.</p>
                   </div>
                   <div className="flex gap-2">
                      <Button variant="secondary" icon={<Filter className="w-4 h-4" />}>Filter</Button>
                      <Button variant="secondary" icon={<Download className="w-4 h-4" />}>Export</Button>
-                     <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={() => { setSelectedRecord({ id: '' } as CRMRecord); setRelatedRecords({}); setActivities([]); setView('detail'); }}>
+                     <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={() => { setSelectedRecord({ id: '' } as CRMRecord); setRelatedRecords({}); setActivity(null); setActivities([]); setView('detail'); }}>
                         New {schema.label}
                      </Button>
                   </div>
@@ -703,12 +834,12 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                <div className="overflow-x-auto">
                   <table className="min-w-full">
                      <thead>
-                        <tr className="bg-slate-50/70 border-b border-slate-100">
+                        <tr className="bg-slate-50 border-b border-slate-200">
                            <th className="px-4 py-3 text-left w-10">
-                              <input type="checkbox" aria-label="Select all" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                              <input type="checkbox" aria-label="Select all" className="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]" />
                            </th>
                            {columns.map(col => (
-                              <th key={col.name} className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                              <th key={col.name} className="px-4 py-3 text-left mono-label whitespace-nowrap">
                                  {col.label}
                               </th>
                            ))}
@@ -731,7 +862,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                        variant="primary"
                                        className="mt-4"
                                        icon={<Plus className="w-4 h-4" />}
-                                       onClick={() => { setSelectedRecord({ id: '' } as CRMRecord); setRelatedRecords({}); setActivities([]); setView('detail'); }}
+                                       onClick={() => { setSelectedRecord({ id: '' } as CRMRecord); setRelatedRecords({}); setActivity(null); setActivities([]); setView('detail'); }}
                                     >
                                        Create {schema.label}
                                     </Button>
@@ -754,9 +885,13 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                           <Badge status={record[col.name]} variant="dot" />
                                        ) : colIdx === 0 ? (
                                           <div className="flex items-center gap-3">
-                                             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-lg flex items-center justify-center text-white text-xs font-semibold shrink-0">
-                                                {(record[col.name] || 'U')[0].toUpperCase()}
-                                             </div>
+                                             {record['image'] ? (
+                                                <img src={record['image']} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0 border border-slate-200" />
+                                             ) : (
+                                                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-lg flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                                                   {(record[col.name] || 'U')[0].toUpperCase()}
+                                                </div>
+                                             )}
                                              <span className="text-slate-900 font-medium group-hover:text-indigo-600 transition-colors">
                                                 {record[col.name]}
                                              </span>

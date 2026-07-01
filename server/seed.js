@@ -9,6 +9,13 @@ const TENANT_ID = 'default';
 // 1. Initial Menu
 const INITIAL_MENU = [
     { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', type: 'item', view: 'dashboard', allowedRoles: ['*'] },
+    { id: 'reports', label: 'Reports', icon: 'BarChart3', type: 'item', view: 'reports', allowedRoles: ['*'] },
+    { id: 'pipeline', label: 'Pipeline', icon: 'GitBranch', type: 'item', view: 'pipeline', allowedRoles: ['*'] },
+    { id: 'processes', label: 'Process Builder', icon: 'Workflow', type: 'item', view: 'processes', allowedRoles: ['admin'] },
+    { id: 'calendar', label: 'Calendar & Tasks', icon: 'Calendar', type: 'item', view: 'calendar', allowedRoles: ['*'] },
+    { id: 'quotes', label: 'Quotes', icon: 'FileText', type: 'item', view: 'quotes', allowedRoles: ['*'] },
+    { id: 'whatsapp', label: 'WhatsApp', icon: 'MessageCircle', type: 'item', view: 'whatsapp', allowedRoles: ['*'] },
+    { id: 'email-inbox', label: 'Email', icon: 'Mail', type: 'item', view: 'email-inbox', allowedRoles: ['*'] },
     { id: 'campaigns', label: 'Campaigns', icon: 'Megaphone', type: 'item', view: 'campaigns', allowedRoles: ['*'] },
     {
         id: 'crm_modules',
@@ -34,6 +41,7 @@ const INITIAL_MENU = [
             { id: 'lookups', label: 'Lookup Manager', icon: 'List', type: 'item', view: 'lookups', allowedRoles: ['admin'] },
             { id: 'autoflow', label: 'Journeys', icon: 'Workflow', type: 'item', view: 'autoflow', allowedRoles: ['admin'] },
             { id: 'lead-rules', label: 'Lead Rules', icon: 'Zap', type: 'item', view: 'lead-rules', allowedRoles: ['admin'] },
+            { id: 'categories', label: 'Product Categories', icon: 'Layers', type: 'item', view: 'categories', allowedRoles: ['admin'] },
             { id: 'lead-capture', label: 'Lead Capture', icon: 'Inbox', type: 'item', view: 'lead-capture', allowedRoles: ['admin'] },
             { id: 'agent-console', label: 'Agent Console', icon: 'PhoneCall', type: 'item', view: 'agent-console', allowedRoles: ['admin'] },
             { id: 'layout', label: 'Form Designer', icon: 'PaintBucket', type: 'item', view: 'layout', allowedRoles: ['admin'] },
