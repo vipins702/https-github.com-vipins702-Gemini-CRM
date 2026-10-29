@@ -6,7 +6,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 export const PORT = process.env.PORT || 3015;
-export const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-123';
+// Signs login tokens. There is no default: a guessable value would let anyone forge a login.
+if (!process.env.JWT_SECRET) {
+    throw new Error(
+        'JWT_SECRET is not set. Add a long random value to server/.env, e.g. the output of: ' +
+        `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+    );
+}
+export const JWT_SECRET = process.env.JWT_SECRET;
+// Encrypts saved integration secrets (tokens, app secrets, SMTP passwords). Defaults to a key
+// derived from JWT_SECRET — set SECRETS_KEY too if you may ever change JWT_SECRET, or saved
+// secrets become unreadable and must be re-entered.
+export const SECRETS_KEY = process.env.SECRETS_KEY || '';
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 

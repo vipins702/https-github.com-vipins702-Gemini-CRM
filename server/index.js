@@ -23,7 +23,7 @@ import { lookupByPhone, logCall, getRecentCalls, convertLeadToCustomer, handleIn
 import { listReports, runReport, listPacks, runPack } from './services/reporting.js';
 import { reportCache } from './services/reportCache.js';
 import { verifyWebhook, parseWebhookPayload, handleIncomingMessage, sendMessage, getConversations, getThread, isConfigured as waConfigured, authenticateMessages as waAuthenticateMessages } from './services/whatsapp.js';
-import { listForClient as listIntegrations, getForClient as getIntegration, saveIntegration, getIngestKey, rotateIngestKey, resolveTenantByIngestKey } from './services/integrations.js';
+import { listForClient as listIntegrations, getForClient as getIntegration, saveIntegration, getIngestKey, rotateIngestKey, resolveTenantByIngestKey, encryptStoredSecrets } from './services/integrations.js';
 import { listQuotes, getQuote, saveQuote, setQuoteStatus, emailQuote, convertQuote } from './services/quotes.js';
 import { getProcess, saveProcess, configurableEntities, findStage, missingForStage, runStageEntryActions } from './services/processes.js';
 import { getTree as getCategoryTree, saveTree as saveCategoryTree, ensureDefaultTree } from './services/categories.js';
@@ -73,6 +73,7 @@ const upload = multer({
 // Initialize Database
 // Initialize Database
 await initDB();
+await encryptStoredSecrets();
 
 // Idempotent menu patch: ensure existing tenant menus expose the Reports view.
 async function ensureReportsMenuItem() {

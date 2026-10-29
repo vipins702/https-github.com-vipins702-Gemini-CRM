@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import db from '../database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { logAudit } from './audit.js';
+import { encryptSecret, decryptSecret, isEncrypted } from '../utils/secrets.js';
 import {
     WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, WHATSAPP_APP_SECRET,
     SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, EMAIL_FROM,
@@ -18,7 +19,8 @@ import {
  *
  * Secrets are never returned to the client in clear text; listForClient() masks
  * them, and saveIntegration() preserves an existing secret when the incoming
- * value is blank or still masked.
+ * value is blank or still masked. In the database, secret fields are encrypted
+ * (utils/secrets.js); getStoredConfig() decrypts them for server-side use.
  */
 
 export const PROVIDERS = ['whatsapp', 'facebook', 'instagram', 'email'];
@@ -43,10 +45,45 @@ function parseConfig(row) {
     try { return JSON.parse(row.config || '{}'); } catch { return {}; }
 }
 
-/** Raw stored config for a provider (clear text — server-side use only). */
+/** Copy of config with this provider's secret fields passed through fn. */
+function mapSecrets(provider, config, fn) {
+    const out = { ...config };
+    for (const f of SECRET_FIELDS[provider] || []) {
+        if (out[f]) out[f] = fn(out[f], f);
+    }
+    return out;
+}
+
+function decryptSecrets(tenantId, provider, config) {
+    return mapSecrets(provider, config, (v, f) => {
+        try { return decryptSecret(v); }
+        catch {
+            // Encrypted under a different key (JWT_SECRET/SECRETS_KEY changed): treat as unset.
+            console.error(`[integrations] cannot decrypt ${provider}.${f} for tenant ${tenantId} — re-enter it in Integrations`);
+            return '';
+        }
+    });
+}
+
+/** Stored config for a provider with secrets decrypted (clear text — server-side use only). */
 export async function getStoredConfig(tenantId, provider) {
     const row = await getRow(tenantId, provider);
-    return { enabled: !!(row && row.enabled), config: parseConfig(row) };
+    return { enabled: !!(row && row.enabled), config: decryptSecrets(tenantId, provider, parseConfig(row)) };
+}
+
+/** Encrypt any secrets still stored as plain text (from before encryption existed). Run at startup. */
+export async function encryptStoredSecrets() {
+    const rows = await db.all('SELECT id, provider, config FROM integrations');
+    let updated = 0;
+    for (const row of rows) {
+        const config = parseConfig(row);
+        const plain = (SECRET_FIELDS[row.provider] || []).some(f => config[f] && !isEncrypted(config[f]));
+        if (!plain) continue;
+        await db.run('UPDATE integrations SET config = ? WHERE id = ?',
+            JSON.stringify(mapSecrets(row.provider, config, encryptSecret)), row.id);
+        updated++;
+    }
+    if (updated) console.log(`[integrations] Encrypted plain-text secrets in ${updated} integration(s)`);
 }
 
 /**
@@ -173,16 +210,17 @@ export async function saveIntegration(tenantId, provider, { config = {}, enabled
     }
 
     const nextEnabled = enabled === undefined ? (existing.enabled ? 1 : 0) : (enabled ? 1 : 0);
+    const stored = JSON.stringify(mapSecrets(provider, merged, encryptSecret));
     const row = await getRow(tenantId, provider);
     if (row) {
         await db.run(
             'UPDATE integrations SET config = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            JSON.stringify(merged), nextEnabled, row.id
+            stored, nextEnabled, row.id
         );
     } else {
         await db.run(
             'INSERT INTO integrations (id, tenant_id, provider, config, enabled) VALUES (?, ?, ?, ?, ?)',
-            uuidv4(), tenantId, provider, JSON.stringify(merged), nextEnabled
+            uuidv4(), tenantId, provider, stored, nextEnabled
         );
     }
     await logAudit({
