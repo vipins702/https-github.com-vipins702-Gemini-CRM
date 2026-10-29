@@ -31,6 +31,7 @@ import { listCampaigns, getCampaign, saveCampaign as saveCampaignSvc, previewAud
 import { calculateLeadScore } from './services/scoring.js';
 import { assignLead } from './services/assignment.js';
 import { listSequences, getSequence, saveSequence, deleteSequence, enrollRecord, getEnrollments, unenrollRecord, startSequenceScheduler } from './services/sequences.js';
+import { runTenantQuery, SandboxQueryError } from './services/sqlSandbox.js';
 import { createReadStream } from 'fs';
 
 const app = express();
@@ -54,6 +55,11 @@ const resolveInboundTenant = async (req, res, next) => {
     } catch (e) {
         res.status(500).json({ error: 'Failed to verify ingest key' });
     }
+};
+
+const requireAdmin = (req, res, next) => {
+    if (req.user?.role === 'admin' || req.user?.permissions?.admin) return next();
+    res.status(403).json({ error: 'Admin access required' });
 };
 
 // --- Uploads (attachments) ---
@@ -580,38 +586,14 @@ app.post('/api/web-content', authenticateToken, async (req, res) => {
     }
 });
 
-// Execute SQL View (Web Presenter)
-app.post('/api/web-presenter/execute-sql', authenticateToken, async (req, res) => {
-    const { query } = req.body;
-
-    // Security check: Only allow SELECT
-    const forbidden = [';', 'drop', 'delete', 'update', 'insert', 'alter', 'truncate', 'grant', 'exec', 'attach', 'detach', 'pragma'];
-    const cleanQuery = query.trim().toLowerCase();
-
-    if (!cleanQuery.startsWith('select')) {
-        return res.status(400).json({ error: 'Only SELECT queries are allowed.' });
-    }
-
-    if (forbidden.some(word => cleanQuery.includes(word))) {
-        return res.status(400).json({ error: 'Query contains forbidden keywords.' });
-    }
-
-    // Security enhancement: ensure query always scopes to tenant
-    if (!cleanQuery.includes('tenant_id')) {
-        return res.status(400).json({ error: 'Query must include tenant_id filter for security.' });
-    }
-
+// Execute SQL View (Web Presenter). Admin-only; runs in the tenant sandbox (services/sqlSandbox.js).
+app.post('/api/web-presenter/execute-sql', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        // Use parameterized binding instead of string replacement for :tenantId
-        const paramMatches = query.match(/:tenantId/gi) || [];
-        const safeQuery = query.replace(/:tenantId/gi, '?');
-        const params = paramMatches.map(() => req.tenantId);
-
-        const rows = await db.all(safeQuery, ...params);
-        res.json(rows);
+        res.json(await runTenantQuery(req.tenantId, req.body?.query));
     } catch (error) {
+        if (error instanceof SandboxQueryError) return res.status(400).json({ error: error.message });
         console.error('Execute SQL error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Failed to run query' });
     }
 });
 // --- Saved Reports & Analytics Engine ---
@@ -856,7 +838,7 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
         if (!validationResult.success) {
             return res.status(400).json({
                 error: 'Validation Failed',
-                details: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+                details: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`)
             });
         }
 
@@ -1276,10 +1258,8 @@ app.get('/api/lookups/:lookupId', authenticateToken, async (req, res) => {
                     FROM records WHERE tenant_id = ? AND entity_type = ?
                 `, req.tenantId, liveSource.source_entity);
             } else if (liveSource.source_type === 'sql' && liveSource.sql_query) {
-                // Custom SQL with tenant filter
-                let finalQuery = liveSource.sql_query.replace(/:tenantId/gi, `'${req.tenantId}'`);
-                // For SQL we use all()
-                const sqlRows = await db.all(finalQuery);
+                // Admin-configured custom SQL, run in the tenant sandbox
+                const sqlRows = await runTenantQuery(req.tenantId, liveSource.sql_query);
                 rows = sqlRows.map(r => ({
                     value_id: String(r[liveSource.value_field] || r.id || r.value_id),
                     value: String(r[liveSource.label_field] || r.name || r.value || 'Unnamed')
@@ -1379,7 +1359,7 @@ app.get('/api/lookups/:lookupId/live-source', authenticateToken, async (req, res
 });
 
 // Configure live source for a lookup
-app.post('/api/lookups/:lookupId/live-source', authenticateToken, async (req, res) => {
+app.post('/api/lookups/:lookupId/live-source', authenticateToken, requireAdmin, async (req, res) => {
     const { lookupId } = req.params;
     const { sourceType, sourceEntity, valueField = 'id', labelField = 'name', sqlQuery } = req.body;
 
@@ -1408,7 +1388,7 @@ app.post('/api/lookups/:lookupId/live-source', authenticateToken, async (req, re
 });
 
 // Remove live source config (revert to static values)
-app.delete('/api/lookups/:lookupId/live-source', authenticateToken, async (req, res) => {
+app.delete('/api/lookups/:lookupId/live-source', authenticateToken, requireAdmin, async (req, res) => {
     const { lookupId } = req.params;
     try {
         await db.run(
@@ -1489,35 +1469,13 @@ app.post('/api/lookups/:lookupId/import-from-source', authenticateToken, async (
     }
 });
 
-// Import lookup values from custom SQL query (with tenant_id always enforced)
-app.post('/api/lookups/:lookupId/import-from-sql', authenticateToken, async (req, res) => {
+// Import lookup values from a custom SQL query. Admin-only; runs in the tenant sandbox.
+app.post('/api/lookups/:lookupId/import-from-sql', authenticateToken, requireAdmin, async (req, res) => {
     const { lookupId } = req.params;
     const { query, valueColumn = 'value_id', labelColumn = 'value' } = req.body;
 
-    if (!query) {
-        return res.status(400).json({ error: 'Query is required' });
-    }
-
-    // Security: Only allow SELECT statements
-    const cleanQuery = query.trim().toLowerCase();
-    if (!cleanQuery.startsWith('select')) {
-        return res.status(400).json({ error: 'Only SELECT queries are allowed' });
-    }
-
-    // Security: Disallow dangerous keywords
-    const dangerousKeywords = ['insert', 'update', 'delete', 'drop', 'alter', 'create', 'truncate', 'exec', 'execute'];
-    for (const keyword of dangerousKeywords) {
-        if (cleanQuery.includes(keyword)) {
-            return res.status(400).json({ error: `Query contains forbidden keyword: ${keyword}` });
-        }
-    }
-
     try {
-        // Replace :tenantId placeholder with actual tenant ID
-        let finalQuery = query.replace(/:tenantId/gi, `'${req.tenantId}'`);
-
-        // Execute the query
-        const rows = await db.all(finalQuery);
+        const rows = await runTenantQuery(req.tenantId, query);
 
         if (rows.length === 0) {
             return res.json({ success: true, count: 0, message: 'Query returned no results' });
@@ -1540,8 +1498,9 @@ app.post('/api/lookups/:lookupId/import-from-sql', authenticateToken, async (req
         });
         res.json({ success: true, count: rows.length });
     } catch (error) {
+        if (error instanceof SandboxQueryError) return res.status(400).json({ error: `Query error: ${error.message}` });
         console.error('Import from SQL error:', error);
-        res.status(500).json({ error: `Query error: ${error.message}` });
+        res.status(500).json({ error: 'Failed to import from query' });
     }
 });
 
@@ -2260,10 +2219,6 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requireSuperadmin, asy
 
 // ---- Integrations (per-tenant credentials: WhatsApp / Facebook / Instagram / Email) ----
 // Admin-only. Secrets are masked on read and preserved on blank save.
-const requireAdmin = (req, res, next) => {
-    if (req.user?.role === 'admin' || req.user?.permissions?.admin) return next();
-    res.status(403).json({ error: 'Admin access required' });
-};
 
 app.get('/api/integrations', authenticateToken, requireAdmin, async (req, res) => {
     try { res.json(await listIntegrations(req.tenantId)); }
