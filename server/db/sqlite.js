@@ -9,6 +9,8 @@ export class SQLiteAdapter {
     constructor() {
         this.db = new Database(dbPath);
         this.db.pragma('journal_mode = WAL');
+        this.jsonType = 'TEXT';
+        this.like = 'LIKE';
         console.log('SQLite Adapter initialized connected to:', dbPath);
     }
 
@@ -28,17 +30,39 @@ export class SQLiteAdapter {
         return this.db.exec(sql);
     }
 
-    prepare(sql) {
-        return this.db.prepare(sql);
+    /** Column names of a table. */
+    async columns(table) {
+        return this.db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
     }
 
-    // For transaction support
-    transaction(fn) {
-        return this.db.transaction(fn);
+    /**
+     * Run fn(tx) in one transaction; tx has get/all/run. better-sqlite3 is synchronous,
+     * so nothing else can run between fn's statements unless fn awaits real I/O.
+     */
+    async transaction(fn) {
+        this.db.exec('BEGIN');
+        try {
+            const result = await fn(this);
+            this.db.exec('COMMIT');
+            return result;
+        } catch (e) {
+            this.db.exec('ROLLBACK');
+            throw e;
+        }
     }
 
-    // Helper for reporting
-    buildJsonPath(column, field) {
-        return `json_extract(${column}, '$.${field}')`;
+    /** SQL for a JSON field of a JSON text column. */
+    json(column, field) {
+        return `json_extract(${column}, '$.${String(field).replace(/'/g, "''")}')`;
+    }
+
+    /** SQL for the column with one JSON text field set to the next bound parameter. */
+    jsonSet(column, field) {
+        return `json_set(${column}, '$.${String(field).replace(/'/g, "''")}', ?)`;
+    }
+
+    /** SQL for a JSON field as a number. */
+    jsonNum(column, field) {
+        return `CAST(${this.json(column, field)} AS REAL)`;
     }
 }

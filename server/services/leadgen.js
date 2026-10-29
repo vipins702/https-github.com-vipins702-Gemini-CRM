@@ -321,10 +321,9 @@ export async function runDueIntervalRules() {
             const result = await runLeadRule(rule, rule.tenant_id, 'system', { dryRun: false });
             const minutes = rule.interval_minutes && rule.interval_minutes > 0 ? rule.interval_minutes : 60;
             // Schedule next run
-            await db.run(
-                `UPDATE lead_rules SET next_run_at = datetime(CURRENT_TIMESTAMP, '+' || ? || ' minutes') WHERE id = ?`,
-                minutes, rule.id
-            );
+            // Same 'YYYY-MM-DD HH:MM:SS' UTC format as CURRENT_TIMESTAMP, which it is compared against.
+            const nextRun = new Date(Date.now() + minutes * 60000).toISOString().replace('T', ' ').slice(0, 19);
+            await db.run(`UPDATE lead_rules SET next_run_at = ? WHERE id = ?`, nextRun, rule.id);
             if (result.created > 0) {
                 console.log(`[leadgen] Interval rule "${rule.name}" created ${result.created} lead(s); next run in ${minutes}m`);
             }

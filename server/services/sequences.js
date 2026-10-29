@@ -101,10 +101,12 @@ export async function unenrollRecord(tenantId, enrollmentId) {
  */
 export async function processDueSequenceSteps() {
     try {
+        // next_step_at is stored as an ISO string (toISOString), so compare against one.
         const due = await db.all(
             `SELECT e.*, s.steps, s.name as seq_name FROM sequence_enrollments e
              JOIN sequences s ON s.id = e.sequence_id
-             WHERE e.status = 'active' AND e.next_step_at <= datetime('now')`
+             WHERE e.status = 'active' AND e.next_step_at <= ?`,
+            new Date().toISOString()
         );
 
         for (const enrollment of due) {

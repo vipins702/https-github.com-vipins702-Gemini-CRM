@@ -25,7 +25,7 @@ const slugify = (s) =>
 
 /** Copy every row of one table from one tenant to another, with fresh ids. */
 async function cloneTable(table, fromTenant, toTenant) {
-    const cols = (await db.all(`PRAGMA table_info(${table})`)).map(c => c.name);
+    const cols = await db.columns(table);
     if (!cols.includes('tenant_id')) return;
     const rows = await db.all(`SELECT * FROM ${table} WHERE tenant_id = ?`, fromTenant);
     for (const row of rows) {

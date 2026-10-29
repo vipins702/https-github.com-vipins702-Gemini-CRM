@@ -106,14 +106,14 @@ export async function handleIncomingMessage(tenantId, { from, profileName, body,
         const lead = await createLeadFromCall(tenantId, phone, actorId, `WhatsApp: ${body || ''}`.slice(0, 300));
         // Re-shape to the lookup result format and rename the source to WhatsApp.
         await db.run(
-            `UPDATE records SET data = json_set(data, '$.source', 'WhatsApp'), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?`,
-            lead.id, tenantId
+            `UPDATE records SET data = ${db.jsonSet('data', 'source')}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?`,
+            'WhatsApp', lead.id, tenantId
         );
         match = { match: 'lead', entityType: 'lead', recordId: lead.id, name: profileName || lead.name };
         // If WhatsApp gave us a profile name, use it as the lead name.
         if (profileName) {
             await db.run(
-                `UPDATE records SET primary_display = ?, data = json_set(data, '$.name', ?) WHERE id = ? AND tenant_id = ?`,
+                `UPDATE records SET primary_display = ?, data = ${db.jsonSet('data', 'name')} WHERE id = ? AND tenant_id = ?`,
                 profileName, profileName, lead.id, tenantId
             );
         }
@@ -215,7 +215,7 @@ export async function getConversations(tenantId, limit = 50) {
                COUNT(*) AS message_count
         FROM wa_messages m
         WHERE m.tenant_id = ?
-        GROUP BY m.phone
+        GROUP BY m.tenant_id, m.phone
         ORDER BY last_at DESC
         LIMIT ?`, tenantId, limit);
 }

@@ -20,8 +20,10 @@ import { reportCache } from './reportCache.js';
  */
 
 // JSON field accessor with sensible fallbacks for the metadata `records` table.
-const J = (field) => `json_extract(r.data, '$.${field}')`;
-const NUM = (field) => `CAST(${J(field)} AS REAL)`;
+const J = (field) => db.json('r.data', field);
+const NUM = (field) => db.jsonNum('r.data', field);
+// 'YYYY-MM' of a stored timestamp (text 'YYYY-MM-DD HH:MM:SS' on both databases).
+const MONTH = (col) => `substr(${col}, 1, 7)`;
 
 /** The vetted report catalog. SQL expressions here are author-controlled (safe). */
 const REPORTS = {
@@ -73,7 +75,7 @@ const REPORTS = {
     mode: 'aggregate',
     viz: 'line',
     entityType: 'lead',
-    dimension: { expr: `strftime('%Y-%m', r.created_at)`, label: 'Month', key: 'name' },
+    dimension: { expr: MONTH('r.created_at'), label: 'Month', key: 'name' },
     measure: { expr: 'COUNT(*)', label: 'New Leads', key: 'value', type: 'number' },
     params: [{ name: 'since', label: 'Created since', type: 'date' }],
     orderByDimension: true,
@@ -177,7 +179,7 @@ export async function runReport(tenantId, reportId, opts = {}) {
     const op = FILTER_OPS[f?.op || 'eq'];
     if (!fd || !op || f.value === undefined || f.value === '') continue;
     if (op === 'LIKE') {
-      where.push(`${fd.expr} LIKE ?`);
+      where.push(`${fd.expr} ${db.like} ?`);
       args.push(`%${f.value}%`);
     } else {
       where.push(`${fd.expr} ${op} ?`);
@@ -323,7 +325,7 @@ const REPORT_PACKS = {
           const w = clauses.join(' AND ');
           const rows = await db.all(`
             SELECT
-              strftime('%Y-%m', r.created_at) AS period,
+              ${MONTH('r.created_at')} AS period,
               COUNT(*) AS new_leads,
               COALESCE(SUM(${VALUE}), 0) AS revenue
             FROM records r WHERE ${w}

@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Backend:**
 - Node.js with Express.js
-- SQLite database (via better-sqlite3)
+- SQLite (default, via better-sqlite3) or PostgreSQL (`DB_TYPE=postgres` + `DATABASE_URL`)
 - JWT authentication with bcryptjs
 - CORS enabled
 
@@ -91,7 +91,8 @@ npm run build
 
 **Config & Initialization:**
 - `server/config.js` - Environment variables (PORT, JWT_SECRET, database path)
-- `server/database.js` - SQLite initialization and connection management
+- `server/database.js` - Schema creation (shared by both databases) and seeding
+- `server/db/sqlite.js`, `server/db/postgres.js` - Database adapters with the same interface
 - `server/index.js` - Express app setup and route handlers
 
 **Middleware:**
@@ -104,9 +105,15 @@ npm run build
 - `server/services/` - Additional service modules
 
 **Database:**
-- SQLite file: `server/crm_v4.db` (current version)
+- SQLite file: `server/crm_v5.db` (current version); PostgreSQL when `DB_TYPE=postgres`
 - Schema includes: users, roles, entities, fields, records, relationships, lookups, workflows, menus, etc.
 - Multi-tenant support (all records have `tenant_id`)
+- Records keep custom fields as JSON in `records.data` (JSONB on Postgres); common fields
+  (status, owner, phone, dates) are real columns, and email/phone/link fields are indexed
+- Write SQL that runs on both: use `db.json(col, field)`, `db.jsonNum()`, `db.jsonSet()`,
+  `db.like`, `db.columns(table)` and `db.transaction(async tx => …)` instead of SQLite-only
+  functions (`json_extract`, `PRAGMA`, `datetime()`, `db.prepare`)
+- `npm run db:copy-to-postgres` copies the SQLite data into the empty Postgres in `DATABASE_URL`
 
 ### API Layer
 

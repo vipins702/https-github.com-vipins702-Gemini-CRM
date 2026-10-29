@@ -18,6 +18,12 @@ if (DB_TYPE === 'sqlite') {
 
 export default dbInstance;
 
+/**
+ * The schema below is written once for both databases. On Postgres the adapter turns
+ * DATETIME into UTC text timestamps (same format SQLite stores) and drops FOREIGN KEY
+ * clauses, which SQLite has never enforced here — enforcing them on Postgres only would
+ * make the two behave differently. records.data is JSON text on SQLite and JSONB on Postgres.
+ */
 export async function initDB() {
     console.log(`Initializing Database (${DB_TYPE})...`);
 
@@ -52,8 +58,8 @@ export async function initDB() {
 
         // Migration: Add is_active if missing (for existing dbs)
         try {
-            const columns = await dbInstance.all(`PRAGMA table_info(users)`);
-            if (!columns.some(c => c.name === 'is_active')) {
+            const columns = await dbInstance.columns('users');
+            if (!columns.includes('is_active')) {
                 console.log('Migrating users table: Adding is_active column...');
                 await dbInstance.run(`ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1`);
             }
@@ -63,8 +69,8 @@ export async function initDB() {
 
         // Migration: Add must_change_password if missing
         try {
-            const columns = await dbInstance.all(`PRAGMA table_info(users)`);
-            if (!columns.some(c => c.name === 'must_change_password')) {
+            const columns = await dbInstance.columns('users');
+            if (!columns.includes('must_change_password')) {
                 console.log('Migrating users table: Adding must_change_password column...');
                 await dbInstance.run(`ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 1`);
             }
@@ -74,8 +80,8 @@ export async function initDB() {
 
         // Migration: Add is_superadmin (platform owner — bypasses tenant scoping)
         try {
-            const columns = await dbInstance.all(`PRAGMA table_info(users)`);
-            if (!columns.some(c => c.name === 'is_superadmin')) {
+            const columns = await dbInstance.columns('users');
+            if (!columns.includes('is_superadmin')) {
                 console.log('Migrating users table: Adding is_superadmin column...');
                 await dbInstance.run(`ALTER TABLE users ADD COLUMN is_superadmin INTEGER DEFAULT 0`);
             }
@@ -104,7 +110,7 @@ export async function initDB() {
                 entity_type TEXT NOT NULL,
                 primary_display TEXT, 
                 status TEXT,
-                data TEXT NOT NULL,
+                data ${dbInstance.jsonType} NOT NULL,
                 owner_id TEXT,
                 normalized_phone TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -116,12 +122,12 @@ export async function initDB() {
 
         // Migration: Add owner_id and normalized_phone if missing
         try {
-            const columns = await dbInstance.all(`PRAGMA table_info(records)`);
-            if (!columns.some(c => c.name === 'owner_id')) {
+            const columns = await dbInstance.columns('records');
+            if (!columns.includes('owner_id')) {
                 console.log('Migrating records table: Adding owner_id column...');
                 await dbInstance.run(`ALTER TABLE records ADD COLUMN owner_id TEXT REFERENCES users(id)`);
             }
-            if (!columns.some(c => c.name === 'normalized_phone')) {
+            if (!columns.includes('normalized_phone')) {
                 console.log('Migrating records table: Adding normalized_phone column...');
                 await dbInstance.run(`ALTER TABLE records ADD COLUMN normalized_phone TEXT`);
                 console.log('Migrating records table: Creating unique index for normalized_phone on customers...');
@@ -273,8 +279,8 @@ export async function initDB() {
 
         // Migration: Add flow_data if missing
         try {
-            const columns = await dbInstance.all(`PRAGMA table_info(workflows)`);
-            if (!columns.some(c => c.name === 'flow_data')) {
+            const columns = await dbInstance.columns('workflows');
+            if (!columns.includes('flow_data')) {
                 console.log('Migrating workflows table: Adding flow_data column...');
                 await dbInstance.run(`ALTER TABLE workflows ADD COLUMN flow_data TEXT`);
             }
@@ -331,8 +337,7 @@ export async function initDB() {
 
         // Migration: add scheduling columns to lead_rules if missing (for DBs created earlier this session)
         try {
-            const cols = await dbInstance.all(`PRAGMA table_info(lead_rules)`);
-            const names = cols.map(c => c.name);
+            const names = await dbInstance.columns('lead_rules');
             if (!names.includes('schedule')) await dbInstance.run(`ALTER TABLE lead_rules ADD COLUMN schedule TEXT DEFAULT 'manual'`);
             if (!names.includes('interval_minutes')) await dbInstance.run(`ALTER TABLE lead_rules ADD COLUMN interval_minutes INTEGER`);
             if (!names.includes('next_run_at')) await dbInstance.run(`ALTER TABLE lead_rules ADD COLUMN next_run_at DATETIME`);
@@ -663,6 +668,15 @@ export async function initDB() {
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_lead_rules_tenant ON lead_rules(tenant_id)`);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_tenant_entity ON records(tenant_id, entity_type)`);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_lookup ON records(tenant_id, entity_type, id)`);
+        // Key fields: real columns, plus indexes on the JSON fields used for duplicate checks
+        // and linking, so these lookups stay fast as the records table grows.
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_status ON records(tenant_id, entity_type, status)`);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_owner ON records(tenant_id, owner_id)`);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_created ON records(tenant_id, entity_type, created_at)`);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_phone ON records(tenant_id, normalized_phone)`);
+        for (const field of ['email', 'phone', 'customerId', 'relatedId']) {
+            await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_json_${field.toLowerCase()} ON records(tenant_id, entity_type, ${dbInstance.json('data', field)})`);
+        }
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_entity_defs ON entity_definitions(tenant_id, entity_type)`);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_rel_tenant ON relationships(tenant_id)`);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_rel_entities ON relationships(source_entity, target_entity)`);

@@ -132,7 +132,7 @@ export async function getConversations(tenantId, limit = 50) {
                COUNT(*) AS message_count
         FROM email_messages m
         WHERE m.tenant_id = ?
-        GROUP BY m.contact_email
+        GROUP BY m.tenant_id, m.contact_email
         ORDER BY last_at DESC
         LIMIT ?`, tenantId, limit);
 }

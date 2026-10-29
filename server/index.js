@@ -668,41 +668,49 @@ app.post('/api/saved-reports/run', authenticateToken, async (req, res) => {
     
     if (!entityType) return res.status(400).json({ error: 'Entity type is required' });
 
+    // Field names and aggregates come from the client, so quote/whitelist them —
+    // only values travel as bound parameters.
+    const ident = (s) => `"${String(s).replace(/"/g, '""')}"`;
+    const AGGREGATES = { count: 'COUNT', sum: 'SUM', avg: 'AVG', min: 'MIN', max: 'MAX' };
+
     try {
         let selectParts = [];
         let groupByParts = [];
         let params = [req.tenantId, entityType];
-        
+
         let sql = `SELECT `;
         const fromClause = ` FROM records WHERE tenant_id = ? AND entity_type = ?`;
-        
+
         // 1. SELECT and GROUP BY Builder
         if (groupBy.length > 0) {
             // Group By mode
             for (const g of groupBy) {
-                const path = db.buildJsonPath('data', g);
-                selectParts.push(`${path} AS "${g}"`);
-                groupByParts.push(`"${g}"`);
+                const path = db.json('data', g);
+                selectParts.push(`${path} AS ${ident(g)}`);
+                // Group by the expression, not the alias: an alias like "status" would
+                // otherwise resolve to the real records.status column.
+                groupByParts.push(path);
             }
             // Aggregations
             let hasAgg = false;
             for (const c of columns) {
-                if (c.aggregate) {
-                    const path = db.buildJsonPath('data', c.field);
-                    selectParts.push(`${c.aggregate.toUpperCase()}(${path}) AS "${c.field}"`);
+                const agg = AGGREGATES[String(c.aggregate || '').toLowerCase()];
+                if (agg) {
+                    const path = agg === 'COUNT' ? db.json('data', c.field) : db.jsonNum('data', c.field);
+                    selectParts.push(`${agg}(${path}) AS ${ident(c.field)}`);
                     hasAgg = true;
                 }
             }
             if (!hasAgg) selectParts.push(`COUNT(id) as "count"`);
-            
+
             sql += selectParts.join(', ') + fromClause;
             sql += ` GROUP BY ` + groupByParts.join(', ');
         } else {
             // Raw mode
             selectParts.push('id');
             for (const c of columns) {
-                const path = db.buildJsonPath('data', c.field);
-                selectParts.push(`${path} AS "${c.field}"`);
+                const path = db.json('data', c.field);
+                selectParts.push(`${path} AS ${ident(c.field)}`);
             }
             if (selectParts.length === 1) selectParts.push('data'); // Fallback to raw JSON if no cols
             sql += selectParts.join(', ') + fromClause;
@@ -711,19 +719,20 @@ app.post('/api/saved-reports/run', authenticateToken, async (req, res) => {
         // 2. Filter Builder
         for (const f of filters) {
             if (!f.field || !f.value) continue;
-            const path = db.buildJsonPath('data', f.field);
+            const path = db.json('data', f.field);
+            const num = Number(f.value);
             switch (f.op) {
                 case 'eq': sql += ` AND ${path} = ?`; params.push(f.value); break;
                 case 'neq': sql += ` AND ${path} != ?`; params.push(f.value); break;
-                case 'contains': sql += ` AND ${path} LIKE ?`; params.push('%' + f.value + '%'); break;
-                case 'gt': sql += ` AND CAST(${path} AS NUMERIC) > CAST(? AS NUMERIC)`; params.push(f.value); break;
-                case 'lt': sql += ` AND CAST(${path} AS NUMERIC) < CAST(? AS NUMERIC)`; params.push(f.value); break;
+                case 'contains': sql += ` AND ${path} ${db.like} ?`; params.push('%' + f.value + '%'); break;
+                case 'gt': sql += ` AND ${db.jsonNum('data', f.field)} > ?`; params.push(Number.isFinite(num) ? num : null); break;
+                case 'lt': sql += ` AND ${db.jsonNum('data', f.field)} < ?`; params.push(Number.isFinite(num) ? num : null); break;
             }
         }
 
         // 3. Sort Builder
         if (sortBy.length > 0) {
-            const sorts = sortBy.map(s => `"${s.field}" ${s.dir.toUpperCase() === 'DESC' ? 'DESC' : 'ASC'}`);
+            const sorts = sortBy.map(s => `${ident(s.field)} ${String(s.dir || '').toUpperCase() === 'DESC' ? 'DESC' : 'ASC'}`);
             sql += ` ORDER BY ` + sorts.join(', ');
         } else {
             if (groupBy.length === 0) sql += ` ORDER BY created_at DESC`;
@@ -958,7 +967,7 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
                 let scheduled = null;
                 try { scheduled = new Date(isoStr).toISOString(); } catch {}
                 await db.run(
-                    `INSERT OR REPLACE INTO notifications (id, tenant_id, user_id, title, body, kind, record_id, entity_type, scheduled_at) VALUES (?,?,?,?,?,?,?,?,?)`,
+                    `INSERT INTO notifications (id, tenant_id, user_id, title, body, kind, record_id, entity_type, scheduled_at) VALUES (?,?,?,?,?,?,?,?,?)`,
                     notifId, req.tenantId, targetUserId,
                     `Task due: ${subj}`,
                     `Due on ${recordData.dueDate}${timeDisplay}`,
@@ -1083,7 +1092,7 @@ app.post('/api/processes/:entityType', authenticateToken, async (req, res) => {
 app.get('/api/records/:entityType/:id/related-activity', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const t = req.tenantId;
-    const J = (f) => `json_extract(data, '$.${f}')`;
+    const J = (f) => db.json('data', f);
     try {
         const [taskRows, quoteRows, emails, whatsapp, calls, histRows] = await Promise.all([
             db.all(`SELECT id, primary_display, status, data FROM records WHERE tenant_id = ? AND entity_type = 'task' AND (${J('relatedId')} = ? OR ${J('customerId')} = ?) ORDER BY created_at DESC LIMIT 50`, t, id, id),
@@ -1324,7 +1333,7 @@ app.post('/api/lookups/:lookupId', authenticateToken, async (req, res) => {
 });
 
 // Bulk import lookup values
-app.post('/api/lookups/:lookupId/import', authenticateToken, (req, res) => {
+app.post('/api/lookups/:lookupId/import', authenticateToken, async (req, res) => {
     const { lookupId } = req.params;
     const { values } = req.body; // Expecting array of { valueId, value, sortOrder }
 
@@ -1332,27 +1341,19 @@ app.post('/api/lookups/:lookupId/import', authenticateToken, (req, res) => {
         return res.status(400).json({ error: 'Values must be an array' });
     }
 
-    const insert = db.prepare(`
-        INSERT INTO lookup_values (id, tenant_id, lookup_id, value_id, value, sort_order)
-        VALUES (@id, @tenantId, @lookupId, @valueId, @value, @sortOrder)
-        ON CONFLICT(tenant_id, lookup_id, value_id) DO UPDATE SET value = excluded.value, sort_order = excluded.sort_order
-    `);
-
-    const insertMany = db.transaction((items) => {
-        for (const item of items) {
-            insert.run({
-                id: uuidv4(),
-                tenantId: req.tenantId,
-                lookupId,
-                valueId: item.valueId || item.value.toLowerCase().replace(/\s+/g, '_'), // Auto-generate ID if missing
-                value: item.value,
-                sortOrder: item.sortOrder || 0
-            });
-        }
-    });
-
     try {
-        insertMany(values);
+        await db.transaction(async (tx) => {
+            for (const item of values) {
+                await tx.run(`
+                    INSERT INTO lookup_values (id, tenant_id, lookup_id, value_id, value, sort_order)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(tenant_id, lookup_id, value_id) DO UPDATE SET value = excluded.value, sort_order = excluded.sort_order`,
+                    uuidv4(), req.tenantId, lookupId,
+                    item.valueId || item.value.toLowerCase().replace(/\s+/g, '_'), // Auto-generate ID if missing
+                    item.value, item.sortOrder || 0
+                );
+            }
+        });
         res.json({ success: true, count: values.length });
     } catch (error) {
         console.error('Bulk import error:', error);
@@ -1363,12 +1364,13 @@ app.post('/api/lookups/:lookupId/import', authenticateToken, (req, res) => {
 // --- LIVE LOOKUP SOURCES ---
 
 // Get live source config for a lookup
-app.get('/api/lookups/:lookupId/live-source', authenticateToken, (req, res) => {
+app.get('/api/lookups/:lookupId/live-source', authenticateToken, async (req, res) => {
     const { lookupId } = req.params;
     try {
-        const source = db.prepare(
-            'SELECT * FROM lookup_sources WHERE tenant_id = ? AND lookup_id = ? AND is_active = 1'
-        ).get(req.tenantId, lookupId);
+        const source = await db.get(
+            'SELECT * FROM lookup_sources WHERE tenant_id = ? AND lookup_id = ? AND is_active = 1',
+            req.tenantId, lookupId
+        );
         res.json(source || null);
     } catch (error) {
         console.error('Get live source error:', error);
@@ -1377,7 +1379,7 @@ app.get('/api/lookups/:lookupId/live-source', authenticateToken, (req, res) => {
 });
 
 // Configure live source for a lookup
-app.post('/api/lookups/:lookupId/live-source', authenticateToken, (req, res) => {
+app.post('/api/lookups/:lookupId/live-source', authenticateToken, async (req, res) => {
     const { lookupId } = req.params;
     const { sourceType, sourceEntity, valueField = 'id', labelField = 'name', sqlQuery } = req.body;
 
@@ -1386,17 +1388,17 @@ app.post('/api/lookups/:lookupId/live-source', authenticateToken, (req, res) => 
     }
 
     try {
-        db.prepare(`
+        await db.run(`
             INSERT INTO lookup_sources (id, tenant_id, lookup_id, source_type, source_entity, value_field, label_field, sql_query)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(tenant_id, lookup_id) DO UPDATE SET 
+            ON CONFLICT(tenant_id, lookup_id) DO UPDATE SET
                 source_type = excluded.source_type,
                 source_entity = excluded.source_entity,
                 value_field = excluded.value_field,
                 label_field = excluded.label_field,
                 sql_query = excluded.sql_query,
                 is_active = 1
-        `).run(uuidv4(), req.tenantId, lookupId, sourceType, sourceEntity || null, valueField, labelField, sqlQuery || null);
+        `, uuidv4(), req.tenantId, lookupId, sourceType, sourceEntity || null, valueField, labelField, sqlQuery || null);
 
         res.json({ success: true, message: 'Live source configured' });
     } catch (error) {
@@ -1406,12 +1408,13 @@ app.post('/api/lookups/:lookupId/live-source', authenticateToken, (req, res) => 
 });
 
 // Remove live source config (revert to static values)
-app.delete('/api/lookups/:lookupId/live-source', authenticateToken, (req, res) => {
+app.delete('/api/lookups/:lookupId/live-source', authenticateToken, async (req, res) => {
     const { lookupId } = req.params;
     try {
-        db.prepare(
-            'UPDATE lookup_sources SET is_active = 0 WHERE tenant_id = ? AND lookup_id = ?'
-        ).run(req.tenantId, lookupId);
+        await db.run(
+            'UPDATE lookup_sources SET is_active = 0 WHERE tenant_id = ? AND lookup_id = ?',
+            req.tenantId, lookupId
+        );
         res.json({ success: true });
     } catch (error) {
         console.error('Delete live source error:', error);
@@ -1420,12 +1423,13 @@ app.delete('/api/lookups/:lookupId/live-source', authenticateToken, (req, res) =
 });
 
 // Delete a lookup value
-app.delete('/api/lookups/:lookupId/:valueId', authenticateToken, (req, res) => {
+app.delete('/api/lookups/:lookupId/:valueId', authenticateToken, async (req, res) => {
     const { lookupId, valueId } = req.params;
     try {
-        db.prepare(
-            'UPDATE lookup_values SET is_active = 0 WHERE tenant_id = ? AND lookup_id = ? AND value_id = ?'
-        ).run(req.tenantId, lookupId, valueId);
+        await db.run(
+            'UPDATE lookup_values SET is_active = 0 WHERE tenant_id = ? AND lookup_id = ? AND value_id = ?',
+            req.tenantId, lookupId, valueId
+        );
         res.json({ success: true });
     } catch (error) {
         console.error('Delete lookup value error:', error);
@@ -1468,33 +1472,16 @@ app.post('/api/lookups/:lookupId/import-from-source', authenticateToken, async (
         }
 
         // Insert values into lookup_values
-        /* 
-           Transaction handling: 
-           Adapter transaction() returns the sync sqlite transaction function.
-           We must use sync prepare inside it or use run in loop.
-           Using prepare from adapter:
-        */
-        const insert = db.prepare(`
-            INSERT INTO lookup_values (id, tenant_id, lookup_id, value_id, value, sort_order)
-            VALUES (@id, @tenantId, @lookupId, @valueId, @value, @sortOrder)
-            ON CONFLICT(tenant_id, lookup_id, value_id) DO UPDATE SET value = excluded.value
-        `);
-
-        // Insert transaction remains synchronous as better-sqlite3 transactions are synchronous
-        const insertMany = db.transaction((items) => {
-            for (let i = 0; i < items.length; i++) {
-                insert.run({
-                    id: uuidv4(),
-                    tenantId: req.tenantId,
-                    lookupId,
-                    valueId: items[i].value_id,
-                    value: items[i].value || 'Unnamed',
-                    sortOrder: i
-                });
+        await db.transaction(async (tx) => {
+            for (let i = 0; i < rows.length; i++) {
+                await tx.run(`
+                    INSERT INTO lookup_values (id, tenant_id, lookup_id, value_id, value, sort_order)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(tenant_id, lookup_id, value_id) DO UPDATE SET value = excluded.value`,
+                    uuidv4(), req.tenantId, lookupId, rows[i].value_id, rows[i].value || 'Unnamed', i
+                );
             }
         });
-
-        insertMany(rows);
         res.json({ success: true, count: rows.length });
     } catch (error) {
         console.error('Import from source error:', error);
@@ -1537,27 +1524,20 @@ app.post('/api/lookups/:lookupId/import-from-sql', authenticateToken, async (req
         }
 
         // Map results to lookup values
-        const insert = db.prepare(`
-            INSERT INTO lookup_values (id, tenant_id, lookup_id, value_id, value, sort_order)
-            VALUES (@id, @tenantId, @lookupId, @valueId, @value, @sortOrder)
-            ON CONFLICT(tenant_id, lookup_id, value_id) DO UPDATE SET value = excluded.value
-        `);
-
-        const insertMany = db.transaction((items) => {
-            for (let i = 0; i < items.length; i++) {
-                const row = items[i];
-                insert.run({
-                    id: uuidv4(),
-                    tenantId: req.tenantId,
-                    lookupId,
-                    valueId: String(row[valueColumn] || row.value_id || row.id || i),
-                    value: String(row[labelColumn] || row.value || row.name || row.label || 'Unnamed'),
-                    sortOrder: i
-                });
+        await db.transaction(async (tx) => {
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                await tx.run(`
+                    INSERT INTO lookup_values (id, tenant_id, lookup_id, value_id, value, sort_order)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(tenant_id, lookup_id, value_id) DO UPDATE SET value = excluded.value`,
+                    uuidv4(), req.tenantId, lookupId,
+                    String(row[valueColumn] || row.value_id || row.id || i),
+                    String(row[labelColumn] || row.value || row.name || row.label || 'Unnamed'),
+                    i
+                );
             }
         });
-
-        insertMany(rows);
         res.json({ success: true, count: rows.length });
     } catch (error) {
         console.error('Import from SQL error:', error);
@@ -1651,29 +1631,29 @@ app.delete('/api/relationships/:id', authenticateToken, async (req, res) => {
 });
 
 // Get related records for a specific record
-app.get('/api/data/:entityType/:recordId/related/:targetEntity', authenticateToken, (req, res) => {
+app.get('/api/data/:entityType/:recordId/related/:targetEntity', authenticateToken, async (req, res) => {
     const { entityType, recordId, targetEntity } = req.params;
     try {
         // Find the relationship definition
-        const relationship = db.prepare(`
-            SELECT * FROM relationships 
+        const relationship = await db.get(`
+            SELECT * FROM relationships
             WHERE tenant_id = ? AND source_entity = ? AND target_entity = ?
-        `).get(req.tenantId, entityType, targetEntity);
+        `, req.tenantId, entityType, targetEntity);
 
         if (!relationship) {
             // Try reverse relationship (target -> source)
-            const reverseRel = db.prepare(`
-                SELECT * FROM relationships 
+            const reverseRel = await db.get(`
+                SELECT * FROM relationships
                 WHERE tenant_id = ? AND source_entity = ? AND target_entity = ?
-            `).get(req.tenantId, targetEntity, entityType);
+            `, req.tenantId, targetEntity, entityType);
 
             if (reverseRel) {
                 // Find records where the foreign key points to our record
-                const rows = db.prepare(`
-                    SELECT * FROM records 
-                    WHERE tenant_id = ? AND entity_type = ? 
-                    AND json_extract(data, '$.' || ?) = ?
-                `).all(req.tenantId, targetEntity, reverseRel.source_field, recordId);
+                const rows = await db.all(`
+                    SELECT * FROM records
+                    WHERE tenant_id = ? AND entity_type = ?
+                    AND ${db.json('data', reverseRel.source_field)} = ?
+                `, req.tenantId, targetEntity, recordId);
 
                 const records = rows.map(row => ({ ...JSON.parse(row.data), id: row.id, status: row.status }));
                 return res.json(records);
@@ -1682,7 +1662,7 @@ app.get('/api/data/:entityType/:recordId/related/:targetEntity', authenticateTok
         }
 
         // Get the source record to find the FK value
-        const sourceRecord = db.prepare('SELECT data FROM records WHERE id = ? AND tenant_id = ?').get(recordId, req.tenantId);
+        const sourceRecord = await db.get('SELECT data FROM records WHERE id = ? AND tenant_id = ?', recordId, req.tenantId);
         if (!sourceRecord) {
             return res.json([]);
         }
@@ -1695,8 +1675,8 @@ app.get('/api/data/:entityType/:recordId/related/:targetEntity', authenticateTok
         }
 
         // Get the related record
-        const relatedRow = db.prepare('SELECT * FROM records WHERE id = ? AND tenant_id = ? AND entity_type = ?')
-            .get(fkValue, req.tenantId, targetEntity);
+        const relatedRow = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ? AND entity_type = ?',
+            fkValue, req.tenantId, targetEntity);
 
         if (relatedRow) {
             res.json([{ ...JSON.parse(relatedRow.data), id: relatedRow.id, status: relatedRow.status }]);
@@ -2497,7 +2477,7 @@ app.get('/api/search', authenticateToken, async (req, res) => {
         const rows = await db.all(
             `SELECT id, entity_type, primary_display, status
              FROM records
-             WHERE tenant_id = ? AND (primary_display LIKE ? OR data LIKE ?)
+             WHERE tenant_id = ? AND (primary_display ${db.like} ? OR CAST(data AS TEXT) ${db.like} ?)
              ORDER BY updated_at DESC
              LIMIT ?`,
             req.tenantId, like, like, limit
@@ -3259,7 +3239,7 @@ app.post('/api/data/:entityType/import', authenticateToken, csvUpload.single('fi
             // Dedupe for leads: by email
             if (entityType === 'lead' && mapped.email) {
                 const existEmail = await db.get(
-                    `SELECT id FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND json_extract(data, '$.email') = ?`,
+                    `SELECT id FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND ${db.json('data', 'email')} = ?`,
                     req.tenantId, mapped.email
                 );
                 if (existEmail) { skipped++; continue; }
@@ -3269,7 +3249,7 @@ app.post('/api/data/:entityType/import', authenticateToken, csvUpload.single('fi
             if (entityType === 'lead' && (mapped.phone || mapped.mobile)) {
                 const phone = mapped.phone || mapped.mobile;
                 const existPhone = await db.get(
-                    `SELECT id FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND json_extract(data, '$.phone') = ?`,
+                    `SELECT id FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND ${db.json('data', 'phone')} = ?`,
                     req.tenantId, phone
                 );
                 if (existPhone) { skipped++; continue; }
@@ -3343,7 +3323,7 @@ app.get('/api/leads/check-duplicate', authenticateToken, async (req, res) => {
         }
         if (email) {
             const emailLower = email.toLowerCase();
-            const lead = await db.get(`SELECT id, primary_display FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND json_extract(data,'$.email') = ?`, req.tenantId, emailLower);
+            const lead = await db.get(`SELECT id, primary_display FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND ${db.json('data', 'email')} = ?`, req.tenantId, emailLower);
             if (lead) return res.json({ duplicate: true, type: 'lead', id: lead.id, name: lead.primary_display });
         }
         res.json({ duplicate: false });
