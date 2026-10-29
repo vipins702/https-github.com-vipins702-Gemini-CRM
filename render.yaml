@@ -1,0 +1,31 @@
+# Render Blueprint for the FlowCRM API (the Express server in server/).
+# Render dashboard → New → Blueprint → choose this repository. Values marked
+# `sync: false` are secrets: Render asks for them once, they never live in git.
+services:
+  - type: web
+    name: flowcrm-api
+    runtime: node
+    region: ohio              # same region as the Neon database (AWS us-east-2)
+    plan: starter             # always on; the free plan sleeps and has no disk
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: node index.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DB_TYPE
+        value: postgres
+      - key: TRUST_PROXY      # requests arrive via Vercel then Render's proxy
+        value: "2"
+      - key: DATABASE_URL     # Neon *pooled* connection string (host contains -pooler)
+        sync: false
+      - key: JWT_SECRET       # copy from server/.env so existing sessions and data match
+        sync: false
+      - key: SECRETS_KEY      # copy from server/.env — decrypts saved integration passwords
+        sync: false
+    # Uploaded photos and attachments; without a disk they vanish on every deploy.
+    disk:
+      name: uploads
+      mountPath: /opt/render/project/src/server/uploads
+      sizeGB: 1

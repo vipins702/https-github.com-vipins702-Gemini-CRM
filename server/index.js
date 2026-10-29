@@ -36,6 +36,10 @@ import { createReadStream } from 'fs';
 
 const app = express();
 
+// Behind proxies (Vercel → Render) every request comes from the proxy's IP; trusting the
+// given number of hops makes req.ip the real client again, so per-IP limits (login) work.
+if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
+
 app.use(cors());
 app.use(express.json({
     // Webhook signatures are computed over the exact bytes received, so keep them.
