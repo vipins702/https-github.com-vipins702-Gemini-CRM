@@ -225,11 +225,13 @@ Core types:
 
 ### Styling
 
-- Tailwind CSS for all styling
-- Dark mode support via `dark:` prefixes
-- `@tailwindcss/postcss` v4 for modern CSS features
-- Colors: indigo, violet, slate, emerald, rose, orange palettes
-- Animation classes: fade-in, pulse, ping, etc.
+- Tailwind CSS v3 for all styling; Apple-style design system in `index.css` + `tailwind.config.cjs` (see DESIGN_SYSTEM.md)
+- Every Tailwind palette points at CSS colour tokens that switch with the theme, so plain classes
+  (`bg-surface`, `text-gray-900`, `bg-blue-600`) work in light and dark — no `dark:` variants needed
+- Use `bg-surface` (not `bg-white`) for cards/panels; `text-white` only on coloured fills
+- `blue`/`indigo`/`accent` follow the tenant brand colour; gray/slate are one neutral scale
+- Dark mode: `dark` class on `<html>`, driven by `services/theme.ts` (top-bar toggle + Settings)
+- 360 views share building blocks in `components/Record360.tsx`
 
 ### State Management
 

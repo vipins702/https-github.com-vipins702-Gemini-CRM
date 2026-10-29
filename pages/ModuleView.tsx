@@ -14,9 +14,11 @@ import { useToast } from '../components/ui/Toast';
 interface ModuleViewProps {
    entityType: EntityType;
    onNavigate?: (view: string, params?: any) => void;
+   /** Open this record's edit form straight away (e.g. "Edit" on a 360 view). */
+   editRecordId?: string;
 }
 
-export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }) => {
+export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, editRecordId }) => {
    // Metadata & Data State
    const [schema, setSchema] = useState<EntityDefinition | null>(null);
    const [layout, setLayout] = useState<LayoutDefinition | null>(null);
@@ -68,6 +70,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
             setSchema(loadedSchema[entityType] || null);
             setLayout(loadedLayout || null);
             setData(loadedData);
+            const toEdit = editRecordId && loadedData.find((r: CRMRecord) => r.id === editRecordId);
+            if (toEdit) { setSelectedRecord(toEdit); loadActivities(toEdit.id); loadRelatedRecords(toEdit.id); setView('detail'); }
 
             // Fetch lookup values for all lookup-type fields
             const lookupFields = loadedSchema[entityType]?.fields?.filter((f: FieldDefinition) => f.type === 'lookup') || [];
@@ -100,6 +104,13 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
       };
       loadModule();
    }, [entityType]);
+
+   // Leads and customers open on their 360 view; other records open the edit form.
+   const openRecord = (record: CRMRecord) => {
+      if (onNavigate && entityType === 'lead') return onNavigate('lead-360', { leadId: record.id });
+      if (onNavigate && entityType === 'customer') return onNavigate('customer-360', { customerId: record.id });
+      setSelectedRecord(record); loadActivities(record.id); loadRelatedRecords(record.id); setView('detail');
+   };
 
    const loadActivities = async (id: string) => {
       const acts = await api.getActivities(id, entityType);
@@ -306,7 +317,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
    };
 
    const renderFieldInput = (field: FieldDefinition, value: any, readOnly = false, config: LayoutFieldConfig | undefined, record: CRMRecord) => {
-      const baseClasses = `w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-white ${config?.styles?.textColor || 'text-gray-900'} ${config?.styles?.fontWeight === 'bold' ? 'font-bold' : ''} ${config?.styles?.fontStyle === 'italic' ? 'italic' : ''}`;
+      const baseClasses = `w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-surface ${config?.styles?.textColor || 'text-gray-900'} ${config?.styles?.fontWeight === 'bold' ? 'font-bold' : ''} ${config?.styles?.fontStyle === 'italic' ? 'italic' : ''}`;
 
       if (readOnly) {
          const display = field.type === 'currency' && value !== '' && value != null
@@ -381,7 +392,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                   {/* Preview / Drop Zone */}
                   <div className="shrink-0 relative group">
                      <div className={`
-                    w-24 h-24 rounded-2xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all bg-white
+                    w-24 h-24 rounded-2xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all bg-surface
                     ${!value ? 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50' : 'border-indigo-100 shadow-sm'}
                 `}>
                         {value ? (
@@ -389,7 +400,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                         ) : (
                            <div className="text-center p-2">
                               <CloudUpload className="w-6 h-6 text-gray-400 mx-auto mb-1 group-hover:text-indigo-500 transition-colors" />
-                              <span className="text-[10px] text-gray-400 font-medium uppercase group-hover:text-indigo-600">Upload</span>
+                              <span className="text-xs text-gray-400 font-medium uppercase group-hover:text-indigo-600">Upload</span>
                            </div>
                         )}
 
@@ -404,7 +415,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                   {/* Controls */}
                   <div className="flex-1 space-y-3 pt-1">
                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Image Source</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Image Source</label>
                         <div className="flex gap-2">
                            <div className="relative flex-1">
                               <Link className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -428,7 +439,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                            )}
                         </div>
                      </div>
-                     <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                     <p className="text-xs text-gray-400 flex items-center gap-1">
                         <Check className="w-3 h-3 text-green-500" /> Supports JPG, PNG, WebP or direct URLs.
                      </p>
                   </div>
@@ -467,47 +478,36 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
       return (
          <div className="min-h-screen animate-in fade-in duration-200">
             {/* TOP HEADER */}
-            <div className="bg-slate-900 relative overflow-hidden">
-               <div className="absolute -top-24 right-10 w-72 h-72 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none"></div>
-
-               <div className="max-w-7xl mx-auto px-6 py-6 relative z-10">
+            <div className="bg-surface border-b border-gray-200/80">
+               <div className="max-w-7xl mx-auto px-6 py-6">
                   {/* Back button */}
                   <button
                      onClick={() => { setView('list'); setSelectedRecord(null); }}
-                     className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
+                     className="flex items-center gap-1 text-accent hover:text-accent-deep mb-5 transition-colors"
                   >
                      <ArrowLeft className="w-4 h-4" />
-                     <span className="text-sm font-medium">Back to {schema.pluralLabel}</span>
+                     <span className="text-sm font-medium">{schema.pluralLabel}</span>
                   </button>
 
-                  <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-5">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                     <div className="flex items-center gap-4 min-w-0">
                         {/* Avatar */}
-                        <div className="relative">
+                        <div className="relative shrink-0">
                            {imageUrl ? (
-                              <img src={imageUrl} alt="Profile" className="w-20 h-20 rounded-2xl object-cover border-4 border-white/20 shadow-2xl" />
+                              <img src={imageUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover shadow-[var(--elev-2)]" />
                            ) : (
-                              <div className="w-20 h-20 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center text-white text-2xl font-bold border border-white/30 shadow-2xl">
-                                 {(selectedRecord[primaryField] || 'U')[0].toUpperCase()}
+                              <div className="w-16 h-16 rounded-full bg-gradient-to-b from-accent-400 to-accent-600 flex items-center justify-center text-white text-2xl font-semibold shadow-[var(--elev-2)]">
+                                 {(String(selectedRecord[primaryField] || selectedRecord['email'] || schema.label || '?'))[0].toUpperCase()}
                               </div>
                            )}
-                           {/* Status indicator */}
-                           <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-3 border-white ${selectedRecord['status'] === 'Active' || selectedRecord['status'] === 'Qualified' || selectedRecord['status'] === 'Open'
-                                 ? 'bg-emerald-500'
-                                 : 'bg-gray-400'
-                              }`}></div>
                         </div>
 
-                        <div className="text-white">
-                           <h1 className="text-2xl font-bold flex items-center gap-3">
-                              {selectedRecord[primaryField]} {selectedRecord['lastName'] || ''}
-                              {selectedRecord['status'] && (
-                                 <span className="px-2.5 py-1 bg-white/20 backdrop-blur rounded-lg text-xs font-medium">
-                                    {selectedRecord['status']}
-                                 </span>
-                              )}
+                        <div className="min-w-0">
+                           <h1 className="font-heading text-[26px] leading-tight font-semibold tracking-tight text-gray-900 flex items-center gap-2.5 flex-wrap">
+                              <span className="truncate">{selectedRecord.id ? `${selectedRecord[primaryField] || ''} ${selectedRecord['lastName'] || ''}`.trim() || `Untitled ${schema.label}` : `New ${schema.label}`}</span>
+                              {selectedRecord['status'] && <Badge status={selectedRecord['status']} />}
                            </h1>
-                           <div className="flex items-center gap-4 mt-2 text-white/80 text-sm">
+                           <div className="flex items-center gap-4 mt-1 text-gray-500 text-sm flex-wrap">
                               {selectedRecord['title'] && (
                                  <span className="font-medium">{selectedRecord['title']}</span>
                               )}
@@ -525,35 +525,24 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                         </div>
                      </div>
 
-                     <div className="flex gap-2">
-                        {entityType === 'customer' && onNavigate && (
-                           <Button
-                              variant="secondary"
-                              className="bg-white/20 border-white/30 text-white hover:bg-white/30"
-                              icon={<Eye className="w-4 h-4" />}
-                              onClick={() => onNavigate('customer-360', { customerId: selectedRecord.id })}
-                           >
-                              360° View
+                     <div className="flex gap-2 shrink-0">
+                        {entityType === 'customer' && onNavigate && selectedRecord.id && (
+                           <Button variant="secondary" icon={<Eye className="w-4 h-4" />} onClick={() => onNavigate('customer-360', { customerId: selectedRecord.id })}>
+                              360° view
                            </Button>
                         )}
-                        {entityType === 'lead' && onNavigate && (
-                           <Button
-                              variant="secondary"
-                              className="bg-white/20 border-white/30 text-white hover:bg-white/30"
-                              icon={<Eye className="w-4 h-4" />}
-                              onClick={() => onNavigate('lead-360', { leadId: selectedRecord.id })}
-                           >
-                              360° View
+                        {entityType === 'lead' && onNavigate && selectedRecord.id && (
+                           <Button variant="secondary" icon={<Eye className="w-4 h-4" />} onClick={() => onNavigate('lead-360', { leadId: selectedRecord.id })}>
+                              360° view
                            </Button>
                         )}
-                        <Button variant="secondary" className="bg-white/20 border-white/30 text-white hover:bg-white/30" onClick={() => setView('list')}>Cancel</Button>
+                        <Button variant="ghost" onClick={() => setView('list')}>Cancel</Button>
                         <Button
-                           className="bg-white text-indigo-600 hover:bg-white/90"
                            icon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                            onClick={handleSave}
                            disabled={isSaving}
                         >
-                           Save Changes
+                           Save
                         </Button>
                      </div>
                   </div>
@@ -561,7 +550,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
             </div>
 
             {/* TABS - Sticky below TopBar */}
-            <div className="bg-white/90 backdrop-blur border-b border-slate-200/70 sticky top-16 z-20">
+            <div className="bg-surface/90 backdrop-blur border-b border-slate-200/70 sticky top-16 z-20">
                <div className="max-w-7xl mx-auto px-6">
                   <div className="flex gap-6" role="tablist">
                      {['overview', 'timeline', 'related'].map((tab) => (
@@ -598,23 +587,23 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                  <Icon className="w-[18px] h-[18px]" />
                               </div>
                               <div className="min-w-0">
-                                 <div className="text-[11px] text-slate-400 uppercase tracking-wider">{label}</div>
+                                 <div className="text-xs text-slate-400">{label}</div>
                                  <div className="text-slate-900 font-medium truncate">{value || '-'}</div>
                               </div>
                            </div>
                         ))}
 
                         <div className="pt-3.5 border-t border-slate-100">
-                           <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Status</label>
+                           <label className="text-xs font-semibold text-slate-400 mb-2 block">Status</label>
                            <Badge status={selectedRecord['status']} />
                         </div>
 
                         {selectedRecord['score'] && (
                            <div>
-                              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Score</label>
+                              <label className="text-xs font-semibold text-slate-400 mb-1 block">Score</label>
                               <div className="flex items-end gap-2">
                                  <div className="text-3xl font-semibold text-indigo-600 leading-none tnum">{selectedRecord['score']}</div>
-                                 <div className="text-xs text-emerald-600 font-semibold mb-1">High Potential</div>
+                                 <div className="text-xs text-gray-500 font-medium mb-1">{Number(selectedRecord['score']) >= 70 ? 'Hot' : Number(selectedRecord['score']) >= 40 ? 'Warm' : 'Cold'}</div>
                               </div>
                               <div className="h-1.5 w-full bg-slate-100 rounded-full mt-2 overflow-hidden">
                                  <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(selectedRecord['score'], 100)}%` }}></div>
@@ -624,15 +613,6 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                      </div>
                   </Card>
 
-                  {/* Next Best Action Widget */}
-                  <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-6 text-white shadow-lg relative overflow-hidden group">
-                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-10 blur-2xl group-hover:bg-white/20 transition-all"></div>
-                     <h4 className="font-bold text-xs uppercase opacity-70 mb-2 tracking-wider">Intelligence</h4>
-                     <p className="font-bold text-lg mb-4 leading-tight">Schedule a follow-up call regarding the Q4 contract.</p>
-                     <button className="w-full bg-white text-indigo-600 text-sm py-2.5 rounded-lg font-bold shadow hover:bg-indigo-50 transition-colors">
-                        Execute Action
-                     </button>
-                  </div>
                </div>
 
                {/* CENTER COLUMN: Dynamic Content */}
@@ -641,7 +621,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                   {detailTab === 'overview' && (
                      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                         {layout.sections.map(section => (
-                           <Card key={section.id} title={section.title} className={`${section.styles?.backgroundColor || 'bg-white'} ${section.className || ''}`}>
+                           <Card key={section.id} title={section.title} className={`${section.styles?.backgroundColor || 'bg-surface'} ${section.className || ''}`}>
                               <div className="grid grid-cols-12 gap-6">
                                  {section.columns.map(col => (
                                     <div key={col.id} style={{ gridColumn: `span ${col.width}` }} className={`space-y-4 ${col.className || ''}`}>
@@ -653,7 +633,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
 
                                           return (
                                              <div key={fieldName}>
-                                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                                                <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1">
                                                    {fieldConfig?.labelOverride || fieldDef.label} {(fieldDef.required || fieldConfig?.validation?.required) && <span className="text-rose-500">*</span>}
                                                    {fieldDef.type === 'image' && <ImageIcon className="w-3 h-3 text-indigo-400" />}
                                                 </label>
@@ -710,7 +690,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                  {activity.stageHistory && activity.stageHistory.length > 0 && (
                                     <div className="md:col-span-2">
-                                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><ActivityIcon className="w-3.5 h-3.5" /> Stage History ({activity.stageHistory.length})</p>
+                                       <p className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><ActivityIcon className="w-3.5 h-3.5" /> Stage History ({activity.stageHistory.length})</p>
                                        <div className="space-y-1.5">
                                           {activity.stageHistory.slice(0, 6).map(hs => (
                                              <div key={hs.id} className="flex items-start gap-2 p-2 rounded-lg bg-slate-50/60">
@@ -719,7 +699,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                                    <span className="font-semibold text-ink">{hs.to}</span>
                                                    {hs.note && <span className="text-ink-soft"> — “{hs.note}”</span>}
                                                 </span>
-                                                <span className="ml-auto text-[10px] text-slate-400 shrink-0">{hs.actor} · {new Date(hs.created_at).toLocaleDateString()}</span>
+                                                <span className="ml-auto text-xs text-slate-400 shrink-0">{hs.actor} · {new Date(hs.created_at).toLocaleDateString()}</span>
                                              </div>
                                           ))}
                                        </div>
@@ -727,7 +707,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                  )}
                                  {activity.quotes.length > 0 && (
                                     <div>
-                                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Quotes ({activity.quotes.length})</p>
+                                       <p className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Quotes ({activity.quotes.length})</p>
                                        <div className="space-y-1.5">
                                           {activity.quotes.slice(0, 5).map(q => (
                                              <button key={q.id} onClick={() => onNavigate?.('quotes', { recordId: q.id })} className="w-full flex items-center justify-between gap-2 p-2 rounded-lg hover:bg-slate-50 text-left">
@@ -740,13 +720,13 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                  )}
                                  {activity.emails.length > 0 && (
                                     <div>
-                                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Emails ({activity.emails.length})</p>
+                                       <p className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Emails ({activity.emails.length})</p>
                                        <div className="space-y-1.5">
                                           {activity.emails.slice(0, 5).map(em => (
                                              <div key={em.id} className="flex items-center gap-2 p-2 rounded-lg">
                                                 <Mail className={`w-3.5 h-3.5 shrink-0 ${em.direction === 'outbound' ? 'text-indigo-500' : 'text-slate-400'}`} />
                                                 <span className="text-xs text-slate-700 truncate flex-1">{em.subject}</span>
-                                                <span className="text-[10px] text-slate-400">{new Date(em.created_at).toLocaleDateString()}</span>
+                                                <span className="text-xs text-slate-400">{new Date(em.created_at).toLocaleDateString()}</span>
                                              </div>
                                           ))}
                                        </div>
@@ -754,7 +734,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                  )}
                                  {activity.whatsapp.length > 0 && (
                                     <div>
-                                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> WhatsApp ({activity.whatsapp.length})</p>
+                                       <p className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> WhatsApp ({activity.whatsapp.length})</p>
                                        <div className="space-y-1.5">
                                           {activity.whatsapp.slice(0, 5).map(w => (
                                              <div key={w.id} className="flex items-center gap-2 p-2 rounded-lg">
@@ -767,13 +747,13 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                  )}
                                  {activity.calls.length > 0 && (
                                     <div>
-                                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Calls ({activity.calls.length})</p>
+                                       <p className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Calls ({activity.calls.length})</p>
                                        <div className="space-y-1.5">
                                           {activity.calls.slice(0, 5).map(c => (
                                              <div key={c.id} className="flex items-center gap-2 p-2 rounded-lg">
                                                 <Phone className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                                                 <span className="text-xs text-slate-700 truncate flex-1">{c.direction} · {c.from_number || '—'}</span>
-                                                <span className="text-[10px] text-slate-400">{c.outcome || c.status}</span>
+                                                <span className="text-xs text-slate-400">{c.outcome || c.status}</span>
                                              </div>
                                           ))}
                                        </div>
@@ -790,11 +770,11 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                     <table className="min-w-full divide-y divide-slate-100">
                                        <thead className="bg-slate-50/50">
                                           <tr>
-                                             <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Name/Subject</th>
-                                             <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                                             <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-400">Name/Subject</th>
+                                             <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-400">Status</th>
                                           </tr>
                                        </thead>
-                                       <tbody className="divide-y divide-slate-100 bg-white">
+                                       <tbody className="divide-y divide-slate-100 bg-surface">
                                           {list.map(r => {
                                              let rData: any = {};
                                              try { rData = JSON.parse(r.data); } catch (e) {}
@@ -874,7 +854,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
    // --- IMPORT MODAL ---
    const ImportModal = showImportModal ? (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+         <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
                <div className="flex items-center gap-2">
@@ -957,7 +937,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                              <option key={f.name} value={f.name}>{f.label}</option>
                                           ))}
                                        </select>
-                                       <span className="block text-[10px] text-slate-400 mt-0.5">← {h}</span>
+                                       <span className="block text-xs text-slate-400 mt-0.5">← {h}</span>
                                     </th>
                                  ))}
                               </tr>
@@ -1023,13 +1003,13 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
          {ImportModal}
          <div className="min-h-screen">
          {/* Page Header */}
-         <div className="bg-white border-b border-slate-200">
+         <div className="bg-surface border-b border-slate-200">
             <div className="max-w-7xl mx-auto px-6 py-5">
                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
                      <h1 className="font-heading text-xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
                         {schema.pluralLabel}
-                        <span className="px-2 py-0.5 bg-[#4F46E5]/10 text-[#3730A3] text-xs font-semibold rounded-md tnum">
+                        <span className="px-2 py-0.5 bg-accent/10 text-accent-deep text-xs font-semibold rounded-md tnum">
                            {totalRecords}
                         </span>
                      </h1>
@@ -1059,7 +1039,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
             {/* Stats Row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                {listStats.map(({ icon: Icon, label, value, tint }) => (
-                  <div key={label} className="bg-white border border-slate-200/70 rounded-xl shadow-[var(--elev-1)] p-4 flex items-center gap-3.5">
+                  <div key={label} className="bg-surface border border-slate-200/70 rounded-xl shadow-[var(--elev-1)] p-4 flex items-center gap-3.5">
                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${tint}`}>
                         <Icon className="w-5 h-5" />
                      </div>
@@ -1079,7 +1059,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                      <input
                         type="text"
                         placeholder={`Search ${schema.pluralLabel.toLowerCase()}…`}
-                        className="pl-9 pr-4 h-10 w-full text-sm border border-transparent bg-slate-100/80 rounded-lg outline-none transition-colors focus:bg-white focus:border-slate-300 focus-ring"
+                        className="pl-9 pr-4 h-10 w-full text-sm border border-transparent bg-slate-100/80 rounded-lg outline-none transition-colors focus:bg-surface focus:border-slate-300 focus-ring"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                      />
@@ -1095,7 +1075,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                      <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
                            <th className="px-4 py-3 text-left w-10">
-                              <input type="checkbox" aria-label="Select all" className="w-4 h-4 rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5]" />
+                              <input type="checkbox" aria-label="Select all" className="w-4 h-4 rounded border-slate-300 text-accent focus:ring-accent" />
                            </th>
                            {columns.map(col => (
                               <th key={col.name} className="px-4 py-3 text-left mono-label whitespace-nowrap">
@@ -1133,7 +1113,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                               <tr
                                  key={record.id}
                                  className="group hover:bg-slate-50 transition-colors cursor-pointer"
-                                 onClick={() => { setSelectedRecord(record); loadActivities(record.id); loadRelatedRecords(record.id); setView('detail'); }}
+                                 onClick={() => openRecord(record)}
                               >
                                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                     <input type="checkbox" aria-label={`Select ${record[columns[0]?.name] || 'row'}`} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
@@ -1143,18 +1123,24 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                                        {col.type === 'status' ? (
                                           <Badge status={record[col.name]} variant="dot" />
                                        ) : colIdx === 0 ? (
-                                          <div className="flex items-center gap-3">
-                                             {record['image'] ? (
-                                                <img src={record['image']} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0 border border-slate-200" />
-                                             ) : (
-                                                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-lg flex items-center justify-center text-white text-xs font-semibold shrink-0">
-                                                   {(record[col.name] || 'U')[0].toUpperCase()}
+                                          (() => {
+                                             // Unnamed records still get a recognisable label (email, phone, company…).
+                                             const label = record[col.name] || record.name || record.email || record.phone || record.mobile || record.company || '';
+                                             return (
+                                                <div className="flex items-center gap-3">
+                                                   {record['image'] || record['profileImage'] ? (
+                                                      <img src={record['image'] || record['profileImage']} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                                   ) : (
+                                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${label ? 'bg-gradient-to-b from-accent-400 to-accent-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                                         {label ? String(label)[0].toUpperCase() : '?'}
+                                                      </div>
+                                                   )}
+                                                   <span className={`font-medium group-hover:text-accent transition-colors ${record[col.name] ? 'text-gray-900' : 'text-gray-500'}`}>
+                                                      {label || <span className="italic font-normal">No name</span>}
+                                                   </span>
                                                 </div>
-                                             )}
-                                             <span className="text-slate-900 font-medium group-hover:text-indigo-600 transition-colors">
-                                                {record[col.name]}
-                                             </span>
-                                          </div>
+                                             );
+                                          })()
                                        ) : col.type === 'currency' ? (
                                           <span className="text-slate-900 font-medium tnum">{formatCurrency(record[col.name], record.currency)}</span>
                                        ) : col.type === 'email' ? (

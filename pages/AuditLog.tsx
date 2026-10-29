@@ -88,7 +88,7 @@ export const AuditLog: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-surface border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-6 py-5">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
@@ -114,13 +114,13 @@ export const AuditLog: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search…"
-                className="pl-9 pr-4 h-9 w-56 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none focus:bg-white focus:border-indigo-400"
+                className="pl-9 pr-4 h-9 w-56 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none focus:bg-surface focus:border-indigo-400"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
             <select
-              className="h-9 px-3 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none focus:bg-white focus:border-indigo-400"
+              className="h-9 px-3 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none focus:bg-surface focus:border-indigo-400"
               value={entityType}
               onChange={e => setEntityType(e.target.value)}
             >
@@ -130,7 +130,7 @@ export const AuditLog: React.FC = () => {
               ))}
             </select>
             <select
-              className="h-9 px-3 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none focus:bg-white focus:border-indigo-400"
+              className="h-9 px-3 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none focus:bg-surface focus:border-indigo-400"
               value={action}
               onChange={e => setAction(e.target.value)}
             >
@@ -141,14 +141,14 @@ export const AuditLog: React.FC = () => {
             </select>
             <input
               type="date"
-              className="h-9 px-3 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none focus:bg-white focus:border-indigo-400"
+              className="h-9 px-3 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none focus:bg-surface focus:border-indigo-400"
               value={from}
               onChange={e => setFrom(e.target.value)}
               placeholder="From date"
             />
             <input
               type="date"
-              className="h-9 px-3 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none focus:bg-white focus:border-indigo-400"
+              className="h-9 px-3 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none focus:bg-surface focus:border-indigo-400"
               value={to}
               onChange={e => setTo(e.target.value)}
             />
@@ -166,7 +166,7 @@ export const AuditLog: React.FC = () => {
 
       {/* Table */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="bg-surface rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           {loading ? (
             <div className="flex items-center justify-center h-48 text-slate-400">
               <RefreshCw className="animate-spin w-6 h-6 mr-2" /> Loading…
@@ -181,11 +181,11 @@ export const AuditLog: React.FC = () => {
               <thead className="bg-slate-50">
                 <tr>
                   <th className="w-8 px-4 py-3" />
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Timestamp</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Actor</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Entity</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Action</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Record</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400">Timestamp</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400">Actor</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400">Entity</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400">Action</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400">Record</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -231,8 +231,8 @@ export const AuditLog: React.FC = () => {
                     {expandedId === row.id && (
                       <tr className="bg-indigo-50/40">
                         <td colSpan={6} className="px-8 py-4">
-                          <div className="bg-white rounded-xl border border-slate-200 p-4">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Change Details</p>
+                          <div className="bg-surface rounded-xl border border-slate-200 p-4">
+                            <p className="text-xs font-bold text-slate-400 mb-2">Change Details</p>
                             <pre className="text-xs text-slate-700 whitespace-pre-wrap font-mono overflow-auto max-h-64">
                               {JSON.stringify(row.details, null, 2)}
                             </pre>

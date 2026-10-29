@@ -263,7 +263,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Background Color</label>
                   <div className="grid grid-cols-5 gap-2">
-                     {['bg-white', 'bg-gray-50', 'bg-blue-50', 'bg-green-50', 'bg-yellow-50'].map(bg => (
+                     {['bg-surface', 'bg-gray-50', 'bg-blue-50', 'bg-green-50', 'bg-yellow-50'].map(bg => (
                         <button
                            key={bg}
                            className={`w-8 h-8 rounded border ${bg} ${section.styles?.backgroundColor === bg ? 'ring-2 ring-indigo-500' : 'border-gray-200'}`}
@@ -316,7 +316,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                      />
                      <span className="text-sm font-bold w-6">{column.width}</span>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1">Total width across all columns in a row must be 12.</p>
+                  <p className="text-xs text-gray-400 mt-1">Total width across all columns in a row must be 12.</p>
                </div>
 
                <div>
@@ -423,7 +423,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                      {/* Format / Regex */}
                      <div>
                         <span className="text-xs text-gray-500 block mb-1">Format check (regex)</span>
-                        <select className="w-full text-xs border border-gray-300 rounded p-1.5 bg-white"
+                        <select className="w-full text-xs border border-gray-300 rounded p-1.5 bg-surface"
                            value={matchedPreset}
                            onChange={(e) => applyPreset(e.target.value)}>
                            <option value="">No format check</option>
@@ -485,7 +485,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                               <button
                                  key={bg}
                                  title={bg}
-                                 className={`w-6 h-6 rounded border ${bg === 'bg-transparent' ? 'bg-white bg-opacity-50' : bg} ${config.styles?.backgroundColor === bg ? 'ring-2 ring-indigo-500' : 'border-gray-200'}`}
+                                 className={`w-6 h-6 rounded border ${bg === 'bg-transparent' ? 'bg-surface bg-opacity-50' : bg} ${config.styles?.backgroundColor === bg ? 'ring-2 ring-indigo-500' : 'border-gray-200'}`}
                                  onClick={() => updateFieldConfig(selected.id, { styles: { ...config.styles, backgroundColor: bg } })}
                               >
                                  {bg === 'bg-transparent' && <X className="w-3 h-3 mx-auto text-gray-300" />}
@@ -498,14 +498,14 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                         <span className="text-xs text-gray-400 block mb-1">Text Style</span>
                         <div className="flex gap-2 bg-gray-50 p-1 rounded border border-gray-200 w-fit">
                            <button
-                              className={`p-1 rounded ${config.styles?.fontWeight === 'bold' ? 'bg-white shadow text-black' : 'text-gray-400 hover:text-gray-600'}`}
+                              className={`p-1 rounded ${config.styles?.fontWeight === 'bold' ? 'bg-surface shadow text-black' : 'text-gray-400 hover:text-gray-600'}`}
                               onClick={() => updateFieldConfig(selected.id, { styles: { ...config.styles, fontWeight: config.styles?.fontWeight === 'bold' ? 'normal' : 'bold' } })}
                               title="Bold"
                            >
                               <Bold className="w-4 h-4" />
                            </button>
                            <button
-                              className={`p-1 rounded ${config.styles?.fontStyle === 'italic' ? 'bg-white shadow text-black' : 'text-gray-400 hover:text-gray-600'}`}
+                              className={`p-1 rounded ${config.styles?.fontStyle === 'italic' ? 'bg-surface shadow text-black' : 'text-gray-400 hover:text-gray-600'}`}
                               onClick={() => updateFieldConfig(selected.id, { styles: { ...config.styles, fontStyle: config.styles?.fontStyle === 'italic' ? 'normal' : 'italic' } })}
                               title="Italic"
                            >
@@ -577,7 +577,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
    return (
       <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
          {/* Header */}
-         <div className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0 z-20 relative">
+         <div className="h-16 bg-surface border-b border-gray-200 px-6 flex items-center justify-between shrink-0 z-20 relative">
             <div className="flex items-center gap-4">
                <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <Monitor className="w-5 h-5 text-indigo-600" />
@@ -604,23 +604,23 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
 
          <div className="flex-1 flex overflow-hidden">
             {/* Left Sidebar: Toolbox */}
-            <div className="w-72 bg-white border-r border-gray-200 flex flex-col z-10">
+            <div className="w-72 bg-surface border-r border-gray-200 flex flex-col z-10">
                <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Fields</h3>
+                  <h3 className="text-xs font-bold text-gray-500">Fields</h3>
                   <button onClick={() => setIsNewFieldModalOpen(true)} className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-medium hover:bg-indigo-100">+ New</button>
                </div>
                <div className="p-4 flex-1 overflow-y-auto space-y-2">
                   {activeSchema.fields.map(field => (
                      <div
                         key={field.name}
-                        className="group flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-indigo-500 hover:shadow-md cursor-pointer transition-all"
+                        className="group flex items-center justify-between p-3 bg-surface border border-gray-200 rounded-lg shadow-sm hover:border-indigo-500 hover:shadow-md cursor-pointer transition-all"
                         onClick={() => handleAddFieldToLayout(field.name)}
                      >
                         <div className="flex items-center gap-3">
                            <GripVertical className="w-4 h-4 text-gray-300 group-hover:text-indigo-400" />
                            <div>
                               <p className="text-sm font-medium text-gray-900">{field.label}</p>
-                              <p className="text-[10px] text-gray-400 capitalize bg-gray-100 px-1 rounded inline-block">{field.type}</p>
+                              <p className="text-xs text-gray-400 capitalize bg-gray-100 px-1 rounded inline-block">{field.type}</p>
                            </div>
                         </div>
                         <Plus className="w-4 h-4 text-indigo-600 opacity-0 group-hover:opacity-100" />
@@ -638,7 +638,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                         className={`rounded-xl shadow-sm border transition-all cursor-pointer ${selected?.id === section.id
                               ? 'ring-2 ring-indigo-500 border-indigo-500'
                               : 'border-gray-200 hover:border-indigo-300'
-                           } ${section.styles?.backgroundColor || 'bg-white'} ${section.className || ''}`}
+                           } ${section.styles?.backgroundColor || 'bg-surface'} ${section.className || ''}`}
                         onClick={(e) => { e.stopPropagation(); setSelected({ type: 'section', id: section.id }); }}
                      >
                         <div className="px-6 py-4 border-b border-gray-100/50 flex items-center justify-between">
@@ -659,7 +659,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                                  {col.fields.map((fieldName, fIdx) => {
                                     const fieldDef = activeSchema.fields.find(f => f.name === fieldName);
                                     const fieldConfig = layout.fieldConfigs?.[fieldName];
-                                    const bgClass = fieldConfig?.styles?.backgroundColor || 'bg-white';
+                                    const bgClass = fieldConfig?.styles?.backgroundColor || 'bg-surface';
 
                                     const textStyle = {
                                        fontWeight: fieldConfig?.styles?.fontWeight,
@@ -709,9 +709,9 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
             </div>
 
             {/* Right Sidebar: Properties */}
-            <div className="w-72 bg-white border-l border-gray-200 flex flex-col z-10">
+            <div className="w-72 bg-surface border-l border-gray-200 flex flex-col z-10">
                <div className="p-4 border-b border-gray-100 bg-gray-50">
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Properties</h3>
+                  <h3 className="text-xs font-bold text-gray-500">Properties</h3>
                </div>
                <div className="flex-1 overflow-y-auto">
                   {renderPropertiesPanel()}
@@ -722,7 +722,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
          {/* New Field Modal */}
          {isNewFieldModalOpen && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-               <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+               <div className="bg-surface rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
                   <div className="flex items-center justify-between mb-6">
                      <h2 className="text-lg font-bold text-gray-900">Create New Field</h2>
                      <button onClick={() => setIsNewFieldModalOpen(false)} className="text-gray-400 hover:text-gray-600">

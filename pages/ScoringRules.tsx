@@ -95,7 +95,7 @@ export const ScoringRules: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-surface border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-6 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -127,11 +127,11 @@ export const ScoringRules: React.FC = () => {
 
         {/* Add/Edit Form */}
         {showForm && (
-          <div className="bg-white rounded-xl border border-indigo-200 shadow-sm p-6">
+          <div className="bg-surface rounded-xl border border-indigo-200 shadow-sm p-6">
             <h3 className="font-bold text-slate-800 mb-4">{editing.id ? 'Edit Rule' : 'New Scoring Rule'}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Rule Name</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Rule Name</label>
                 <input
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
                   placeholder="e.g. Website lead +20"
@@ -140,7 +140,7 @@ export const ScoringRules: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Points (+ or -)</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Points (+ or -)</label>
                 <input
                   type="number"
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
@@ -149,7 +149,7 @@ export const ScoringRules: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Field</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Field</label>
                 <select
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
                   value={editing.field}
@@ -159,7 +159,7 @@ export const ScoringRules: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Operator</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Operator</label>
                 <select
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
                   value={editing.operator}
@@ -170,7 +170,7 @@ export const ScoringRules: React.FC = () => {
               </div>
               {needsValue && (
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Value</label>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">Value</label>
                   <input
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
                     placeholder="e.g. Website"
@@ -191,20 +191,20 @@ export const ScoringRules: React.FC = () => {
         {loading ? (
           <div className="text-center py-12 text-slate-400">Loading rules…</div>
         ) : rules.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center">
+          <div className="bg-surface rounded-xl border border-dashed border-slate-300 p-12 text-center">
             <Star className="w-10 h-10 mx-auto mb-3 text-slate-300" />
             <p className="text-slate-500 font-medium">No scoring rules yet</p>
             <p className="text-slate-400 text-sm mt-1">Add your first rule to auto-score incoming leads</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="bg-surface rounded-xl border border-slate-200 overflow-hidden">
             <table className="min-w-full divide-y divide-slate-100">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Rule</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Condition</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Points</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Active</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400">Rule</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400">Condition</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400">Points</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400">Active</th>
                   <th className="px-4 py-3 w-16" />
                 </tr>
               </thead>

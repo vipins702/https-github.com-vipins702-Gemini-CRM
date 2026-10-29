@@ -17,14 +17,14 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
-  const baseStyles = "inline-flex items-center justify-center font-semibold rounded-full transition-[background-color,box-shadow,transform,filter] duration-200 [transition-timing-function:cubic-bezier(.22,1,.36,1)] focus:outline-none disabled:opacity-50 disabled:pointer-events-none [touch-action:manipulation] select-none active:translate-y-0 tnum";
+  const baseStyles = "inline-flex items-center justify-center font-semibold rounded-full transition-[background-color,box-shadow,transform] duration-150 focus:outline-none disabled:opacity-50 disabled:pointer-events-none [touch-action:manipulation] select-none active:scale-[0.98] tnum";
 
   const variants = {
     primary: "btn-tri-primary",
     secondary: "btn-glass",
-    outline: "btn-glass",
-    danger: "text-white border border-[#DC2626]/40 bg-[linear-gradient(180deg,#ef4444,#DC2626)] shadow-[0_10px_22px_-10px_rgba(220,38,38,0.7),inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-[1.05] hover:-translate-y-px",
-    ghost: "text-ink-soft hover:bg-white/60 hover:text-ink",
+    outline: "bg-transparent text-accent border border-gray-200 hover:bg-gray-50",
+    danger: "text-white bg-red-600 hover:bg-red-700",
+    ghost: "text-ink-soft hover:bg-gray-100 hover:text-ink",
     gradient: "btn-tri-primary",
   };
 

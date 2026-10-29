@@ -154,7 +154,7 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({ onNavigate }) => {
               <Button variant="secondary" className="flex-1 justify-center" icon={<Search className="w-4 h-4" />} onClick={() => doLookup()} disabled={looking}>Look up</Button>
               <Button className="flex-1 justify-center" icon={looking ? <Loader2 className="w-4 h-4 animate-spin" /> : <PhoneIncoming className="w-4 h-4" />} onClick={simulateCall} disabled={looking}>Simulate Call</Button>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2"><strong>Simulate Call</strong> = an inbound call: unknown number auto-creates a lead. A real call from Exotel hits <code>/api/cti/incoming</code> and does the same.</p>
+            <p className="text-xs text-slate-400 mt-2"><strong>Simulate Call</strong> = an inbound call: unknown number auto-creates a lead. A real call from Exotel hits <code>/api/cti/incoming</code> and does the same.</p>
           </Card>
 
           <Card title="Recent Calls" action={<History className="w-4 h-4 text-slate-400" />}>
@@ -169,7 +169,7 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({ onNavigate }) => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-slate-800 truncate">{c.matched_name || c.from_number || 'Unknown'}</div>
-                      <div className="text-[11px] text-slate-400">{c.from_number} · {c.outcome || c.status}</div>
+                      <div className="text-xs text-slate-400">{c.from_number} · {c.outcome || c.status}</div>
                     </div>
                   </button>
                 ))}
@@ -220,9 +220,9 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({ onNavigate }) => {
                   { icon: <User className="w-4 h-4" />, label: 'Owner', value: d.accountManager || d.assignedto || '—' },
                 ].map((f, i) => (
                   <div key={i} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg">
-                    <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-400 ring-1 ring-slate-100">{f.icon}</div>
+                    <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center text-slate-400 ring-1 ring-slate-100">{f.icon}</div>
                     <div className="min-w-0">
-                      <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">{f.label}</div>
+                      <div className="text-xs text-slate-400 font-semibold">{f.label}</div>
                       <div className="text-sm font-medium text-slate-700 truncate">{f.value || '—'}</div>
                     </div>
                   </div>
@@ -231,7 +231,7 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({ onNavigate }) => {
 
               {/* What did the caller want? → route to Case (support) or Opportunity (sales) */}
               <div className="mt-6 pt-5 border-t border-slate-100">
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">What did the caller want?</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">What did the caller want?</label>
                 <textarea className={inputCls} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)}
                   placeholder="e.g. 'My internet plan keeps disconnecting' (support)  or  'Interested in your premium insurance plan' (sales)" />
                 <div className="flex flex-wrap gap-2 mt-2">
@@ -270,7 +270,7 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({ onNavigate }) => {
               {/* AI upsell result */}
               {upsell && (
                 <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-indigo-950 to-slate-900 text-white">
-                  <div className="flex items-center gap-2 text-indigo-300 text-[10px] font-semibold uppercase tracking-widest mb-2">
+                  <div className="flex items-center gap-2 text-indigo-300 text-xs font-semibold mb-2">
                     <Sparkles className="w-3.5 h-3.5" /> AI Upsell {upsell.source === 'gemini' && <span className="bg-indigo-500/30 px-1.5 rounded">Gemini</span>}
                   </div>
                   <div className="font-semibold text-lg">{upsell.product}</div>
@@ -281,7 +281,7 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({ onNavigate }) => {
 
               {/* Log call outcome (uses the notes above) */}
               <div className="mt-6 pt-5 border-t border-slate-100">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Log this call</div>
+                <div className="text-xs font-semibold text-slate-500 mb-2">Log this call</div>
                 <div className="flex gap-2">
                   <select className="border border-slate-300 rounded-lg px-3 py-2 text-sm flex-1" value={outcome} onChange={(e) => setOutcome(e.target.value)}>
                     {['Interested', 'Not Interested', 'Call Back', 'No Answer', 'Resolved'].map(o => <option key={o} value={o}>{o}</option>)}

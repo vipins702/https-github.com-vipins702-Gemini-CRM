@@ -132,13 +132,13 @@ const ProviderCard: React.FC<{ data: IntegrationConfig; onSaved: (c: Integration
           </div>
         </div>
         <label className="flex items-center gap-2 cursor-pointer shrink-0">
-          <span className="mono-label text-[10px]">Enabled</span>
+          <span className="mono-label text-xs">Enabled</span>
           <button
             type="button"
             onClick={() => { setEnabled(e => !e); setDirty(true); }}
-            className={`relative w-10 h-5 rounded-full transition-colors ${enabled ? 'bg-[#4F46E5]' : 'bg-slate-300'}`}
+            className={`relative w-10 h-5 rounded-full transition-colors ${enabled ? 'bg-accent' : 'bg-slate-300'}`}
           >
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : ''}`} />
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-surface rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : ''}`} />
           </button>
         </label>
       </div>
@@ -146,7 +146,7 @@ const ProviderCard: React.FC<{ data: IntegrationConfig; onSaved: (c: Integration
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {meta.fields.map(f => (
           <div key={f.key} className={f.help ? 'md:col-span-2' : ''}>
-            <label className="mono-label text-[10px] flex items-center gap-1 mb-1">
+            <label className="mono-label text-xs flex items-center gap-1 mb-1">
               {f.secret && <Lock className="w-3 h-3 text-slate-400" />}{f.label}
               {f.secret && data.secretSet[f.key] && <span className="text-emerald-600 normal-case font-normal">· stored</span>}
             </label>
@@ -157,7 +157,7 @@ const ProviderCard: React.FC<{ data: IntegrationConfig; onSaved: (c: Integration
               value={form[f.key] ?? ''}
               onChange={e => set(f.key, e.target.value)}
             />
-            {f.help && <p className="text-[11px] text-ink-muted mt-1">{f.help}</p>}
+            {f.help && <p className="text-xs text-ink-muted mt-1">{f.help}</p>}
           </div>
         ))}
       </div>
@@ -175,7 +175,7 @@ const ProviderCard: React.FC<{ data: IntegrationConfig; onSaved: (c: Integration
               type="text"
               readOnly
               value={webhookUrl}
-              className="flex-1 px-3 py-2 border border-blue-200 bg-white rounded-lg text-[13px] font-mono text-slate-600 outline-none"
+              className="flex-1 px-3 py-2 border border-blue-200 bg-surface rounded-lg text-[13px] font-mono text-slate-600 outline-none"
               onClick={e => (e.target as HTMLInputElement).select()}
             />
             <Button
@@ -230,7 +230,7 @@ export const Integrations: React.FC<Props> = () => {
   return (
     <div className="p-6 lg:p-8 font-sans animate-in fade-in duration-300 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-1">
-        <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-[#3730A3]"><Plug className="w-5 h-5" /></span>
+        <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-accent-deep"><Plug className="w-5 h-5" /></span>
         <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink">Integrations</h1>
       </div>
       <p className="text-sm text-ink-muted mb-6 ml-12">

@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  ArrowLeft, Mail, Phone, Building, Target, Loader2, Send, UserPlus, Check,
-  FileText, MessageSquare, Activity as ActivityIcon, Clock, Globe, Hash, Camera,
+  ArrowLeft, Mail, Phone, Building, Target, Loader2, UserPlus, Globe, Hash, Briefcase,
+  DollarSign, Gauge, UserCircle, CalendarClock, FileText, CheckCircle2, ChevronRight,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -10,9 +10,12 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import { Attachments } from '../components/Attachments';
 import { useToast } from '../components/ui/Toast';
+import {
+  Avatar360, QuickActions, contactActions, StageProgress, StatTile, AboutList, ActivityTimeline, parseTs, timeAgo,
+} from '../components/Record360';
 import { api } from '../services/api';
 import { formatCurrency } from '../services/currency';
-import { CRMRecord, RelatedActivity, Activity, ViewState } from '../types';
+import { RelatedActivity, Activity, ViewState, ProcessStage, User } from '../types';
 
 interface Props {
   leadId: string;
@@ -25,12 +28,15 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
   const [lead, setLead] = useState<any>(null);
   const [activity, setActivity] = useState<RelatedActivity | null>(null);
   const [timeline, setTimeline] = useState<Activity[]>([]);
+  const [stages, setStages] = useState<ProcessStage[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [note, setNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [converting, setConverting] = useState(false);
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,20 +53,23 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
   const load = async () => {
     setLoading(true);
     try {
-      const [rec, act, tl] = await Promise.all([
+      const [rec, act, tl, proc, us] = await Promise.all([
         api.getRecord('lead', leadId),               // flattened: fields top-level
         api.getRelatedActivity('lead', leadId).catch(() => null),
         api.getActivities(leadId, 'lead').catch(() => []),
+        api.getProcess('lead').catch(() => null),
+        api.getUsers().catch(() => []),
       ]);
       setLead(rec || null);
       setActivity(act);
       setTimeline(tl || []);
+      setStages(proc?.stages || []);
+      setUsers(us || []);
     } finally { setLoading(false); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [leadId]);
 
-  const name = lead ? ([lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.name || lead.company || 'Lead') : '';
-  const initials = (name || 'L').split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase();
+  const name = lead ? ([lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.name || lead.company || lead.email || lead.phone || 'Unnamed lead') : '';
 
   const addNote = async () => {
     if (!note.trim()) return;
@@ -88,8 +97,9 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 space-y-6">
-        <Skeleton variant="card" className="h-32" />
+      <div className="p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto">
+        <Skeleton variant="card" className="h-56" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[0, 1, 2, 3].map(i => <Skeleton key={i} variant="card" className="h-20" />)}</div>
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 lg:col-span-4"><Skeleton variant="card" className="h-64" /></div>
           <div className="col-span-12 lg:col-span-8"><Skeleton variant="card" className="h-64" /></div>
@@ -109,211 +119,135 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
 
   const isConverted = !!lead._converted_to_customer;
   const score = Number(lead.score || 0);
+  const value = Number(lead.value || 0);
+  const owner = users.find(u => u.id === (lead.owner_id || lead.ownerId || lead.assigneeId));
+  const created = parseTs(lead.created_at);
+  const subtitle = [lead.title, lead.company].filter(Boolean).join(' · ');
 
   return (
-    <div className="p-6 lg:p-8 font-sans animate-in fade-in duration-300">
-      {/* Back */}
-      <button onClick={onBack} className="flex items-center gap-2 text-sm text-ink-soft hover:text-ink transition-colors mb-4">
-        <ArrowLeft className="w-4 h-4" /> Back to pipeline
+    <div className="p-6 lg:p-8 font-sans max-w-[1400px] mx-auto panel-rise">
+      <button onClick={onBack} className="flex items-center gap-1 text-sm font-medium text-accent hover:text-accent-deep transition-colors mb-4">
+        <ArrowLeft className="w-4 h-4" /> Back
       </button>
 
-      {/* Hero header */}
-      <div className="glass-showcase p-6 mb-6 flex flex-col md:flex-row md:items-center gap-5">
-        <div className="flex flex-col items-center gap-1 shrink-0">
-          <span className="tri-ring w-16 h-16">
-            {lead.profileImage
-              ? <img src={lead.profileImage} className="w-full h-full object-cover rounded-full" alt={name} />
-              : <span className="flex items-center justify-center font-heading font-extrabold text-xl text-[#3730A3]">{initials}</span>
-            }
-          </span>
-          <label className="flex items-center gap-1 cursor-pointer text-[10px] text-[#4F46E5] hover:underline font-medium">
-            {uploadingAvatar ? <Loader2 className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
-            {lead.profileImage ? 'Change photo' : 'Add photo'}
-            <input type="file" accept="image/*" className="sr-only" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
-          </label>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink">{name}</h1>
-            <Badge status={lead.status} />
-            {isConverted && <span className="status-pill status-green">Converted</span>}
+      {/* Header: who, where they are in the pipeline, and what you can do */}
+      <section className="glass-showcase p-6 mb-5" aria-label="Lead summary">
+        <div className="flex flex-col md:flex-row md:items-center gap-5">
+          <Avatar360 name={name} image={lead.profileImage} onUpload={handleAvatarUpload} uploading={uploadingAvatar} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="font-heading text-[28px] leading-tight font-semibold tracking-tight text-gray-900 truncate">{name}</h1>
+              {lead.status && <Badge status={lead.status} />}
+              {isConverted && <span className="status-pill status-green">Converted</span>}
+            </div>
+            {subtitle && <p className="text-[15px] text-gray-600 mt-0.5 truncate">{subtitle}</p>}
+            <div className="flex items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-500 flex-wrap">
+              {lead.email && <span className="flex items-center gap-1.5 min-w-0"><Mail className="w-4 h-4 shrink-0" /><span className="truncate">{lead.email}</span></span>}
+              {lead.phone && <span className="flex items-center gap-1.5"><Phone className="w-4 h-4" />{lead.phone}</span>}
+              {lead.source && <span className="flex items-center gap-1.5"><Globe className="w-4 h-4" />{lead.source}</span>}
+            </div>
           </div>
-          <div className="flex items-center gap-4 mt-1.5 text-sm text-ink-muted flex-wrap">
-            {lead.company && <span className="flex items-center gap-1.5"><Building className="w-3.5 h-3.5" />{lead.company}</span>}
-            {lead.email && <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />{lead.email}</span>}
-            {lead.phone && <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" />{lead.phone}</span>}
-            {lead.source && <span className="flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" />{lead.source}</span>}
-          </div>
-        </div>
-        <div className="flex gap-2 shrink-0">
           {!isConverted && (
-            <Button icon={converting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} onClick={() => setShowConvertConfirm(true)} disabled={converting}>
-              Convert to Customer
+            <Button className="shrink-0" icon={converting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} onClick={() => setShowConvertConfirm(true)} disabled={converting}>
+              Convert to customer
             </Button>
           )}
         </div>
+
+        <div className="mt-5 pt-5 border-t border-gray-100 flex flex-col xl:flex-row xl:items-center gap-5">
+          <QuickActions actions={contactActions({
+            phone: lead.phone || lead.mobile,
+            email: lead.email,
+            onWhatsApp: onNavigate && (() => onNavigate('whatsapp', { phone: lead.phone || lead.mobile })),
+            onEmail: onNavigate && (() => onNavigate('email-inbox', { email: lead.email })),
+            onNote: () => noteRef.current?.focus(),
+            onEdit: onNavigate && (() => onNavigate('lead', { editId: leadId })),
+          })} />
+          {stages.length > 0 && <div className="flex-1 min-w-0"><StageProgress stages={stages} current={lead.status} /></div>}
+        </div>
+      </section>
+
+      {/* Key numbers */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatTile label="Deal value" value={value > 0 ? formatCurrency(value) : '—'} icon={DollarSign} tone="green" />
+        <StatTile label="Lead score" value={score > 0 ? score : '—'} icon={Gauge} tone="purple">
+          {score > 0 && <div className="mt-1.5 h-1.5 rounded-full bg-gray-100 overflow-hidden"><div className="h-full rounded-full bg-purple-500" style={{ width: `${Math.min(score, 100)}%` }} /></div>}
+        </StatTile>
+        <StatTile label="Owner" value={owner ? (owner.name || owner.email) : 'Unassigned'} icon={UserCircle} tone="accent" />
+        <StatTile label="Added" value={created ? timeAgo(created) : '—'} sub={created?.toLocaleDateString()} icon={CalendarClock} tone="orange" />
       </div>
 
       <div className="grid grid-cols-12 gap-6">
-        {/* LEFT: key facts */}
+        {/* Left: details and related work */}
         <div className="col-span-12 lg:col-span-4 space-y-6">
-          <Card title="Key Info">
-            <div className="space-y-3.5">
-              {[
-                { icon: Mail,     label: 'Email',    value: lead.email,    color: 'bg-blue-100 text-blue-700' },
-                { icon: Phone,    label: 'Phone',    value: lead.phone,    color: 'bg-emerald-100 text-emerald-700' },
-                { icon: Building, label: 'Company',  value: lead.company,  color: 'bg-orange-100 text-orange-700' },
-                { icon: Globe,    label: 'Source',   value: lead.source,   color: 'bg-violet-100 text-violet-700' },
-                { icon: Target,   label: 'Industry', value: lead.industry, color: 'bg-rose-100 text-rose-700' },
-                { icon: Hash,     label: 'Title',    value: lead.title,    color: 'bg-cyan-100 text-cyan-700' },
-              ].filter(r => r.value || ['Email','Phone','Company','Source'].includes(r.label)).map(({ icon: Icon, label, value, color }) => (
-                <div key={label} className="flex items-center gap-3 text-sm">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${color}`}><Icon className="w-[18px] h-[18px]" /></div>
-                  <div className="min-w-0">
-                    <div className="mono-label text-[10px]">{label}</div>
-                    <div className="text-ink font-medium truncate">{value || '—'}</div>
-                  </div>
-                </div>
-              ))}
-              {lead.value > 0 && (
-                <div className="pt-3.5 border-t border-slate-100">
-                  <div className="mono-label text-[10px] mb-1">Deal Value</div>
-                  <div className="font-heading text-2xl font-extrabold text-[#0F766E] tnum">{formatCurrency(Number(lead.value))}</div>
-                </div>
-              )}
-              {score > 0 && (
-                <div className="pt-3.5 border-t border-slate-100">
-                  <div className="mono-label text-[10px] mb-1.5 flex items-center gap-1"><Target className="w-3 h-3" /> Lead Score</div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-2xl font-extrabold text-[#3730A3] tnum leading-none">{score}</div>
-                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-[#4F46E5] rounded-full" style={{ width: `${Math.min(score, 100)}%` }} /></div>
-                  </div>
-                </div>
-              )}
-            </div>
+          <Card title="About">
+            <AboutList rows={[
+              { icon: Mail, label: 'Email', value: lead.email, href: lead.email ? `mailto:${lead.email}` : undefined },
+              { icon: Phone, label: 'Phone', value: lead.phone || lead.mobile, href: (lead.phone || lead.mobile) ? `tel:${lead.phone || lead.mobile}` : undefined },
+              { icon: Building, label: 'Company', value: lead.company },
+              { icon: Briefcase, label: 'Title', value: lead.title },
+              { icon: Globe, label: 'Source', value: lead.source },
+              ...(lead.industry ? [{ icon: Target, label: 'Industry', value: lead.industry }] : []),
+              ...(lead.website ? [{ icon: Hash, label: 'Website', value: lead.website, href: /^https?:/.test(lead.website) ? lead.website : `https://${lead.website}` }] : []),
+            ]} />
           </Card>
 
-          <Card title="Attachments">
+          {!!activity?.tasks.length && (
+            <Card title={`Tasks · ${activity.tasks.length}`} noPadding>
+              <ul className="divide-y divide-gray-100">
+                {activity.tasks.slice(0, 6).map(t => (
+                  <li key={t.id} className="flex items-center gap-3 px-5 py-3">
+                    <CheckCircle2 className={`w-5 h-5 shrink-0 ${/complete|done/i.test(t.status) ? 'text-green-500' : 'text-gray-300'}`} aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 truncate">{t.subject}</p>
+                      {t.dueDate && <p className="text-xs text-gray-500">Due {new Date(t.dueDate).toLocaleDateString()}</p>}
+                    </div>
+                    <Badge status={t.status} />
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {!!activity?.quotes.length && (
+            <Card title={`Quotes · ${activity.quotes.length}`} noPadding>
+              <ul className="divide-y divide-gray-100">
+                {activity.quotes.slice(0, 6).map(q => (
+                  <li key={q.id}>
+                    <button onClick={() => onNavigate?.('quotes', { recordId: q.id })} className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-gray-50 transition-colors">
+                      <FileText className="w-5 h-5 text-purple-500 shrink-0" aria-hidden="true" />
+                      <span className="text-sm font-medium text-gray-900 truncate flex-1">{q.quoteNumber}</span>
+                      <span className="text-sm font-semibold text-gray-900 tnum">{formatCurrency(q.total, q.currency)}</span>
+                      <ChevronRight className="w-4 h-4 text-gray-300" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          <Card title="Files">
             <Attachments entityType="lead" recordId={leadId} />
           </Card>
         </div>
 
-        {/* RIGHT: activity + timeline */}
-        <div className="col-span-12 lg:col-span-8 space-y-6">
-          {/* Related activity incl. stage history */}
-          <Card title="Activity & History" >
-            {!activity ? (
-              <div className="py-6 text-center text-sm text-ink-muted flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Stage history */}
-                <div className="md:col-span-2">
-                  <p className="mono-label mb-2 flex items-center gap-1.5"><ActivityIcon className="w-3.5 h-3.5" /> Stage History ({activity.stageHistory?.length || 0})</p>
-                  {(!activity.stageHistory || activity.stageHistory.length === 0) ? (
-                    <p className="text-xs text-ink-muted">No stage changes yet. Move this lead on the Pipeline to build history.</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {activity.stageHistory.slice(0, 8).map(hs => (
-                        <div key={hs.id} className="flex items-start gap-2 p-2 rounded-lg bg-slate-50/60">
-                          <span className="text-xs text-slate-600">
-                            {hs.from && <span className="text-slate-400">{hs.from} → </span>}
-                            <span className="font-semibold text-ink">{hs.to}</span>
-                            {hs.note && <span className="text-ink-soft"> — “{hs.note}”</span>}
-                          </span>
-                          <span className="ml-auto text-[10px] text-slate-400 shrink-0">{hs.actor} · {new Date(hs.created_at).toLocaleDateString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {activity.quotes.length > 0 && (
-                  <div>
-                    <p className="mono-label mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Quotes ({activity.quotes.length})</p>
-                    <div className="space-y-1.5">
-                      {activity.quotes.slice(0, 5).map(q => (
-                        <button key={q.id} onClick={() => onNavigate?.('quotes', { recordId: q.id })} className="w-full flex items-center justify-between gap-2 p-2 rounded-lg hover:bg-slate-50 text-left">
-                          <span className="text-xs font-semibold text-ink truncate">{q.quoteNumber}</span>
-                          <span className="flex items-center gap-2 shrink-0"><span className="text-xs font-bold text-[#0F766E] tnum">{formatCurrency(q.total, q.currency)}</span><Badge status={q.status} /></span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {activity.tasks.length > 0 && (
-                  <div>
-                    <p className="mono-label mb-2 flex items-center gap-1.5"><Check className="w-3.5 h-3.5" /> Tasks ({activity.tasks.length})</p>
-                    <div className="space-y-1.5">
-                      {activity.tasks.slice(0, 5).map(tk => (
-                        <div key={tk.id} className="flex items-center justify-between gap-2 p-2 rounded-lg">
-                          <span className="text-xs text-ink truncate">{tk.subject}</span><Badge status={tk.status} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {activity.emails.length > 0 && (
-                  <div>
-                    <p className="mono-label mb-2 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Emails ({activity.emails.length})</p>
-                    <div className="space-y-1.5">
-                      {activity.emails.slice(0, 5).map(em => (
-                        <div key={em.id} className="flex items-center gap-2 p-2 rounded-lg">
-                          <Mail className={`w-3.5 h-3.5 shrink-0 ${em.direction === 'outbound' ? 'text-indigo-500' : 'text-slate-400'}`} />
-                          <span className="text-xs text-ink truncate flex-1">{em.subject}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {activity.whatsapp.length > 0 && (
-                  <div>
-                    <p className="mono-label mb-2 flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> WhatsApp ({activity.whatsapp.length})</p>
-                    <div className="space-y-1.5">
-                      {activity.whatsapp.slice(0, 5).map(w => (
-                        <div key={w.id} className="flex items-center gap-2 p-2 rounded-lg">
-                          <MessageSquare className={`w-3.5 h-3.5 shrink-0 ${w.direction === 'outbound' ? 'text-emerald-500' : 'text-slate-400'}`} />
-                          <span className="text-xs text-ink truncate flex-1">{w.body}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </Card>
-
-          {/* Timeline + note */}
-          <Card title="Timeline">
-            <div className="flex gap-2 mb-4">
-              <input value={note} onChange={e => setNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNote()} placeholder="Add a note…" className="flex-1" />
-              <Button icon={savingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} onClick={addNote} disabled={savingNote || !note.trim()}>Add</Button>
-            </div>
-            {timeline.length === 0 ? (
-              <p className="text-sm text-ink-muted text-center py-4">No activity yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {timeline.slice(0, 20).map((a: any, i) => (
-                  <div key={a.id || i} className="flex gap-3 text-sm">
-                    <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0"><Clock className="w-3.5 h-3.5 text-slate-400" /></div>
-                    <div className="min-w-0">
-                      <p className="text-ink">
-                        <span className="font-semibold capitalize">{a.action || 'note'}</span>
-                        {a.details?.note && <span className="text-ink-soft"> — {a.details.note}</span>}
-                        {a.details?.to && <span className="text-ink-soft"> — {a.details.from ? `${a.details.from} → ` : ''}{a.details.to}{a.details.note ? ` (“${a.details.note}”)` : ''}</span>}
-                      </p>
-                      <p className="text-[11px] text-slate-400">{a.timestamp || a.created_at ? new Date(a.timestamp || a.created_at).toLocaleString() : ''}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+        {/* Right: everything that happened, in one place */}
+        <div className="col-span-12 lg:col-span-8">
+          <ActivityTimeline
+            timeline={timeline}
+            activity={activity}
+            note={note}
+            onNoteChange={setNote}
+            onAddNote={addNote}
+            savingNote={savingNote}
+            noteInputRef={noteRef}
+          />
         </div>
       </div>
 
       <ConfirmationDialog
         isOpen={showConvertConfirm}
-        title="Convert to Customer?"
+        title="Convert to customer?"
         message={`Convert "${name}" from a lead to a customer record? This will create a customer profile and link all activity.`}
         confirmText="Convert"
         onConfirm={async () => {

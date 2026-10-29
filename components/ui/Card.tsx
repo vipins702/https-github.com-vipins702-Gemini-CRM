@@ -22,22 +22,21 @@ export const Card: React.FC<CardProps> = ({
   const baseStyles = "overflow-hidden";
 
   const variants = {
-    // WORK surface — flat white, light elevation (default for data screens)
-    default: "glass-work",
-    bordered: "rounded-2xl bg-white border border-[var(--border)] transition-colors duration-200 hover:border-slate-300",
-    // Standard data card — flat white, hairline border
+    // White card with soft shadow (graphite in dark mode) — default for data screens
+    default: "glass-showcase",
+    bordered: "rounded-2xl bg-surface border border-gray-200 transition-colors duration-200 hover:border-gray-300",
     glass: "glass-showcase",
     showcase: "glass-showcase",
-    // Accent (blue job)
-    gradient: "rounded-2xl bg-[linear-gradient(135deg,#3730A3_0%,#4F46E5_55%,#6366F1_100%)] text-white border-0 shadow-[var(--elev-3)]",
+    // Accent highlight card
+    gradient: "rounded-2xl bg-gradient-to-b from-accent-500 to-accent-600 text-white border-0 shadow-[var(--elev-3)]",
   };
 
   return (
     <div className={`${baseStyles} ${variants[variant]} ${className}`}>
       {title && (
-        <div className={`px-5 py-4 border-b ${variant === 'gradient' ? 'border-white/20' : 'border-[var(--border-subtle)]'} flex justify-between items-center gap-3`}>
+        <div className={`px-5 py-4 border-b ${variant === 'gradient' ? 'border-white/20' : 'border-gray-100'} flex justify-between items-center gap-3`}>
           <div className="min-w-0">
-            <h3 className={`font-heading text-[15px] font-bold tracking-tight truncate ${variant === 'gradient' ? 'text-white' : 'text-ink'}`}>
+            <h3 className={`font-heading text-[17px] font-semibold tracking-tight truncate ${variant === 'gradient' ? 'text-white' : 'text-ink'}`}>
               {title}
             </h3>
             {subtitle && (

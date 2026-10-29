@@ -90,7 +90,7 @@ export const Sequences: React.FC = () => {
   if (editing) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <div className="bg-white border-b border-slate-200">
+        <div className="bg-surface border-b border-slate-200">
           <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between">
             <h1 className="text-xl font-extrabold text-slate-900">
               {editing.id ? 'Edit Sequence' : 'New Drip Sequence'}
@@ -104,9 +104,9 @@ export const Sequences: React.FC = () => {
 
         <div className="max-w-4xl mx-auto px-6 py-6 space-y-6">
           {/* Meta */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-surface rounded-xl border border-slate-200 p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Sequence Name</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Sequence Name</label>
               <input
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 placeholder="e.g. 7-Day Lead Nurture"
@@ -115,7 +115,7 @@ export const Sequences: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">For Entity Type</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">For Entity Type</label>
               <select
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 value={editing.entity_type}
@@ -130,7 +130,7 @@ export const Sequences: React.FC = () => {
           {/* Steps */}
           <div className="space-y-4">
             {editing.steps.length === 0 && (
-              <div className="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center">
+              <div className="bg-surface rounded-xl border border-dashed border-slate-300 p-10 text-center">
                 <Mail className="w-10 h-10 mx-auto mb-3 text-slate-300" />
                 <p className="text-slate-500 font-medium">No steps yet</p>
                 <p className="text-slate-400 text-sm">Add your first email or task step below</p>
@@ -138,7 +138,7 @@ export const Sequences: React.FC = () => {
             )}
 
             {editing.steps.map((step, idx) => (
-              <div key={step.id} className="bg-white rounded-xl border border-slate-200 p-6 relative">
+              <div key={step.id} className="bg-surface rounded-xl border border-slate-200 p-6 relative">
                 {/* Step header */}
                 <div className="flex items-center gap-3 mb-4">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${step.type === 'email' ? 'bg-indigo-500' : 'bg-amber-500'}`}>
@@ -171,7 +171,7 @@ export const Sequences: React.FC = () => {
                 {step.type === 'email' ? (
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Email Subject</label>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Email Subject</label>
                       <input
                         className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
                         placeholder="e.g. Quick follow-up, {firstName}"
@@ -180,7 +180,7 @@ export const Sequences: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">
                         Body <span className="text-slate-400 normal-case font-normal">(use {'{firstName}'}, {'{company}'}, etc.)</span>
                       </label>
                       <textarea
@@ -195,7 +195,7 @@ export const Sequences: React.FC = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Task Subject</label>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Task Subject</label>
                       <input
                         className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
                         placeholder="e.g. Call {firstName} for follow-up"
@@ -204,7 +204,7 @@ export const Sequences: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Priority</label>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Priority</label>
                       <select
                         className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                         value={step.task_priority || 'Medium'}
@@ -234,7 +234,7 @@ export const Sequences: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-surface border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -255,7 +255,7 @@ export const Sequences: React.FC = () => {
         {loading ? (
           <div className="text-center py-12 text-slate-400">Loading sequences…</div>
         ) : sequences.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed border-slate-300 p-16 text-center">
+          <div className="bg-surface rounded-xl border border-dashed border-slate-300 p-16 text-center">
             <Mail className="w-12 h-12 mx-auto mb-4 text-slate-300" />
             <p className="text-slate-600 font-semibold text-lg">No drip sequences yet</p>
             <p className="text-slate-400 text-sm mt-1 mb-6">Create a sequence to automatically follow up with leads over multiple days</p>
@@ -264,7 +264,7 @@ export const Sequences: React.FC = () => {
         ) : (
           <div className="space-y-3">
             {sequences.map(seq => (
-              <div key={seq.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div key={seq.id} className="bg-surface rounded-xl border border-slate-200 overflow-hidden">
                 <div
                   className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 cursor-pointer"
                   onClick={() => setExpandedId(expandedId === seq.id ? null : seq.id!)}
@@ -295,7 +295,7 @@ export const Sequences: React.FC = () => {
                               {idx + 1}
                             </div>
                             <span className="text-xs font-semibold text-slate-600 capitalize">{step.type}</span>
-                            <span className="ml-auto text-[10px] text-slate-400">Day {step.delay_days}</span>
+                            <span className="ml-auto text-xs text-slate-400">Day {step.delay_days}</span>
                           </div>
                           <p className="text-xs text-slate-700 font-medium truncate">
                             {step.type === 'email' ? step.subject : step.task_subject}

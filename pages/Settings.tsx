@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { api } from '../services/api';
-import { applySettings } from '../services/theme';
+import { applySettings, setPersonalTheme, getThemeMode, onThemeChange, ThemeMode } from '../services/theme';
 import { SystemSettings } from '../types';
 import { CURRENCIES, formatCurrency } from '../services/currency';
 import {
@@ -42,6 +42,9 @@ const TIMEZONES = [
 export const Settings: React.FC = () => {
    const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'notifications'>('appearance');
    const [settings, setSettings] = useState<SystemSettings | null>(null);
+   // Theme actually in use (a top-bar toggle can differ from the saved workspace default).
+   const [activeTheme, setActiveTheme] = useState<ThemeMode>(getThemeMode);
+   useEffect(() => onThemeChange(({ mode }) => setActiveTheme(mode)), []);
    const [loading, setLoading] = useState(true);
    const [saving, setSaving] = useState(false);
 
@@ -67,16 +70,18 @@ export const Settings: React.FC = () => {
       if (!settings) return;
       const next = { ...settings, [key]: value };
       setSettings(next);
+      if (key === 'theme') setPersonalTheme(value); // your own choice wins over any earlier top-bar toggle
       applySettings(next); // live preview — apply instantly as the user changes options
    };
 
+   // Swatches use the fixed palette tokens (bg-blue-* / bg-indigo-* follow the current brand).
    const colors = [
-      { id: 'indigo', label: 'Indigo', class: 'bg-indigo-600' },
-      { id: 'blue', label: 'Blue', class: 'bg-blue-600' },
-      { id: 'purple', label: 'Purple', class: 'bg-purple-600' },
-      { id: 'emerald', label: 'Emerald', class: 'bg-emerald-600' },
-      { id: 'rose', label: 'Rose', class: 'bg-rose-600' },
-      { id: 'orange', label: 'Orange', class: 'bg-orange-600' },
+      { id: 'blue', label: 'Blue', swatch: 'rgb(var(--blue-600))' },
+      { id: 'indigo', label: 'Indigo', swatch: 'rgb(var(--indigo-600))' },
+      { id: 'purple', label: 'Purple', swatch: 'rgb(var(--purple-600))' },
+      { id: 'emerald', label: 'Green', swatch: 'rgb(var(--green-600))' },
+      { id: 'rose', label: 'Pink', swatch: 'rgb(var(--pink-600))' },
+      { id: 'orange', label: 'Orange', swatch: 'rgb(var(--orange-600))' },
    ];
 
    if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>;
@@ -85,7 +90,7 @@ export const Settings: React.FC = () => {
    return (
       <div className="h-screen flex flex-col overflow-hidden">
          {/* Header */}
-         <div className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between shrink-0">
+         <div className="h-16 bg-surface border-b border-slate-200 px-8 flex items-center justify-between shrink-0">
             <div>
                <h1 className="font-heading text-xl font-extrabold tracking-tight text-ink">System Preferences</h1>
                <p className="text-xs text-ink-muted">Customize the look and feel of your CRM.</p>
@@ -104,19 +109,19 @@ export const Settings: React.FC = () => {
             <div className="w-64 space-y-2">
                <button
                   onClick={() => setActiveTab('general')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'general' ? 'bg-white shadow-sm text-indigo-600 ring-1 ring-gray-200' : 'text-gray-500 hover:bg-gray-100'}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'general' ? 'bg-surface shadow-sm text-indigo-600 ring-1 ring-gray-200' : 'text-gray-500 hover:bg-gray-100'}`}
                >
                   <Building className="w-5 h-5" /> Organization
                </button>
                <button
                   onClick={() => setActiveTab('appearance')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'appearance' ? 'bg-white shadow-sm text-indigo-600 ring-1 ring-gray-200' : 'text-gray-500 hover:bg-gray-100'}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'appearance' ? 'bg-surface shadow-sm text-indigo-600 ring-1 ring-gray-200' : 'text-gray-500 hover:bg-gray-100'}`}
                >
                   <Palette className="w-5 h-5" /> Appearance
                </button>
                <button
                   onClick={() => setActiveTab('notifications')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'notifications' ? 'bg-white shadow-sm text-indigo-600 ring-1 ring-gray-200' : 'text-gray-500 hover:bg-gray-100'}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'notifications' ? 'bg-surface shadow-sm text-indigo-600 ring-1 ring-gray-200' : 'text-gray-500 hover:bg-gray-100'}`}
                >
                   <Bell className="w-5 h-5" /> Notifications
                </button>
@@ -234,7 +239,7 @@ export const Settings: React.FC = () => {
                            <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
                               <select
-                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-surface"
                                  value={settings.timezone || 'UTC'}
                                  onChange={(e) => updateSetting('timezone', e.target.value)}
                               >
@@ -288,7 +293,7 @@ export const Settings: React.FC = () => {
                               <div>
                                  <label className="block text-sm font-medium text-gray-700 mb-1">Default Currency</label>
                                  <select
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-surface"
                                     value={settings.defaultCurrency || 'USD'}
                                     onChange={(e) => updateSetting('defaultCurrency', e.target.value)}
                                  >
@@ -300,7 +305,7 @@ export const Settings: React.FC = () => {
                               <div>
                                  <label className="block text-sm font-medium text-gray-700 mb-1">Number / Date Format</label>
                                  <select
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-surface"
                                     value={settings.locale || ''}
                                     onChange={(e) => updateSetting('locale', e.target.value)}
                                  >
@@ -329,7 +334,8 @@ export const Settings: React.FC = () => {
                               <button
                                  key={mode}
                                  onClick={() => updateSetting('theme', mode)}
-                                 className={`p-4 rounded-xl border-2 flex flex-col items-center gap-3 transition-all ${settings.theme === mode ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-gray-300 text-gray-500'}`}
+                                 className={`p-4 rounded-xl border-2 flex flex-col items-center gap-3 transition-all ${activeTheme === mode ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-gray-300 text-gray-500'}`}
+                                 aria-pressed={activeTheme === mode}
                               >
                                  {mode === 'light' && <Sun className="w-6 h-6" />}
                                  {mode === 'dark' && <Moon className="w-6 h-6" />}
@@ -347,7 +353,10 @@ export const Settings: React.FC = () => {
                               <button
                                  key={color.id}
                                  onClick={() => updateSetting('primaryColor', color.id)}
-                                 className={`w-12 h-12 rounded-full ${color.class} flex items-center justify-center transition-transform ${settings.primaryColor === color.id ? 'ring-4 ring-offset-2 ring-gray-200 scale-110' : 'hover:scale-105'}`}
+                                 aria-label={`${color.label} brand colour`}
+                                 aria-pressed={settings.primaryColor === color.id}
+                                 style={{ backgroundColor: color.swatch }}
+                                 className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform ${settings.primaryColor === color.id ? 'ring-4 ring-offset-2 ring-offset-surface ring-gray-200 scale-110' : 'hover:scale-105'}`}
                               >
                                  {settings.primaryColor === color.id && <Check className="w-6 h-6 text-white" />}
                               </button>
@@ -440,7 +449,7 @@ export const Settings: React.FC = () => {
                                  onClick={() => updateSetting('glassmorphism', !settings.glassmorphism)}
                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.glassmorphism ? 'bg-indigo-600' : 'bg-gray-200'}`}
                               >
-                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.glassmorphism ? 'translate-x-6' : 'translate-x-1'}`} />
+                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform ${settings.glassmorphism ? 'translate-x-6' : 'translate-x-1'}`} />
                               </button>
                            </div>
 
@@ -471,7 +480,7 @@ export const Settings: React.FC = () => {
                      <Card title="Live Preview">
                         <div className={`p-6 rounded-xl ${settings.glassmorphism ? 'glass gradient-mesh' : 'bg-gray-100'}`}>
                            <div className="flex items-center gap-4">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white ${settings.primaryColor === 'indigo' ? 'bg-indigo-600' : settings.primaryColor === 'blue' ? 'bg-blue-600' : settings.primaryColor === 'purple' ? 'bg-purple-600' : settings.primaryColor === 'emerald' ? 'bg-emerald-600' : settings.primaryColor === 'rose' ? 'bg-rose-600' : 'bg-orange-600'}`}>
+                              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white bg-accent">
                                  <Check className="w-6 h-6" />
                               </div>
                               <div>

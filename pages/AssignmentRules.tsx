@@ -117,7 +117,7 @@ export const AssignmentRules: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-surface border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
@@ -145,12 +145,12 @@ export const AssignmentRules: React.FC = () => {
 
         {/* Add/Edit Form */}
         {showForm && (
-          <div className="bg-white rounded-xl border border-indigo-200 shadow-sm p-6 space-y-4">
+          <div className="bg-surface rounded-xl border border-indigo-200 shadow-sm p-6 space-y-4">
             <h3 className="font-bold text-slate-800">{editing.id ? 'Edit Rule' : 'New Assignment Rule'}</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Rule Name</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Rule Name</label>
                 <input
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
                   value={editing.name}
@@ -159,7 +159,7 @@ export const AssignmentRules: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Priority (higher = first)</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Priority (higher = first)</label>
                 <input
                   type="number"
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
@@ -172,7 +172,7 @@ export const AssignmentRules: React.FC = () => {
             {/* Conditions */}
             <div>
               <div className="flex items-center gap-3 mb-3">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Match</label>
+                <label className="text-xs font-semibold text-slate-500">Match</label>
                 <select
                   className="border border-slate-300 rounded-lg px-2 py-1 text-sm"
                   value={editing.conditions.match}
@@ -223,7 +223,7 @@ export const AssignmentRules: React.FC = () => {
             {/* Assign to */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assignment Mode</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Assignment Mode</label>
                 <select
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                   value={editing.mode}
@@ -235,7 +235,7 @@ export const AssignmentRules: React.FC = () => {
               </div>
               {editing.mode === 'specific' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assign To</label>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">Assign To</label>
                   <select
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                     value={editing.assign_to}
@@ -263,13 +263,13 @@ export const AssignmentRules: React.FC = () => {
         {loading ? (
           <div className="text-center py-12 text-slate-400">Loading…</div>
         ) : rules.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center">
+          <div className="bg-surface rounded-xl border border-dashed border-slate-300 p-12 text-center">
             <Users className="w-10 h-10 mx-auto mb-3 text-slate-300" />
             <p className="text-slate-500 font-medium">No assignment rules yet</p>
             <p className="text-slate-400 text-sm mt-1">Default: round-robin across all active users</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+          <div className="bg-surface rounded-xl border border-slate-200 divide-y divide-slate-100">
             {rules.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0)).map(rule => (
               <div key={rule.id} className={`${!rule.is_active ? 'opacity-50' : ''}`}>
                 <div
@@ -297,7 +297,7 @@ export const AssignmentRules: React.FC = () => {
                 </div>
                 {expandedId === rule.id && (
                   <div className="px-12 pb-4">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    <p className="text-xs font-bold text-slate-400 mb-2">
                       Match {rule.conditions?.match?.toUpperCase()} of:
                     </p>
                     {(rule.conditions?.rules || []).map((c, i) => (

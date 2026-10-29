@@ -27,7 +27,7 @@ const TriggerNode = ({ data, selected }: NodeProps<FlowNodeData>) => (
   <div className={`relative group min-w-[200px] transition-all duration-200 ${selected ? 'scale-105' : ''}`}>
     <div className={`
        rounded-full px-6 py-3 shadow-lg flex items-center gap-3 justify-center border-2
-       ${selected ? 'bg-indigo-600 border-indigo-400 ring-2 ring-indigo-200' : 'bg-slate-900 border-slate-800'}
+       ${selected ? 'bg-indigo-600 border-indigo-400 ring-2 ring-indigo-200' : 'bg-[#1d1d1f] border-[#2c2c2e]'}
     `}>
        <div className="p-1.5 bg-indigo-500 rounded-full text-white">
           <Zap className="w-4 h-4" fill="currentColor" />
@@ -42,7 +42,7 @@ const ActionNode = ({ data, selected }: NodeProps<FlowNodeData>) => (
   <div className={`relative group min-w-[220px] transition-all duration-200 ${selected ? 'ring-2 ring-indigo-500 ring-offset-2 rounded-xl' : ''}`}>
     <Handle type="target" position={Position.Top} className="!w-3 !h-3 !bg-slate-400 !border-2 !border-white" />
     
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+    <div className="bg-surface border border-slate-200 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
        <div className="h-1 bg-indigo-500 w-full"></div>
        <div className="p-4 flex items-start gap-3">
           <div className={`p-2 rounded-lg shrink-0 ${
@@ -56,7 +56,7 @@ const ActionNode = ({ data, selected }: NodeProps<FlowNodeData>) => (
              {!['mail', 'user-plus', 'file-text'].includes(data.icon || '') && <Settings className="w-5 h-5"/>}
           </div>
           <div>
-             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{data.type}</div>
+             <div className="text-xs font-bold text-slate-400 mb-0.5">{data.type}</div>
              <div className="font-semibold text-slate-900 text-sm leading-tight">{data.label}</div>
           </div>
        </div>
@@ -82,11 +82,11 @@ const ConditionNode = ({ data, selected }: NodeProps<FlowNodeData>) => (
     
     {/* Two source handles for True/False branches */}
     <div className="absolute -bottom-3 left-1/4 -translate-x-1/2 flex flex-col items-center">
-       <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1 rounded mb-1">YES</span>
+       <span className="text-xs font-bold text-green-600 bg-green-50 px-1 rounded mb-1">YES</span>
        <Handle type="source" id="true" position={Position.Bottom} className="!relative !left-0 !transform-none !w-3 !h-3 !bg-green-500 !border-2 !border-white" />
     </div>
     <div className="absolute -bottom-3 right-1/4 translate-x-1/2 flex flex-col items-center">
-       <span className="text-[9px] font-bold text-red-600 bg-red-50 px-1 rounded mb-1">NO</span>
+       <span className="text-xs font-bold text-red-600 bg-red-50 px-1 rounded mb-1">NO</span>
        <Handle type="source" id="false" position={Position.Bottom} className="!relative !left-0 !transform-none !w-3 !h-3 !bg-red-500 !border-2 !border-white" />
     </div>
   </div>
@@ -297,14 +297,14 @@ export const WorkflowBuilder: React.FC = () => {
   const entityOptions = Object.values(schemas) as any[];
   const triggerEntityFields = (schemas[cfg.entityType]?.fields || []) as any[];
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
+  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-surface outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600"/></div>;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white">
+    <div className="flex h-screen overflow-hidden bg-surface">
       {/* Sidebar Tool Palette */}
-      <div className="w-72 bg-white border-r border-gray-200 flex flex-col z-20 shadow-xl">
+      <div className="w-72 bg-surface border-r border-gray-200 flex flex-col z-20 shadow-xl">
         <div className="p-5 border-b border-gray-100 bg-gray-50/50">
           <div className="flex items-center gap-2 mb-1">
              <div className="bg-indigo-600 p-1.5 rounded-lg">
@@ -317,9 +317,9 @@ export const WorkflowBuilder: React.FC = () => {
 
         <div className="p-5 space-y-6 overflow-y-auto flex-1">
           <div>
-             <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Triggers</div>
+             <div className="text-xs font-bold text-gray-400 mb-3 px-1">Triggers</div>
              <div 
-               className="p-3 bg-slate-900 text-white rounded-lg cursor-grab active:cursor-grabbing hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-3"
+               className="p-3 bg-gray-900 text-surface rounded-lg cursor-grab active:cursor-grabbing hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-3"
                onDragStart={(event) => onDragStart(event, tools[0])} 
                draggable
              >
@@ -329,12 +329,12 @@ export const WorkflowBuilder: React.FC = () => {
           </div>
 
           <div>
-             <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Logic</div>
+             <div className="text-xs font-bold text-gray-400 mb-3 px-1">Logic</div>
              <div className="space-y-2">
                 {tools.slice(4).map((tool) => (
                    <div 
                      key={tool.label}
-                     className="p-3 border border-gray-200 bg-white rounded-lg cursor-grab active:cursor-grabbing hover:border-indigo-500 hover:shadow-md transition-all flex items-center gap-3"
+                     className="p-3 border border-gray-200 bg-surface rounded-lg cursor-grab active:cursor-grabbing hover:border-indigo-500 hover:shadow-md transition-all flex items-center gap-3"
                      onDragStart={(event) => onDragStart(event, tool)} 
                      draggable
                    >
@@ -349,12 +349,12 @@ export const WorkflowBuilder: React.FC = () => {
           </div>
 
           <div>
-             <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Actions</div>
+             <div className="text-xs font-bold text-gray-400 mb-3 px-1">Actions</div>
              <div className="space-y-2">
                 {tools.slice(1, 4).map((tool) => (
                    <div 
                      key={tool.label}
-                     className="p-3 border border-gray-200 bg-white rounded-lg cursor-grab active:cursor-grabbing hover:border-indigo-500 hover:shadow-md transition-all flex items-center gap-3"
+                     className="p-3 border border-gray-200 bg-surface rounded-lg cursor-grab active:cursor-grabbing hover:border-indigo-500 hover:shadow-md transition-all flex items-center gap-3"
                      onDragStart={(event) => onDragStart(event, tool)} 
                      draggable
                    >
@@ -411,7 +411,7 @@ export const WorkflowBuilder: React.FC = () => {
               defaultEdgeOptions={{ type: 'smoothstep', animated: false, style: { strokeWidth: 2, stroke: '#94a3b8' } }}
             >
               <Background color="#cbd5e1" gap={20} size={1} />
-              <Controls className="bg-white border border-gray-200 shadow-md rounded-lg overflow-hidden m-4" showInteractive={false} />
+              <Controls className="bg-surface border border-gray-200 shadow-md rounded-lg overflow-hidden m-4" showInteractive={false} />
               <MiniMap 
                  className="!bg-white !border !border-gray-200 !shadow-md !rounded-lg !overflow-hidden !m-4" 
                  nodeColor={(n) => {
@@ -425,7 +425,7 @@ export const WorkflowBuilder: React.FC = () => {
       </div>
 
       {/* Sliding Configuration Panel */}
-      <div className={`fixed right-0 top-0 h-full w-80 bg-white shadow-2xl border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${selectedNode ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed right-0 top-0 h-full w-80 bg-surface shadow-2xl border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${selectedNode ? 'translate-x-0' : 'translate-x-full'}`}>
          {selectedNode && (
            <div className="flex flex-col h-full">
              {/* Panel Header */}
@@ -442,7 +442,7 @@ export const WorkflowBuilder: React.FC = () => {
              {/* Panel Content */}
              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
                <div>
-                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Step Label</label>
+                 <label className="block text-xs font-bold text-gray-500 mb-2">Step Label</label>
                  <input
                    type="text"
                    value={selected?.data?.label || ''}
@@ -455,30 +455,30 @@ export const WorkflowBuilder: React.FC = () => {
                {selectedNode.type === 'trigger' && (
                   <div className="space-y-4">
                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Trigger Entity</label>
+                        <label className="block text-xs font-bold text-gray-500 mb-2">Trigger Entity</label>
                         <select className={inputCls} value={cfg.entityType || ''} onChange={(e) => updateNodeConfig({ entityType: e.target.value, conditions: { match: 'all', rules: [] } })}>
                            <option value="">Select entity…</option>
                            {entityOptions.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                         </select>
                      </div>
                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Event</label>
+                        <label className="block text-xs font-bold text-gray-500 mb-2">Event</label>
                         <select className={inputCls} value={cfg.triggerType || 'create'} onChange={(e) => updateNodeConfig({ triggerType: e.target.value })}>
                            <option value="create">Record Created</option>
                            <option value="update">Record Updated</option>
                            <option value="delete">Record Deleted</option>
                         </select>
                         {cfg.triggerType === 'delete' && (
-                           <p className="text-[11px] text-amber-600 mt-1.5">Note: delete triggers are not yet wired in the engine.</p>
+                           <p className="text-xs text-amber-600 mt-1.5">Note: delete triggers are not yet wired in the engine.</p>
                         )}
                      </div>
 
                      {/* Conditions */}
                      <div>
                         <div className="flex items-center justify-between mb-2">
-                           <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Conditions</label>
+                           <label className="text-xs font-bold text-gray-500">Conditions</label>
                            <select
-                              className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white"
+                              className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-surface"
                               value={(cfg.conditions?.match) || 'all'}
                               onChange={(e) => updateNodeConfig({ conditions: { match: e.target.value, rules: cfg.conditions?.rules || [] } })}
                            >
@@ -487,17 +487,17 @@ export const WorkflowBuilder: React.FC = () => {
                            </select>
                         </div>
                         {!cfg.entityType ? (
-                           <p className="text-[11px] text-gray-400">Select an entity to add conditions.</p>
+                           <p className="text-xs text-gray-400">Select an entity to add conditions.</p>
                         ) : (
                            <div className="space-y-2">
                               {(cfg.conditions?.rules || []).map((r: any, i: number) => (
                                  <div key={i} className="flex items-center gap-1.5">
-                                    <select className="flex-1 min-w-0 border border-gray-200 rounded px-1.5 py-1 text-xs bg-white"
+                                    <select className="flex-1 min-w-0 border border-gray-200 rounded px-1.5 py-1 text-xs bg-surface"
                                        value={r.field}
                                        onChange={(e) => { const c = cfg.conditions || { match: 'all', rules: [] }; updateNodeConfig({ conditions: { match: c.match || 'all', rules: c.rules.map((x: any, idx: number) => idx === i ? { ...x, field: e.target.value } : x) } }); }}>
                                        {triggerEntityFields.map((f) => <option key={f.name} value={f.name}>{f.label}</option>)}
                                     </select>
-                                    <select className="border border-gray-200 rounded px-1 py-1 text-xs bg-white"
+                                    <select className="border border-gray-200 rounded px-1 py-1 text-xs bg-surface"
                                        value={r.operator}
                                        onChange={(e) => { const c = cfg.conditions || { match: 'all', rules: [] }; updateNodeConfig({ conditions: { match: c.match || 'all', rules: c.rules.map((x: any, idx: number) => idx === i ? { ...x, operator: e.target.value } : x) } }); }}>
                                        {OPERATORS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -522,7 +522,7 @@ export const WorkflowBuilder: React.FC = () => {
                {selectedNode.type === 'action' && (
                  <div className="space-y-4">
                     <div>
-                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Action Type</label>
+                       <label className="block text-xs font-bold text-gray-500 mb-2">Action Type</label>
                        <select className={inputCls} value={cfg.type || ''} onChange={(e) => updateNodeConfig({ type: e.target.value })}>
                          <option value="">Select action…</option>
                          {ACTION_TYPES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
@@ -532,15 +532,15 @@ export const WorkflowBuilder: React.FC = () => {
                     {cfg.type === 'email' && (
                        <>
                           <div>
-                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">To</label>
+                             <label className="block text-xs font-bold text-gray-500 mb-2">To</label>
                              <input className={inputCls} value={cfg.to ?? '{email}'} onChange={(e) => updateNodeConfig({ to: e.target.value })} placeholder="{email}" />
                           </div>
                           <div>
-                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Subject</label>
+                             <label className="block text-xs font-bold text-gray-500 mb-2">Subject</label>
                              <input className={inputCls} value={cfg.subject ?? ''} onChange={(e) => updateNodeConfig({ subject: e.target.value })} placeholder="Welcome {firstName}" />
                           </div>
                           <div>
-                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Body</label>
+                             <label className="block text-xs font-bold text-gray-500 mb-2">Body</label>
                              <textarea className={inputCls} rows={4} value={cfg.body ?? ''} onChange={(e) => updateNodeConfig({ body: e.target.value })} placeholder="Hi {firstName}, …" />
                           </div>
                        </>
@@ -549,11 +549,11 @@ export const WorkflowBuilder: React.FC = () => {
                     {cfg.type === 'create_task' && (
                        <>
                           <div>
-                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Task Subject</label>
+                             <label className="block text-xs font-bold text-gray-500 mb-2">Task Subject</label>
                              <input className={inputCls} value={cfg.subject ?? ''} onChange={(e) => updateNodeConfig({ subject: e.target.value })} placeholder="Follow up with {firstName}" />
                           </div>
                           <div>
-                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Due in (days)</label>
+                             <label className="block text-xs font-bold text-gray-500 mb-2">Due in (days)</label>
                              <input type="number" min={0} className={inputCls} value={cfg.dueInDays ?? ''} onChange={(e) => updateNodeConfig({ dueInDays: e.target.value })} placeholder="2" />
                           </div>
                        </>
@@ -561,7 +561,7 @@ export const WorkflowBuilder: React.FC = () => {
 
                     {(cfg.type === 'update_record' || cfg.type === 'create_lead') && (
                        <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                          <label className="block text-xs font-bold text-gray-500 mb-2">
                              {cfg.type === 'update_record' ? 'Fields to set' : 'Lead fields'}
                           </label>
                           <textarea
@@ -571,7 +571,7 @@ export const WorkflowBuilder: React.FC = () => {
                              onChange={(e) => updateNodeConfig({ fields: textToFields(e.target.value) })}
                              placeholder={'status = Contacted\nscore = 50'}
                           />
-                          <p className="text-[11px] text-gray-400 mt-1.5">One per line: <code>field = value</code>. Use {'{token}'} to pull from the record.</p>
+                          <p className="text-xs text-gray-400 mt-1.5">One per line: <code>field = value</code>. Use {'{token}'} to pull from the record.</p>
                        </div>
                     )}
 
@@ -593,9 +593,9 @@ export const WorkflowBuilder: React.FC = () => {
 
                {selectedNode.type === 'wait' && (
                   <div>
-                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Duration (seconds)</label>
+                     <label className="block text-xs font-bold text-gray-500 mb-2">Duration (seconds)</label>
                      <input type="number" min={0} className={inputCls} value={cfg.seconds ?? ''} onChange={(e) => updateNodeConfig({ type: 'wait', seconds: e.target.value })} placeholder="60" />
-                     <p className="text-[11px] text-amber-600 mt-1.5">Note: timed delays are saved but not yet executed (needs the scheduler).</p>
+                     <p className="text-xs text-amber-600 mt-1.5">Note: timed delays are saved but not yet executed (needs the scheduler).</p>
                   </div>
                )}
              </div>

@@ -126,7 +126,7 @@ export const MenuManager: React.FC = () => {
     return (
       <div key={item.id} className="mb-1">
         <div 
-           className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-transparent hover:bg-gray-50'}`}
+           className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-surface border-transparent hover:bg-gray-50'}`}
            style={{ marginLeft: `${depth * 16}px` }}
            onClick={() => { setSelectedItem(item); setParentId(parentId); }}
         >
@@ -171,7 +171,7 @@ export const MenuManager: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
        {/* Header */}
-       <div className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between shrink-0">
+       <div className="h-16 bg-surface border-b border-gray-200 px-8 flex items-center justify-between shrink-0">
           <div>
              <h1 className="text-xl font-bold text-gray-900">Menu Manager</h1>
              <p className="text-xs text-gray-500">Configure sidebar navigation and visibility.</p>
@@ -185,9 +185,9 @@ export const MenuManager: React.FC = () => {
 
        <div className="flex-1 overflow-hidden p-8 flex gap-8">
           {/* Tree View */}
-          <div className="w-1/3 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
+          <div className="w-1/3 bg-surface border border-gray-200 rounded-xl shadow-sm flex flex-col">
              <div className="p-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Menu Structure</h3>
+                <h3 className="text-xs font-bold text-gray-500">Menu Structure</h3>
              </div>
              <div className="flex-1 overflow-y-auto p-4">
                 {menu.map(item => renderTreeItem(item))}
@@ -260,7 +260,7 @@ export const MenuManager: React.FC = () => {
                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                                   selectedItem.allowedRoles?.includes('*') 
                                     ? 'bg-indigo-600 text-white border-indigo-600' 
-                                    : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                                    : 'bg-surface text-gray-600 border-gray-300 hover:border-gray-400'
                                }`}
                             >
                                All Users
@@ -273,7 +273,7 @@ export const MenuManager: React.FC = () => {
                                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                                      selectedItem.allowedRoles?.includes(role.id) && !selectedItem.allowedRoles?.includes('*')
                                        ? 'bg-indigo-100 text-indigo-700 border-indigo-200' 
-                                       : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400 disabled:opacity-50'
+                                       : 'bg-surface text-gray-600 border-gray-300 hover:border-gray-400 disabled:opacity-50'
                                   }`}
                                >
                                   {role.name}
@@ -284,7 +284,7 @@ export const MenuManager: React.FC = () => {
                    </div>
                 </Card>
              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-surface rounded-xl border-2 border-dashed border-gray-200">
                    <Menu className="w-12 h-12 mb-4 opacity-20"/>
                    <p>Select an item from the tree to edit properties.</p>
                 </div>

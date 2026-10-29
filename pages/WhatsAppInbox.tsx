@@ -7,6 +7,8 @@ import { WaConversation, WaMessage, ViewState } from '../types';
 
 interface Props {
   onNavigate?: (view: ViewState, params?: any) => void;
+  /** Open this number's conversation (e.g. from a lead's 360 view). */
+  initialPhone?: string;
 }
 
 const fmtTime = (s: string) => {
@@ -18,9 +20,9 @@ const fmtTime = (s: string) => {
     : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
-export const WhatsAppInbox: React.FC<Props> = ({ onNavigate }) => {
+export const WhatsAppInbox: React.FC<Props> = ({ onNavigate, initialPhone }) => {
   const [conversations, setConversations] = useState<WaConversation[]>([]);
-  const [activePhone, setActivePhone] = useState<string>('');
+  const [activePhone, setActivePhone] = useState<string>(initialPhone ? initialPhone.replace(/\D/g, '') : '');
   const [thread, setThread] = useState<WaMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [mode, setMode] = useState<'live' | 'simulated'>('simulated');
@@ -109,7 +111,7 @@ export const WhatsAppInbox: React.FC<Props> = ({ onNavigate }) => {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><MessageCircle className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><MessageCircle className="w-[18px] h-[18px] text-accent" /></span></span>
             WhatsApp Inbox
           </h1>
           <p className="text-ink-muted text-sm mt-1">
@@ -141,17 +143,17 @@ export const WhatsAppInbox: React.FC<Props> = ({ onNavigate }) => {
                 key={c.phone}
                 onClick={() => setActivePhone(c.phone)}
                 className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all ${activePhone === c.phone
-                  ? 'bg-[#4F46E5]/[0.06] border-[#4F46E5]/30'
-                  : 'bg-white border-transparent hover:border-slate-200 hover:bg-slate-50'}`}
+                  ? 'bg-accent/[0.06] border-accent/30'
+                  : 'bg-surface border-transparent hover:border-slate-200 hover:bg-slate-50'}`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className={`text-sm font-semibold truncate ${activePhone === c.phone ? 'text-[#3730A3]' : 'text-ink'}`}>
+                  <span className={`text-sm font-semibold truncate ${activePhone === c.phone ? 'text-accent-deep' : 'text-ink'}`}>
                     {c.profile_name || `+${c.phone}`}
                   </span>
-                  <span className="text-[10px] text-ink-muted shrink-0 tnum">{fmtTime(c.last_at)}</span>
+                  <span className="text-xs text-ink-muted shrink-0 tnum">{fmtTime(c.last_at)}</span>
                 </div>
                 <p className="text-xs text-ink-muted truncate mt-0.5">
-                  {c.last_direction === 'outbound' && <span className="text-[#4F46E5]">You: </span>}
+                  {c.last_direction === 'outbound' && <span className="text-accent">You: </span>}
                   {c.last_body}
                 </p>
               </button>
@@ -172,7 +174,7 @@ export const WhatsAppInbox: React.FC<Props> = ({ onNavigate }) => {
               {/* Thread header */}
               <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="tri-ring w-9 h-9 shrink-0"><span className="flex items-center justify-center font-heading font-bold text-sm text-[#3730A3]">
+                  <span className="tri-ring w-9 h-9 shrink-0"><span className="flex items-center justify-center font-heading font-bold text-sm text-accent-deep">
                     {(activeConv?.profile_name || '#').charAt(0).toUpperCase()}
                   </span></span>
                   <div className="min-w-0">
@@ -194,11 +196,11 @@ export const WhatsAppInbox: React.FC<Props> = ({ onNavigate }) => {
                 ) : thread.map(m => (
                   <div key={m.id} className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[72%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed border ${m.direction === 'outbound'
-                      ? 'bg-[#4F46E5] text-white border-transparent rounded-br-md'
-                      : 'bg-white text-ink border-slate-200 rounded-bl-md'}`}
+                      ? 'bg-accent text-white border-transparent rounded-br-md'
+                      : 'bg-surface text-ink border-slate-200 rounded-bl-md'}`}
                     >
                       <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                      <p className={`text-[10px] mt-1 tnum ${m.direction === 'outbound' ? 'text-white/70' : 'text-ink-muted'}`}>
+                      <p className={`text-xs mt-1 tnum ${m.direction === 'outbound' ? 'text-white/70' : 'text-ink-muted'}`}>
                         {fmtTime(m.created_at)}{m.status === 'simulated' ? ' · simulated' : m.status === 'failed' ? ' · failed' : ''}
                       </p>
                     </div>
@@ -229,7 +231,7 @@ export const WhatsAppInbox: React.FC<Props> = ({ onNavigate }) => {
       {/* Simulate modal */}
       {showSim && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowSim(false)}>
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-[var(--elev-pop)] w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-surface rounded-2xl border border-slate-200 shadow-[var(--elev-pop)] w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading font-extrabold text-lg text-ink">Simulate incoming message</h2>
               <button onClick={() => setShowSim(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-ink-muted"><X className="w-4 h-4" /></button>

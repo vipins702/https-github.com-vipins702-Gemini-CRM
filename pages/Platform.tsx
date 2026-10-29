@@ -35,27 +35,27 @@ const CreateTenantModal: React.FC<{ onClose: () => void; onCreated: (t: Tenant) 
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-[#3730A3]"><Building2 className="w-5 h-5" /></span>
+            <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-accent-deep"><Building2 className="w-5 h-5" /></span>
             <h2 className="font-heading text-lg font-extrabold text-ink">New Tenant</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-6 space-y-4">
           <div>
-            <label className="mono-label text-[10px] mb-1 block">Workspace Name</label>
+            <label className="mono-label text-xs mb-1 block">Workspace Name</label>
             <input className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Acme Corp" value={name} onChange={e => setName(e.target.value)} />
           </div>
           <div className="pt-2 border-t border-slate-100">
-            <p className="mono-label text-[10px] mb-2">First Admin (tenant owner)</p>
+            <p className="mono-label text-xs mb-2">First Admin (tenant owner)</p>
             <div className="grid grid-cols-2 gap-3">
               <input className="px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Admin name" value={adminName} onChange={e => setAdminName(e.target.value)} />
               <input className="px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="admin@acme.com" type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} />
             </div>
             <input className="w-full mt-3 px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Temporary password (min 6 chars)" type="text" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
-            <p className="text-[11px] text-ink-muted mt-1">The admin will be asked to change this on first login. A starter copy of the default workspace (modules, layouts, menus) is provisioned automatically.</p>
+            <p className="text-xs text-ink-muted mt-1">The admin will be asked to change this on first login. A starter copy of the default workspace (modules, layouts, menus) is provisioned automatically.</p>
           </div>
         </div>
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100">
@@ -117,7 +117,7 @@ export const Platform: React.FC<Props> = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-3">
-            <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-[#3730A3]"><Globe className="w-5 h-5" /></span>
+            <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-accent-deep"><Globe className="w-5 h-5" /></span>
             <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink">Platform Console</h1>
           </div>
           <p className="text-sm text-ink-muted mt-1 ml-12">Manage every tenant workspace on this CRM.</p>
@@ -137,7 +137,7 @@ export const Platform: React.FC<Props> = () => {
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${k.color}`}><k.icon className="w-5 h-5" /></div>
                 <div>
                   <div className="font-heading text-2xl font-extrabold text-ink tnum leading-none">{k.value}</div>
-                  <div className="mono-label text-[10px] mt-1">{k.label}</div>
+                  <div className="mono-label text-xs mt-1">{k.label}</div>
                 </div>
               </div>
             </Card>
@@ -161,11 +161,11 @@ export const Platform: React.FC<Props> = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100">
-                <th className="mono-label text-[10px] text-left px-5 py-3">Workspace</th>
-                <th className="mono-label text-[10px] text-left px-3 py-3">Status</th>
-                <th className="mono-label text-[10px] text-right px-3 py-3">Users</th>
-                <th className="mono-label text-[10px] text-right px-3 py-3">Records</th>
-                <th className="mono-label text-[10px] text-right px-5 py-3">Actions</th>
+                <th className="mono-label text-xs text-left px-5 py-3">Workspace</th>
+                <th className="mono-label text-xs text-left px-3 py-3">Status</th>
+                <th className="mono-label text-xs text-right px-3 py-3">Users</th>
+                <th className="mono-label text-xs text-right px-3 py-3">Records</th>
+                <th className="mono-label text-xs text-right px-5 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -186,10 +186,10 @@ export const Platform: React.FC<Props> = () => {
                         ) : (
                           <div className="flex items-center gap-2 group">
                             <span className="font-semibold text-ink truncate">{t.name}</span>
-                            <button onClick={() => { setEditId(t.id); setEditName(t.name); }} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-[#4F46E5]"><Pencil className="w-3 h-3" /></button>
+                            <button onClick={() => { setEditId(t.id); setEditName(t.name); }} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-accent"><Pencil className="w-3 h-3" /></button>
                           </div>
                         )}
-                        <div className="text-[11px] text-ink-muted font-mono truncate">{t.id}</div>
+                        <div className="text-xs text-ink-muted font-mono truncate">{t.id}</div>
                       </div>
                     </div>
                   </td>
@@ -202,7 +202,7 @@ export const Platform: React.FC<Props> = () => {
                   <td className="px-3 py-3 text-right tnum text-ink">{t.recordCount ?? 0}</td>
                   <td className="px-5 py-3 text-right">
                     {t.id === 'default' ? (
-                      <span className="text-[11px] text-ink-muted">Primary</span>
+                      <span className="text-xs text-ink-muted">Primary</span>
                     ) : (
                       <Button
                         size="sm"

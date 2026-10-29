@@ -9,40 +9,33 @@
     content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://ui-avatars.com data:; connect-src 'self' http://localhost:* ws://localhost:* https://generativelanguage.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;">
   <title>FlowCRM — Enterprise CRM Platform</title>
 
-  <!-- Google Fonts: Gabarito (headings), Figtree (body/UI), Spline Sans Mono (data/labels) -->
+  <meta name="color-scheme" content="light dark">
+
+  <!-- Apple's system font where available; Inter elsewhere (Windows, Android). -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Gabarito:wght@500;600;700;800;900&family=Figtree:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+  <script>
+    // Apply the saved light/dark choice before first paint (no white flash). services/theme.ts owns it after load.
+    (function () {
+      try {
+        var m = localStorage.getItem('flowcrm_theme');
+        var dark = m === 'dark' || (m === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    })();
+  </script>
   <style>
-    /* Custom Scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 100vh;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
-    }
-
     /* React Flow Customization */
     .react-flow__node {
-      font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
     }
   </style>
   <script type="module" src="/index.tsx"></script>
 </head>
 
-<body class="text-slate-900 font-sans antialiased">
+<body class="text-gray-900 font-sans antialiased">
   <div id="root"></div>
 </body>
 

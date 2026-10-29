@@ -110,7 +110,7 @@ export const CalendarTasks: React.FC<Props> = ({ onNavigate }) => {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><CalIcon className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><CalIcon className="w-[18px] h-[18px] text-accent" /></span></span>
             Calendar & Tasks
           </h1>
           <p className="text-ink-muted text-sm mt-1">Allocate work to your team and track what's due.</p>
@@ -118,8 +118,8 @@ export const CalendarTasks: React.FC<Props> = ({ onNavigate }) => {
         <div className="flex items-center gap-2">
           {/* scope toggle */}
           <div className="flex rounded-full bg-slate-100 p-0.5 text-sm">
-            <button onClick={() => setScope('all')} className={`px-3 py-1.5 rounded-full font-medium transition-colors ${scope === 'all' ? 'bg-white text-ink shadow-sm' : 'text-ink-muted'}`}>All</button>
-            <button onClick={() => setScope('mine')} className={`px-3 py-1.5 rounded-full font-medium transition-colors ${scope === 'mine' ? 'bg-white text-ink shadow-sm' : 'text-ink-muted'}`}>My tasks</button>
+            <button onClick={() => setScope('all')} className={`px-3 py-1.5 rounded-full font-medium transition-colors ${scope === 'all' ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted'}`}>All</button>
+            <button onClick={() => setScope('mine')} className={`px-3 py-1.5 rounded-full font-medium transition-colors ${scope === 'mine' ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted'}`}>My tasks</button>
           </div>
           <Button size="sm" icon={<Plus className="w-4 h-4" />} onClick={() => setShowNew(true)}>New Task</Button>
         </div>
@@ -165,18 +165,18 @@ export const CalendarTasks: React.FC<Props> = ({ onNavigate }) => {
                 const dayNum = Number(cell.slice(-2));
                 return (
                   <button key={i} onClick={() => setSelectedDay(cell)}
-                    className={`aspect-square rounded-xl border p-1.5 text-left transition-all flex flex-col ${isSel ? 'border-[#4F46E5] bg-[#4F46E5]/[0.06]' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
-                    <span className={`text-xs font-semibold mb-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full ${isToday ? 'bg-[#4F46E5] text-white' : 'text-ink-soft'}`}>{dayNum}</span>
+                    className={`aspect-square rounded-xl border p-1.5 text-left transition-all flex flex-col ${isSel ? 'border-accent bg-accent/[0.06]' : 'border-slate-200 hover:border-slate-300 bg-surface'}`}>
+                    <span className={`text-xs font-semibold mb-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full ${isToday ? 'bg-accent text-white' : 'text-ink-soft'}`}>{dayNum}</span>
                     <div className="flex-1 space-y-0.5 overflow-hidden">
                       {items.slice(0, 3).map(t => (
                         <div key={t.id} className="flex items-center gap-1 min-w-0">
                           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: isDone(t.status) ? '#0D9488' : priorityJob(t.priority) }} />
-                          <span className={`text-[10px] truncate ${isDone(t.status) ? 'line-through text-ink-muted' : 'text-ink-soft'}`}>
+                          <span className={`text-xs truncate ${isDone(t.status) ? 'line-through text-ink-muted' : 'text-ink-soft'}`}>
                             {t.dueTime ? `${fmtTime(t.dueTime)} ` : ''}{t.subject}
                           </span>
                         </div>
                       ))}
-                      {items.length > 3 && <span className="text-[10px] text-ink-muted">+{items.length - 3} more</span>}
+                      {items.length > 3 && <span className="text-xs text-ink-muted">+{items.length - 3} more</span>}
                     </div>
                   </button>
                 );
@@ -241,24 +241,24 @@ const TaskRow: React.FC<{
   t: TaskItem; users: AppUser[]; busy: boolean;
   onToggle: () => void; onReassign: (uid: string) => void; onOpen: () => void; onOpenRelated: () => void;
 }> = ({ t, users, busy, onToggle, onReassign, onOpen, onOpenRelated }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-3">
+  <div className="rounded-xl border border-slate-200 bg-surface p-3">
     <div className="flex items-start gap-2.5">
-      <button onClick={onToggle} disabled={busy} className="mt-0.5 shrink-0 text-ink-muted hover:text-[#0D9488] transition-colors">
-        {busy ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : isDone(t.status) ? <CheckCircle2 className="w-[18px] h-[18px] text-[#0D9488]" /> : <Circle className="w-[18px] h-[18px]" />}
+      <button onClick={onToggle} disabled={busy} className="mt-0.5 shrink-0 text-ink-muted hover:text-success transition-colors">
+        {busy ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : isDone(t.status) ? <CheckCircle2 className="w-[18px] h-[18px] text-success" /> : <Circle className="w-[18px] h-[18px]" />}
       </button>
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-1">
-          <button onClick={onOpen} className={`text-sm font-semibold text-left hover:text-[#4F46E5] transition-colors ${isDone(t.status) ? 'line-through text-ink-muted' : 'text-ink'}`}>
+          <button onClick={onOpen} className={`text-sm font-semibold text-left hover:text-accent transition-colors ${isDone(t.status) ? 'line-through text-ink-muted' : 'text-ink'}`}>
             {t.subject}
           </button>
           {t.dueTime && (
-            <span className="shrink-0 text-[11px] font-medium text-[#4F46E5] bg-blue-50 px-1.5 py-0.5 rounded-md">
+            <span className="shrink-0 text-xs font-medium text-accent bg-blue-50 px-1.5 py-0.5 rounded-md">
               {fmtTime(t.dueTime)}
             </span>
           )}
         </div>
         {t.relatedId && (
-          <button onClick={onOpenRelated} className="flex items-center gap-1 mt-1 text-xs text-[#4F46E5] hover:underline">
+          <button onClick={onOpenRelated} className="flex items-center gap-1 mt-1 text-xs text-accent hover:underline">
             <LinkIcon className="w-3 h-3" />
             {t.relatedName || t.relatedEntity}<span className="text-ink-muted">· {t.relatedEntity}</span>
           </button>
@@ -337,7 +337,7 @@ const NewTaskModal: React.FC<{
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-[var(--elev-pop)] w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface rounded-2xl border border-slate-200 shadow-[var(--elev-pop)] w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-heading font-extrabold text-lg text-ink">New task</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-ink-muted"><X className="w-4 h-4" /></button>

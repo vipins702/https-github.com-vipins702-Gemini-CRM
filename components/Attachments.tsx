@@ -49,7 +49,7 @@ export const Attachments: React.FC<Props> = ({ entityType, recordId, compact }) 
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1.5 text-xs font-semibold text-[#4F46E5] hover:text-[#3730A3] disabled:opacity-50"
+          className="flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-accent-deep disabled:opacity-50"
         >
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload
         </button>
@@ -59,13 +59,13 @@ export const Attachments: React.FC<Props> = ({ entityType, recordId, compact }) 
       {loading ? (
         <p className="text-xs text-ink-muted py-3 text-center">Loading…</p>
       ) : items.length === 0 ? (
-        <button onClick={() => inputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-xl text-xs text-ink-muted hover:border-[#4F46E5]/40 hover:text-[#4F46E5] transition-colors">
+        <button onClick={() => inputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-xl text-xs text-ink-muted hover:border-accent/40 hover:text-accent transition-colors">
           Drop files or click to upload
         </button>
       ) : (
         <div className={compact ? 'flex flex-wrap gap-2' : 'grid grid-cols-2 sm:grid-cols-3 gap-2'}>
           {items.map(a => (
-            <div key={a.id} className="group relative bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div key={a.id} className="group relative bg-surface border border-slate-200 rounded-xl overflow-hidden">
               {a.kind === 'image' ? (
                 <a href={a.url} target="_blank" rel="noreferrer" className="block">
                   <img src={a.url} alt={a.filename} className="w-full h-20 object-cover" />
@@ -77,7 +77,7 @@ export const Attachments: React.FC<Props> = ({ entityType, recordId, compact }) 
                 </a>
               )}
               <div className="px-2 py-1.5 flex items-center justify-between gap-1 border-t border-slate-100">
-                <span className="text-[10px] text-ink-muted truncate">{a.kind === 'image' ? a.filename : fmtSize(a.size)}</span>
+                <span className="text-xs text-ink-muted truncate">{a.kind === 'image' ? a.filename : fmtSize(a.size)}</span>
                 <button onClick={() => remove(a.id)} className="text-slate-300 hover:text-red-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

@@ -29,7 +29,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 animate-in fade-in slide-in-from-bottom-4">
+      <div className="bg-surface rounded-xl shadow-lg w-full max-w-sm p-6 animate-in fade-in slide-in-from-bottom-4">
         <div className="flex items-start gap-4">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isDangerous ? 'bg-rose-100' : 'bg-blue-100'}`}>
             <AlertCircle className={`w-5 h-5 ${isDangerous ? 'text-rose-600' : 'text-blue-600'}`} />

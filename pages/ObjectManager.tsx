@@ -22,11 +22,11 @@ import ReactFlow, {
 
 // Custom Node for Schema Graph
 const EntityNode = ({ data }: { data: { label: string, fields: number, isSystem: boolean } }) => (
-   <div className={`min-w-[180px] rounded-lg border-2 shadow-sm bg-white overflow-hidden ${data.isSystem ? 'border-gray-200' : 'border-indigo-200'}`}>
+   <div className={`min-w-[180px] rounded-lg border-2 shadow-sm bg-surface overflow-hidden ${data.isSystem ? 'border-gray-200' : 'border-indigo-200'}`}>
       <Handle type="target" position={Position.Left} className="w-3 h-3 bg-gray-300 !border-2 !border-white" />
       <div className={`px-4 py-2 border-b text-xs font-bold uppercase tracking-wider flex justify-between items-center ${data.isSystem ? 'bg-gray-50 text-gray-500 border-gray-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
          {data.label}
-         {data.isSystem && <span className="text-[10px] bg-gray-200 px-1.5 rounded text-gray-600">SYS</span>}
+         {data.isSystem && <span className="text-xs bg-gray-200 px-1.5 rounded text-gray-600">SYS</span>}
       </div>
       <div className="p-3 text-sm text-gray-600">
          <div className="flex items-center gap-2">
@@ -196,7 +196,7 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
    return (
       <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
          {/* Header */}
-         <div className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between shrink-0 z-20">
+         <div className="h-16 bg-surface border-b border-gray-200 px-8 flex items-center justify-between shrink-0 z-20">
             <div>
                <h1 className="text-xl font-bold text-gray-900">Object Manager</h1>
                <p className="text-xs text-gray-500">Manage data schema and relationships.</p>
@@ -204,13 +204,13 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
             <div className="flex bg-gray-100 p-1 rounded-lg">
                <button
                   onClick={() => setActiveTab('list')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'list' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'list' ? 'bg-surface shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
                >
                   <LayoutTemplate className="w-4 h-4" /> Objects
                </button>
                <button
                   onClick={() => setActiveTab('graph')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'graph' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'graph' ? 'bg-surface shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
                >
                   <Network className="w-4 h-4" /> Schema Graph
                </button>
@@ -227,17 +227,17 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
                   {/* View toggle */}
                   <div className="flex justify-end mb-4">
                      <div className="flex bg-gray-100 p-1 rounded-lg">
-                        <button onClick={() => setObjView('table')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${objView === 'table' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                        <button onClick={() => setObjView('table')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${objView === 'table' ? 'bg-surface shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
                            <List className="w-4 h-4" /> List
                         </button>
-                        <button onClick={() => setObjView('grid')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${objView === 'grid' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                        <button onClick={() => setObjView('grid')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${objView === 'grid' ? 'bg-surface shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
                            <LayoutGrid className="w-4 h-4" /> Grid
                         </button>
                      </div>
                   </div>
 
                   {objView === 'table' ? (
-                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                     <div className="bg-surface rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                         <table className="w-full text-sm">
                            <thead className="bg-gray-50 border-b border-gray-200">
                               <tr>
@@ -264,7 +264,7 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
                                        </td>
                                        <td className="px-6 py-3.5 font-mono text-xs text-gray-500">{schema.id}</td>
                                        <td className="px-6 py-3.5">
-                                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ring-1 ring-inset ${isSystem ? 'bg-gray-100 text-gray-600 ring-gray-500/20' : 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'}`}>
+                                          <span className={`text-xs font-bold px-2 py-0.5 rounded-md ring-1 ring-inset ${isSystem ? 'bg-gray-100 text-gray-600 ring-gray-500/20' : 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'}`}>
                                              {isSystem ? 'SYSTEM' : 'CUSTOM'}
                                           </span>
                                        </td>
@@ -285,7 +285,7 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
                      {Object.values(schemas).map((schema: EntityDefinition) => {
                         const isSystem = ['lead', 'customer', 'case', 'task', 'product'].includes(schema.id);
                         return (
-                           <div key={schema.id} className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:border-indigo-500 hover:shadow-md transition-all group relative overflow-hidden">
+                           <div key={schema.id} className="bg-surface rounded-xl border border-gray-200 p-6 shadow-sm hover:border-indigo-500 hover:shadow-md transition-all group relative overflow-hidden">
                               <div className={`absolute top-0 right-0 p-2 rounded-bl-xl text-xs font-bold ${isSystem ? 'bg-gray-100 text-gray-500' : 'bg-indigo-100 text-indigo-600'}`}>
                                  {isSystem ? 'SYSTEM' : 'CUSTOM'}
                               </div>
@@ -341,10 +341,10 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
                      fitView
                   >
                      <Background color="#cbd5e1" gap={20} size={1} />
-                     <Controls className="bg-white border-gray-200 shadow-xl rounded-lg" />
+                     <Controls className="bg-surface border-gray-200 shadow-xl rounded-lg" />
 
                      {/* Instructions Overlay */}
-                     <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded-full shadow-lg border border-gray-200 text-xs font-medium text-gray-500 flex items-center gap-2">
+                     <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-surface px-4 py-2 rounded-full shadow-lg border border-gray-200 text-xs font-medium text-gray-500 flex items-center gap-2">
                         <Network className="w-4 h-4 text-indigo-500" />
                         Drag a line between objects to create a Lookup Relationship
                      </div>
@@ -356,7 +356,7 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
          {/* Create Object Modal */}
          {isModalOpen && (
             <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-               <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in-95">
+               <div className="bg-surface rounded-xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in-95">
                   <div className="flex items-center gap-3 mb-6">
                      <div className="p-3 bg-indigo-100 rounded-lg text-indigo-600">
                         <Database className="w-6 h-6" />
@@ -402,7 +402,7 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
          {/* Relationship Modal */}
          {isRelModalOpen && relConfig && (
             <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-               <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 animate-in zoom-in-95">
+               <div className="bg-surface rounded-xl shadow-2xl max-w-2xl w-full p-6 animate-in zoom-in-95">
                   <div className="flex justify-between items-start mb-6">
                      <div>
                         <h3 className="text-lg font-bold text-gray-900">Create Relationship</h3>
@@ -417,14 +417,14 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
 
                   {/* Column Mapping Section */}
                   <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Column Mapping</label>
+                     <label className="block text-xs font-bold text-gray-500 mb-3">Column Mapping</label>
                      <div className="grid grid-cols-5 gap-4 items-center">
                         {/* Source Entity */}
                         <div className="col-span-2">
-                           <div className="bg-white border border-indigo-200 rounded-lg p-3">
+                           <div className="bg-surface border border-indigo-200 rounded-lg p-3">
                               <div className="text-xs font-bold text-indigo-600 mb-2">{schemas[relConfig.source]?.label} Fields</div>
                               <select
-                                 className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm bg-white"
+                                 className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm bg-surface"
                                  value={relConfig.sourceField}
                                  onChange={e => setRelConfig({ ...relConfig, sourceField: e.target.value })}
                               >
@@ -445,10 +445,10 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
 
                         {/* Target Entity */}
                         <div className="col-span-2">
-                           <div className="bg-white border border-green-200 rounded-lg p-3">
+                           <div className="bg-surface border border-green-200 rounded-lg p-3">
                               <div className="text-xs font-bold text-green-600 mb-2">{schemas[relConfig.target]?.label} Fields</div>
                               <select
-                                 className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm bg-white"
+                                 className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm bg-surface"
                                  value={relConfig.targetField}
                                  onChange={e => setRelConfig({ ...relConfig, targetField: e.target.value })}
                               >

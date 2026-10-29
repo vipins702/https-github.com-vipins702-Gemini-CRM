@@ -214,7 +214,7 @@ export const UserManagement: React.FC = () => {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#4F46E5] w-7 h-7" />
+        <Loader2 className="animate-spin text-accent w-7 h-7" />
       </div>
     );
   }
@@ -246,7 +246,7 @@ export const UserManagement: React.FC = () => {
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
                 activeTab === tab
-                  ? 'bg-[var(--surface)] shadow-sm text-[#4F46E5] border border-[var(--border)]'
+                  ? 'bg-[var(--surface)] shadow-sm text-accent border border-[var(--border)]'
                   : 'text-ink-muted hover:text-ink'
               }`}
             >
@@ -311,7 +311,7 @@ export const UserManagement: React.FC = () => {
                             <div className="flex items-center gap-3">
                               <div className="tri-ring w-9 h-9 shrink-0">
                                 <div className="flex items-center justify-center w-full h-full">
-                                  <span className="text-[11px] font-bold text-[#3730A3]">{initials}</span>
+                                  <span className="text-xs font-bold text-accent-deep">{initials}</span>
                                 </div>
                               </div>
                               <div>
@@ -433,19 +433,19 @@ export const UserManagement: React.FC = () => {
                       onClick={() => setSelectedRole(role)}
                       className={`w-full text-left p-4 rounded-2xl border transition-all ${
                         isSelected
-                          ? 'border-[#4F46E5] bg-blue-50 shadow-sm'
+                          ? 'border-accent bg-blue-50 shadow-sm'
                           : 'border-[var(--border)] bg-[var(--surface)] hover:border-slate-300 hover:bg-[var(--surface-muted)]'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                            isSelected ? 'bg-[#4F46E5] text-white' : 'bg-slate-100 text-slate-500'
+                            isSelected ? 'bg-accent text-white' : 'bg-slate-100 text-slate-500'
                           }`}>
                             <Shield className="w-4 h-4" />
                           </div>
                           <div className="min-w-0">
-                            <div className={`text-sm font-semibold truncate ${isSelected ? 'text-[#3730A3]' : 'text-ink'}`}>
+                            <div className={`text-sm font-semibold truncate ${isSelected ? 'text-accent-deep' : 'text-ink'}`}>
                               {role.name}
                             </div>
                             {role.description && (
@@ -457,7 +457,7 @@ export const UserManagement: React.FC = () => {
                           <span className={`status-pill ${isSelected ? 'status-blue' : 'status-neutral'}`}>
                             {count} user{count !== 1 ? 's' : ''}
                           </span>
-                          {isSelected && <ChevronRight className="w-3.5 h-3.5 text-[#4F46E5]" />}
+                          {isSelected && <ChevronRight className="w-3.5 h-3.5 text-accent" />}
                         </div>
                       </div>
                     </button>
@@ -474,7 +474,7 @@ export const UserManagement: React.FC = () => {
                     <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between gap-4 shrink-0">
                       <div className="flex-1 min-w-0">
                         <input
-                          className="font-heading text-lg font-bold text-ink w-full bg-transparent border border-transparent hover:border-[var(--border)] focus:border-[#4F46E5] rounded-lg px-2 py-1 -ml-2 focus:outline-none focus:ring-1 focus:ring-[#4F46E5] transition-all placeholder-ink-muted"
+                          className="font-heading text-lg font-bold text-ink w-full bg-transparent border border-transparent hover:border-[var(--border)] focus:border-accent rounded-lg px-2 py-1 -ml-2 focus:outline-none focus:ring-1 focus:ring-accent transition-all placeholder-ink-muted"
                           value={selectedRole.name}
                           placeholder="Role Name"
                           onChange={e => {
@@ -484,7 +484,7 @@ export const UserManagement: React.FC = () => {
                           }}
                         />
                         <input
-                          className="text-sm text-ink-muted w-full bg-transparent border border-transparent hover:border-[var(--border)] focus:border-[#4F46E5] rounded-lg px-2 py-1 -ml-2 mt-0.5 focus:outline-none focus:ring-1 focus:ring-[#4F46E5] transition-all placeholder-ink-muted"
+                          className="text-sm text-ink-muted w-full bg-transparent border border-transparent hover:border-[var(--border)] focus:border-accent rounded-lg px-2 py-1 -ml-2 mt-0.5 focus:outline-none focus:ring-1 focus:ring-accent transition-all placeholder-ink-muted"
                           value={selectedRole.description || ''}
                           placeholder="Add a description..."
                           onChange={e => {
@@ -547,7 +547,7 @@ export const UserManagement: React.FC = () => {
                                 <td className="px-5 py-3.5">
                                   <div className="flex items-center gap-2.5">
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${mc.bg}`}>
-                                      <span className={`text-[11px] font-bold ${mc.text}`}>
+                                      <span className={`text-xs font-bold ${mc.text}`}>
                                         {schema.pluralLabel.charAt(0).toUpperCase()}
                                       </span>
                                     </div>
@@ -575,9 +575,9 @@ export const UserManagement: React.FC = () => {
                                       <button
                                         key={scope}
                                         onClick={() => updateScope(schema.id, scope)}
-                                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all ${
+                                        className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-all ${
                                           currentScope === scope
-                                            ? 'bg-[#4F46E5] text-white shadow-sm'
+                                            ? 'bg-accent text-white shadow-sm'
                                             : 'text-ink-muted hover:text-ink'
                                         }`}
                                       >
@@ -595,7 +595,7 @@ export const UserManagement: React.FC = () => {
                                     title={hasFields ? 'Configure Field Security' : 'No fields to configure'}
                                     className={`w-8 h-8 rounded-lg flex items-center justify-center mx-auto transition-colors ${
                                       hasFields
-                                        ? 'bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-[#4F46E5]'
+                                        ? 'bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-accent'
                                         : 'bg-slate-50 text-slate-300 cursor-not-allowed'
                                     }`}
                                   >
@@ -624,7 +624,7 @@ export const UserManagement: React.FC = () => {
       {/* ════════════════════ USER MODAL ════════════════════ */}
       {isUserModalOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+          <div className="bg-surface rounded-2xl shadow-2xl p-6 w-full max-w-md">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -650,7 +650,7 @@ export const UserManagement: React.FC = () => {
               <div>
                 <label className="block text-sm font-semibold text-ink mb-1.5">Full Name</label>
                 <input
-                  className="w-full border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-ink focus:ring-2 focus:ring-[#4F46E5] focus:border-[#4F46E5] outline-none transition-all bg-[var(--surface)] placeholder-ink-muted"
+                  className="w-full border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-ink focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-[var(--surface)] placeholder-ink-muted"
                   placeholder="John Smith"
                   value={editingUser.name || ''}
                   onChange={e => setEditingUser({ ...editingUser, name: e.target.value })}
@@ -662,7 +662,7 @@ export const UserManagement: React.FC = () => {
                 <label className="block text-sm font-semibold text-ink mb-1.5">Email Address</label>
                 <input
                   type="email"
-                  className="w-full border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-ink focus:ring-2 focus:ring-[#4F46E5] focus:border-[#4F46E5] outline-none transition-all bg-[var(--surface)] placeholder-ink-muted"
+                  className="w-full border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-ink focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-[var(--surface)] placeholder-ink-muted"
                   placeholder="user@company.com"
                   value={editingUser.email || ''}
                   onChange={e => setEditingUser({ ...editingUser, email: e.target.value })}
@@ -679,7 +679,7 @@ export const UserManagement: React.FC = () => {
                 </label>
                 <input
                   type="password"
-                  className="w-full border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-ink focus:ring-2 focus:ring-[#4F46E5] focus:border-[#4F46E5] outline-none transition-all bg-[var(--surface)] placeholder-ink-muted"
+                  className="w-full border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-ink focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-[var(--surface)] placeholder-ink-muted"
                   placeholder={editingUser.id ? '••••••••' : 'Enter password'}
                   value={editingUser.password || ''}
                   onChange={e => setEditingUser({ ...editingUser, password: e.target.value })}
@@ -690,7 +690,7 @@ export const UserManagement: React.FC = () => {
               <div>
                 <label className="block text-sm font-semibold text-ink mb-1.5">Role</label>
                 <select
-                  className="w-full border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-ink focus:ring-2 focus:ring-[#4F46E5] focus:border-[#4F46E5] outline-none transition-all bg-[var(--surface)] cursor-pointer"
+                  className="w-full border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-ink focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-[var(--surface)] cursor-pointer"
                   value={editingUser.roleId || ''}
                   onChange={e => setEditingUser({ ...editingUser, roleId: e.target.value })}
                 >
@@ -713,10 +713,10 @@ export const UserManagement: React.FC = () => {
                   type="button"
                   onClick={() => setEditingUser({ ...editingUser, isActive: !editingUser.isActive })}
                   className={`w-11 h-6 rounded-full transition-all relative shrink-0 ${
-                    editingUser.isActive ? 'bg-[#4F46E5]' : 'bg-slate-200'
+                    editingUser.isActive ? 'bg-accent' : 'bg-slate-200'
                   }`}
                 >
-                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-surface shadow transition-transform ${
                     editingUser.isActive ? 'translate-x-5' : 'translate-x-0'
                   }`} />
                 </button>
@@ -741,7 +741,7 @@ export const UserManagement: React.FC = () => {
       {/* ════════════════════ FLS MODAL ════════════════════ */}
       {isFLSModalOpen && selectedRole && flsEntityId && schemas[flsEntityId] && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[80vh] overflow-hidden">
+          <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[80vh] overflow-hidden">
 
             {/* Header */}
             <div className="px-6 py-5 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
@@ -768,7 +768,7 @@ export const UserManagement: React.FC = () => {
             {/* Field list */}
             <div className="flex-1 overflow-y-auto">
               <table className="min-w-full">
-                <thead className="sticky top-0 z-10 bg-white border-b border-[var(--border)]">
+                <thead className="sticky top-0 z-10 bg-surface border-b border-[var(--border)]">
                   <tr>
                     <th className="px-6 py-3 text-left"><span className="mono-label">Field</span></th>
                     <th className="px-6 py-3 text-center"><span className="mono-label">Read</span></th>

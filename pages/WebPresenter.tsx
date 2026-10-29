@@ -247,7 +247,7 @@ export const WebPresenter: React.FC = () => {
    return (
       <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
          {/* Top Bar */}
-         <div className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
+         <div className="h-16 bg-surface border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
             <div>
                <h1 className="text-lg font-bold text-gray-900">Web Presenter & Integrations</h1>
                <p className="text-xs text-gray-500">Configure external data sources</p>
@@ -259,7 +259,7 @@ export const WebPresenter: React.FC = () => {
 
          <div className="flex-1 flex overflow-hidden">
             {/* Sidebar */}
-            <div className="w-72 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
+            <div className="w-72 bg-surface border-r border-gray-200 flex flex-col overflow-y-auto">
                <div className="p-2 space-y-1">
                   {sources.map(s => (
                      <div
@@ -267,18 +267,18 @@ export const WebPresenter: React.FC = () => {
                         onClick={() => handleSelectSource(s.id)}
                         className={`group p-3 rounded-lg border flex items-center justify-between cursor-pointer transition-all ${selectedId === s.id
                            ? 'bg-indigo-50 border-indigo-200 shadow-sm'
-                           : 'bg-white border-transparent hover:bg-gray-50'
+                           : 'bg-surface border-transparent hover:bg-gray-50'
                            }`}
                      >
                         <div className="flex items-center gap-3">
-                           <div className={`p-2 rounded-md ${selectedId === s.id ? 'bg-white' : 'bg-gray-100'}`}>
+                           <div className={`p-2 rounded-md ${selectedId === s.id ? 'bg-surface' : 'bg-gray-100'}`}>
                               {getTypeIcon(s.type)}
                            </div>
                            <div className="overflow-hidden">
                               <h4 className={`text-sm font-semibold truncate ${selectedId === s.id ? 'text-indigo-900' : 'text-gray-700'}`}>{s.name}</h4>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                  <div className={`w-1.5 h-1.5 rounded-full ${s.status === 'Active' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                                 <span className="text-[10px] text-gray-500 uppercase">{s.type}</span>
+                                 <span className="text-xs text-gray-500 uppercase">{s.type}</span>
                               </div>
                            </div>
                         </div>
@@ -295,7 +295,7 @@ export const WebPresenter: React.FC = () => {
                {editConfig ? (
                   <>
                      {/* Config Header */}
-                     <div className="bg-white px-8 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
+                     <div className="bg-surface px-8 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
                         <div className="flex items-center gap-4">
                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
                               {getTypeIcon(editConfig.type)}
@@ -352,7 +352,7 @@ export const WebPresenter: React.FC = () => {
                      </div>
 
                      {/* Tabs */}
-                     <div className="bg-white border-b border-gray-200 px-8 flex gap-8">
+                     <div className="bg-surface border-b border-gray-200 px-8 flex gap-8">
                         {['config', 'query', 'preview'].map(tab => (
                            <button
                               key={tab}
@@ -614,19 +614,19 @@ export const WebPresenter: React.FC = () => {
                                           {crmParams.map((p, i) => (
                                              <div key={i} className="flex gap-2 items-center">
                                                 <input
-                                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-surface"
                                                    placeholder="paramName (no braces)"
                                                    value={p.name}
                                                    onChange={(e) => updateCrmParam(i, 'name', e.target.value)}
                                                 />
                                                 <input
-                                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-surface"
                                                    placeholder="Label"
                                                    value={p.label}
                                                    onChange={(e) => updateCrmParam(i, 'label', e.target.value)}
                                                 />
                                                 <select
-                                                   className="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                                                   className="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-surface"
                                                    value={p.type}
                                                    onChange={(e) => updateCrmParam(i, 'type', e.target.value as any)}
                                                 >
@@ -635,7 +635,7 @@ export const WebPresenter: React.FC = () => {
                                                    <option value="date">Date</option>
                                                 </select>
                                                 <input
-                                                   className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                                                   className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-surface"
                                                    placeholder="default"
                                                    value={p.defaultValue}
                                                    onChange={(e) => updateCrmParam(i, 'defaultValue', e.target.value)}
@@ -660,7 +660,7 @@ export const WebPresenter: React.FC = () => {
                                                          <span className="font-mono">{'{' + name + '}'}</span>
                                                       </label>
                                                       <input
-                                                         className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm bg-white"
+                                                         className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm bg-surface"
                                                          placeholder={`Test value for ${name}`}
                                                          value={crmTestParams[name] ?? ''}
                                                          onChange={(e) => setCrmTestParams(prev => ({ ...prev, [name]: e.target.value }))}
@@ -685,7 +685,7 @@ export const WebPresenter: React.FC = () => {
                                     {editConfig.type === 'api' && (
                                        <div className="bg-gray-50 border-b border-gray-200 p-2 flex gap-2">
                                           <select
-                                             className="bg-white border border-gray-300 rounded px-2 py-1 text-sm font-bold w-24"
+                                             className="bg-surface border border-gray-300 rounded px-2 py-1 text-sm font-bold w-24"
                                              value={editConfig.method}
                                              onChange={(e) => handleChange('method', e.target.value)}
                                           >
@@ -703,7 +703,7 @@ export const WebPresenter: React.FC = () => {
                                     )}
 
                                     <textarea
-                                       className="flex-1 w-full p-4 font-mono text-sm outline-none bg-slate-900 text-green-400 resize-none min-h-[300px]"
+                                       className="flex-1 w-full p-4 font-mono text-sm outline-none bg-[#1d1d1f] text-[#30d158] resize-none min-h-[300px]"
                                        value={editConfig.query || ''}
                                        onChange={(e) => handleChange('query', e.target.value)}
                                        placeholder={editConfig.type === 'database' ? 'SELECT * FROM table...' : '// JSON Body or Query Params'}
@@ -747,25 +747,25 @@ export const WebPresenter: React.FC = () => {
                                              <div className="bg-gray-100 p-2 text-xs text-center border-b border-gray-200 text-gray-500">
                                                 Previewing: {queryResult.src}
                                              </div>
-                                             <div className="h-full bg-white flex items-center justify-center text-gray-400">
+                                             <div className="h-full bg-surface flex items-center justify-center text-gray-400">
                                                 (IFrame Content Would Render Here)
                                              </div>
                                           </div>
                                        ) : (
-                                          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                                          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-surface">
                                              {Array.isArray(queryResult) && queryResult.length > 0 ? (
                                                 <div className="overflow-x-auto">
                                                    <table className="min-w-full divide-y divide-gray-200">
                                                       <thead className="bg-gray-50">
                                                          <tr>
                                                             {Object.keys(queryResult[0]).map(key => (
-                                                               <th key={key} className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                                               <th key={key} className="px-6 py-3 text-left text-xs font-bold text-gray-500">
                                                                   {key}
                                                                </th>
                                                             ))}
                                                          </tr>
                                                       </thead>
-                                                      <tbody className="bg-white divide-y divide-gray-200">
+                                                      <tbody className="bg-surface divide-y divide-gray-200">
                                                          {queryResult.map((row: any, idx: number) => (
                                                             <tr key={idx} className="hover:bg-gray-50">
                                                                {Object.values(row).map((val: any, vIdx) => (

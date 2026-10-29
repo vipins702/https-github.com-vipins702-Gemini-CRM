@@ -9,8 +9,8 @@ interface LoginProps {
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
-   const [email, setEmail] = useState('admin@flowcrm.com');
-   const [password, setPassword] = useState('Admin@123');
+   const [email, setEmail] = useState('');
+   const [password, setPassword] = useState('');
    const [showPassword, setShowPassword] = useState(false);
    const [loading, setLoading] = useState(false);
    const [error, setError] = useState('');
@@ -24,7 +24,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
          const session = await api.login(email, password);
          onLogin(session);
       } catch (err) {
-         setError('Invalid credentials. Try admin@flowcrm.com / Admin@123');
+         setError('That email or password is incorrect.');
          setShake(true);
          setTimeout(() => setShake(false), 500);
       } finally {
@@ -32,23 +32,23 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
    };
 
-   const inputCls = "w-full h-12 pl-11 pr-4 text-[15px] border border-[#dbe3ef] rounded-xl outline-none transition-colors bg-white/90 placeholder:text-ink-muted/70 focus:border-[#4F46E5] focus-ring";
+   const inputCls = "w-full h-12 pl-11 pr-4 text-[15px] border border-gray-200 rounded-xl outline-none transition-colors bg-surface placeholder:text-gray-400 focus:border-accent focus-ring";
 
    return (
       <div className="min-h-dvh flex items-center justify-center font-sans p-5 sm:p-8 relative overflow-hidden bg-hero">
          {/* Centered showcase glass panel */}
          <div className={`relative z-10 w-full max-w-4xl glass-hero panel-rise grid lg:grid-cols-2 overflow-hidden ${shake ? 'animate-shake' : ''}`}>
             {/* Left — brand / value prop */}
-            <div className="hidden lg:flex flex-col justify-between p-10 xl:p-12 bg-white/20 border-r border-white/40">
+            <div className="hidden lg:flex flex-col justify-between p-10 xl:p-12 bg-surface/40 border-r border-gray-200/60">
                <div className="flex items-center gap-2.5">
                   <div className="tri-ring-sq w-10 h-10">
-                     <div className="flex items-center justify-center"><Hexagon className="w-5 h-5 text-[#4F46E5]" strokeWidth={2.4} /></div>
+                     <div className="flex items-center justify-center"><Hexagon className="w-5 h-5 text-white" strokeWidth={2.4} /></div>
                   </div>
-                  <span className="font-heading text-xl font-extrabold tracking-tight gradient-text">FlowCRM</span>
+                  <span className="font-heading text-xl font-semibold tracking-tight text-gray-900">FlowCRM</span>
                </div>
 
                <div className="max-w-md">
-                  <h1 className="font-heading text-4xl font-extrabold tracking-tight leading-[1.08] text-ink">
+                  <h1 className="font-heading text-[40px] font-bold tracking-tight leading-[1.08] text-ink">
                      The CRM that <span className="gradient-text">runs itself</span>.
                   </h1>
                   <p className="text-[15px] text-ink-soft leading-relaxed mt-5">
@@ -56,9 +56,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   </p>
                   <ul className="mt-8 space-y-3">
                      {[
-                        { icon: Workflow, text: 'Visual workflow automation', tint: 'text-[#4F46E5] bg-[#4F46E5]/10' },
-                        { icon: Zap, text: 'AI lead capture & routing', tint: 'text-[#D97706] bg-[#D97706]/10' },
-                        { icon: ShieldCheck, text: 'Role-based access & audit trail', tint: 'text-[#0D9488] bg-[#0D9488]/10' },
+                        { icon: Workflow, text: 'Visual workflow automation', tint: 'text-accent bg-accent/10' },
+                        { icon: Zap, text: 'AI lead capture & routing', tint: 'text-warning bg-warning/10' },
+                        { icon: ShieldCheck, text: 'Role-based access & audit trail', tint: 'text-success bg-success/10' },
                      ].map(({ icon: Icon, text, tint }) => (
                         <li key={text} className="flex items-center gap-3 text-ink-soft text-sm font-medium">
                            <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${tint}`}>
@@ -70,23 +70,19 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   </ul>
                </div>
 
-               <div className="flex gap-8 border-t border-white/50 pt-6">
-                  <div><div className="font-heading text-2xl font-extrabold text-ink tnum">10x</div><p className="mono-label !text-[10px] mt-0.5">Faster setup</p></div>
-                  <div><div className="font-heading text-2xl font-extrabold text-ink tnum">100%</div><p className="mono-label !text-[10px] mt-0.5">Configurable</p></div>
-                  <div><div className="font-heading text-2xl font-extrabold text-ink tnum">SOC 2</div><p className="mono-label !text-[10px] mt-0.5">Ready</p></div>
-               </div>
+               <p className="text-sm text-gray-500">Leads, customers and conversations — in one place.</p>
             </div>
 
             {/* Right — form */}
-            <div className="p-8 sm:p-10 xl:p-12 bg-white/55">
+            <div className="p-8 sm:p-10 xl:p-12 bg-surface/70">
                <div className="lg:hidden flex items-center gap-2.5 mb-8">
-                  <div className="tri-ring-sq w-9 h-9"><div className="flex items-center justify-center"><Hexagon className="w-[18px] h-[18px] text-[#4F46E5]" strokeWidth={2.4} /></div></div>
-                  <span className="font-heading text-lg font-extrabold tracking-tight gradient-text">FlowCRM</span>
+                  <div className="tri-ring-sq w-9 h-9"><div className="flex items-center justify-center"><Hexagon className="w-[18px] h-[18px] text-white" strokeWidth={2.4} /></div></div>
+                  <span className="font-heading text-lg font-semibold tracking-tight text-gray-900">FlowCRM</span>
                </div>
 
                <div className="mb-8">
-                  <h2 className="font-heading text-2xl font-extrabold tracking-tight text-ink">Welcome back</h2>
-                  <p className="text-ink-muted mt-1.5 text-sm">Sign in to your workspace to continue.</p>
+                  <h2 className="font-heading text-[28px] font-semibold tracking-tight text-ink">Welcome back</h2>
+                  <p className="text-gray-500 mt-1 text-[15px]">Sign in to your workspace to continue.</p>
                </div>
 
                <form onSubmit={handleSubmit} className="space-y-5" noValidate>
@@ -105,7 +101,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <div className="space-y-1.5">
                      <div className="flex items-center justify-between">
                         <label htmlFor="login-password" className="block text-sm font-medium text-ink-soft">Password</label>
-                        <a href="#" className="text-sm text-[#4F46E5] hover:text-[#3730A3] font-semibold">Forgot?</a>
+                        <a href="#" className="text-sm text-accent hover:text-accent-deep font-semibold">Forgot?</a>
                      </div>
                      <div className="relative">
                         <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-[18px] h-[18px]" aria-hidden="true" />
@@ -122,13 +118,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   </div>
 
                   <label htmlFor="remember" className="flex items-center gap-2 text-sm text-ink-soft select-none cursor-pointer">
-                     <input type="checkbox" id="remember" className="rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5] w-4 h-4" />
+                     <input type="checkbox" id="remember" className="rounded border-slate-300 text-accent focus:ring-accent w-4 h-4" />
                      Keep me signed in
                   </label>
 
                   {error && (
-                     <div role="alert" aria-live="assertive" className="p-3 bg-rose-50 text-rose-700 text-sm rounded-xl flex items-start gap-2.5 border border-rose-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 mt-1.5"></span>
+                     <div role="alert" aria-live="assertive" className="p-3 bg-red-50 text-red-700 text-sm rounded-xl flex items-start gap-2.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 mt-1.5"></span>
                         <span className="font-medium">{error}</span>
                      </div>
                   )}
@@ -142,17 +138,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                </form>
 
                <p className="mt-8 text-center text-sm text-ink-muted">
-                  Don't have an account? <a href="#" className="text-[#4F46E5] font-semibold hover:underline">Create a workspace</a>
+                  Don't have an account? <a href="#" className="text-accent font-semibold hover:underline">Create a workspace</a>
                </p>
 
-               <div className="mt-8 pt-6 border-t border-white/50">
-                  <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-1.5 text-xs text-ink-muted">
-                     <span className="mono-label !text-[10px]">Demo</span>
-                     <button onClick={() => { setEmail('admin@flowcrm.com'); setPassword('Admin@123'); }} className="font-medium text-ink-soft hover:text-[#4F46E5] transition-colors">admin@flowcrm.com</button>
-                     <span className="text-slate-300">·</span>
-                     <button onClick={() => { setEmail('sarah@flowcrm.com'); setPassword('Admin@123'); }} className="font-medium text-ink-soft hover:text-[#4F46E5] transition-colors">sarah@flowcrm.com</button>
-                  </div>
-               </div>
             </div>
          </div>
       </div>

@@ -20,10 +20,10 @@ import {
 } from 'lucide-react';
 
 // ─── Colour palette ──────────────────────────────────────────────────────────
-const TRI = ['#4F46E5', '#0D9488', '#D97706', '#3730A3', '#0F766E', '#B45309'];
-const ACCENT: Record<string, string> = { blue: '#4F46E5', green: '#0D9488', orange: '#D97706' };
-const axisTick = { fill: '#6E7490', fontSize: 12, fontWeight: 500 };
-const tipStyle = { backgroundColor: '#101528', border: 'none', borderRadius: '12px', color: '#fff' } as React.CSSProperties;
+const TRI = ['#0A84FF', '#30D158', '#FF9F0A', '#BF5AF2', '#FF375F', '#40C8E0'];
+const ACCENT: Record<string, string> = { blue: '#0A84FF', green: '#30D158', orange: '#FF9F0A' };
+const axisTick = { fill: '#8E8E93', fontSize: 12, fontWeight: 500 };
+const tipStyle = { backgroundColor: 'rgba(29, 29, 31, 0.92)', border: 'none', borderRadius: '12px', color: '#fff' } as React.CSSProperties;
 
 const EmptyViz: React.FC = () => (
   <div className="h-72 flex flex-col items-center justify-center text-center">
@@ -125,7 +125,7 @@ const StandardReports: React.FC = () => {
       if (result.viz === 'line') return (
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={result.rows}>
-            <CartesianGrid strokeDasharray="2 4" vertical={false} stroke="#cdd7e6" />
+            <CartesianGrid strokeDasharray="2 4" vertical={false} stroke="rgba(142, 142, 147, 0.22)" />
             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={axisTick} />
             <YAxis axisLine={false} tickLine={false} tick={axisTick} />
             <Tooltip formatter={(v: any) => tip(v)} contentStyle={tipStyle} />
@@ -136,7 +136,7 @@ const StandardReports: React.FC = () => {
       return (
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={result.rows}>
-            <CartesianGrid strokeDasharray="2 4" vertical={false} stroke="#cdd7e6" />
+            <CartesianGrid strokeDasharray="2 4" vertical={false} stroke="rgba(142, 142, 147, 0.22)" />
             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={axisTick} />
             <YAxis axisLine={false} tickLine={false} tick={axisTick} />
             <Tooltip formatter={(v: any) => tip(v)} cursor={{ fill: 'rgba(37,99,235,0.06)' }} contentStyle={tipStyle} />
@@ -191,9 +191,9 @@ const StandardReports: React.FC = () => {
               <div className="space-y-1.5">
                 {items.map(d => (
                   <button key={d.id} onClick={() => setActiveId(d.id)}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${activeId === d.id ? 'bg-[#4F46E5]/[0.06] border-[#4F46E5]/30' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${activeId === d.id ? 'bg-accent/[0.06] border-accent/30' : 'bg-surface border-slate-200 hover:bg-slate-50'}`}
                   >
-                    <div className={`text-sm font-semibold ${activeId === d.id ? 'text-[#3730A3]' : 'text-ink'}`}>{d.name}</div>
+                    <div className={`text-sm font-semibold ${activeId === d.id ? 'text-accent-deep' : 'text-ink'}`}>{d.name}</div>
                     <div className="text-xs text-ink-muted mt-0.5 line-clamp-2">{d.description}</div>
                   </button>
                 ))}
@@ -244,7 +244,7 @@ const VIZ_ICONS: Record<string, React.ReactNode> = {
   pie: <PieIcon className="w-4 h-4" />,
   metric: <Eye className="w-4 h-4" />,
 };
-const CHART_COLORS = ['#4F46E5', '#14B8A6', '#F97316', '#8B5CF6', '#EF4444', '#06B6D4'];
+const CHART_COLORS = ['#0A84FF', '#30D158', '#FF9F0A', '#BF5AF2', '#FF375F', '#40C8E0'];
 const FILTER_OPS = ['eq', 'neq', 'contains', 'gt', 'lt'] as const;
 const blankReport = (): SavedReport => ({ name: '', entityType: 'lead', columns: [], filters: [], groupBy: [], sortBy: [], vizType: 'table' });
 
@@ -329,9 +329,9 @@ const CustomBuilder: React.FC<{ schemas: Record<string, EntityDefinition> }> = (
             <p className="text-3xl font-extrabold text-blue-900">{result.total}</p>
           </div>
           {nums.slice(0, 3).map((k, i) => (
-            <div key={k} style={{ background: ['#f0fdf4', '#fff7ed', '#eff6ff'][i] }} className="rounded-xl p-4">
-              <p className="text-xs font-medium mb-1" style={{ color: ['#065f46', '#92400e', '#1e3a8a'][i] }}>{k}</p>
-              <p className="text-2xl font-extrabold" style={{ color: ['#064e3b', '#78350f', '#1e3a8a'][i] }}>
+            <div key={k} className={`rounded-xl p-4 ${['bg-green-50', 'bg-orange-50', 'bg-purple-50'][i]}`}>
+              <p className={`text-xs font-medium mb-1 ${['text-green-700', 'text-orange-700', 'text-purple-700'][i]}`}>{k}</p>
+              <p className={`text-2xl font-semibold ${['text-green-800', 'text-orange-800', 'text-purple-800'][i]}`}>
                 {formatCurrency(rows.reduce((s: number, r: any) => s + (Number(r[k]) || 0), 0))}
               </p>
             </div>
@@ -362,7 +362,7 @@ const CustomBuilder: React.FC<{ schemas: Record<string, EntityDefinition> }> = (
       <div className="mb-5">
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={rows}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(142, 142, 147, 0.22)" />
             <XAxis dataKey={xKey} tick={axisTick} />
             <YAxis tick={axisTick} />
             <Tooltip contentStyle={tipStyle} />
@@ -377,7 +377,7 @@ const CustomBuilder: React.FC<{ schemas: Record<string, EntityDefinition> }> = (
       <div className="mb-5">
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={rows}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(142, 142, 147, 0.22)" />
             <XAxis dataKey={xKey} tick={axisTick} />
             <YAxis tick={axisTick} />
             <Tooltip contentStyle={tipStyle} />
@@ -393,10 +393,10 @@ const CustomBuilder: React.FC<{ schemas: Record<string, EntityDefinition> }> = (
     <div className="space-y-5">
       {/* Sub-tabs: Builder / Saved */}
       <div className="flex items-center gap-3">
-        <button onClick={() => setSavedTab(false)} className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${!savedTab ? 'bg-slate-900 text-white' : 'text-ink-muted hover:bg-slate-100'}`}>
+        <button onClick={() => setSavedTab(false)} className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${!savedTab ? 'bg-gray-900 text-surface' : 'text-ink-muted hover:bg-slate-100'}`}>
           Builder
         </button>
-        <button onClick={() => { setSavedTab(true); loadSaved(); }} className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${savedTab ? 'bg-slate-900 text-white' : 'text-ink-muted hover:bg-slate-100'}`}>
+        <button onClick={() => { setSavedTab(true); loadSaved(); }} className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${savedTab ? 'bg-gray-900 text-surface' : 'text-ink-muted hover:bg-slate-100'}`}>
           Saved {savedReports.length > 0 && <span className="ml-1 bg-slate-200 text-slate-700 text-xs px-1.5 rounded-full">{savedReports.length}</span>}
         </button>
       </div>
@@ -414,7 +414,7 @@ const CustomBuilder: React.FC<{ schemas: Record<string, EntityDefinition> }> = (
               <table className="min-w-full">
                 <thead><tr className="border-b border-slate-200 bg-slate-50">
                   {['Name', 'Entity', 'Visualization', 'Created'].map(h => (
-                    <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-ink-muted uppercase tracking-wider">{h}</th>
+                    <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-ink-muted">{h}</th>
                   ))}
                   <th />
                 </tr></thead>
@@ -464,7 +464,7 @@ const CustomBuilder: React.FC<{ schemas: Record<string, EntityDefinition> }> = (
                 <div className="flex gap-1.5">
                   {(['table', 'bar', 'line', 'pie', 'metric'] as const).map(v => (
                     <button key={v} onClick={() => set({ vizType: v })}
-                      className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg border text-xs font-medium transition-all ${report.vizType === v ? 'border-[#4F46E5] bg-blue-50 text-[#4F46E5]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                      className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg border text-xs font-medium transition-all ${report.vizType === v ? 'border-accent bg-blue-50 text-accent' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
                     >
                       {VIZ_ICONS[v]}
                       {v}
@@ -524,7 +524,7 @@ const CustomBuilder: React.FC<{ schemas: Record<string, EntityDefinition> }> = (
                   </div>
                 ))}
               </div>
-              <button onClick={addFilter} className="text-sm text-[#4F46E5] hover:text-[#4338CA] font-medium flex items-center gap-1">
+              <button onClick={addFilter} className="text-sm text-accent hover:text-accent-deep font-medium flex items-center gap-1">
                 <Filter className="w-3.5 h-3.5" /> Add filter
               </button>
             </Card>
@@ -586,7 +586,7 @@ const CustomBuilder: React.FC<{ schemas: Record<string, EntityDefinition> }> = (
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50">
                           {Object.keys(result.rows[0]).filter(k => k !== 'id').map(k => (
-                            <th key={k} className="px-3 py-2 text-left text-xs font-semibold text-ink-muted uppercase tracking-wider">{k}</th>
+                            <th key={k} className="px-3 py-2 text-left text-xs font-semibold text-ink-muted">{k}</th>
                           ))}
                         </tr>
                       </thead>
@@ -636,7 +636,7 @@ const SavedReportsViewer: React.FC<{ schemas: Record<string, EntityDefinition> }
     finally { setRunning(false); }
   };
 
-  if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-[#4F46E5]" /></div>;
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-accent" /></div>;
   if (!saved.length) return (
     <Card>
       <div className="py-16 text-center">
@@ -652,7 +652,7 @@ const SavedReportsViewer: React.FC<{ schemas: Record<string, EntityDefinition> }
       <div className="col-span-12 lg:col-span-4 space-y-3">
         {saved.map(r => (
           <button key={r.id} onClick={() => run(r)}
-            className={`w-full text-left p-4 rounded-xl border transition-colors ${selected?.id === r.id ? 'border-[#4F46E5] bg-blue-50' : 'border-slate-200 bg-white hover:border-[#4F46E5]/40'}`}>
+            className={`w-full text-left p-4 rounded-xl border transition-colors ${selected?.id === r.id ? 'border-accent bg-blue-50' : 'border-slate-200 bg-surface hover:border-accent/40'}`}>
             <div className="font-semibold text-sm text-ink">{r.name}</div>
             {r.description && <div className="text-xs text-ink-muted mt-0.5">{r.description}</div>}
             <div className="flex items-center gap-2 mt-2">
@@ -663,7 +663,7 @@ const SavedReportsViewer: React.FC<{ schemas: Record<string, EntityDefinition> }
         ))}
       </div>
       <div className="col-span-12 lg:col-span-8">
-        {running && <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-[#4F46E5]" /></div>}
+        {running && <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-accent" /></div>}
         {!running && result && selected && (
           <Card title={selected.name}>
             {result.rows.length === 0 ? <EmptyViz /> : (
@@ -672,7 +672,7 @@ const SavedReportsViewer: React.FC<{ schemas: Record<string, EntityDefinition> }
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50">
                       {Object.keys(result.rows[0]).filter(k => k !== 'id').map(k => (
-                        <th key={k} className="px-3 py-2 text-left text-xs font-semibold text-ink-muted uppercase tracking-wider">{k}</th>
+                        <th key={k} className="px-3 py-2 text-left text-xs font-semibold text-ink-muted">{k}</th>
                       ))}
                     </tr>
                   </thead>
@@ -718,24 +718,24 @@ export const Reports: React.FC<Props> = ({ schemas }) => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><BarChart3 className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><BarChart3 className="w-[18px] h-[18px] text-accent" /></span></span>
             Reports
           </h1>
           <p className="text-ink-muted text-sm mt-1">Standard analytics &amp; custom configurable reports.</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setTab('standard')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${tab === 'standard' ? 'bg-[#4F46E5] text-white' : 'text-ink-muted hover:bg-slate-100'}`}>
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${tab === 'standard' ? 'bg-accent text-white' : 'text-ink-muted hover:bg-slate-100'}`}>
             Standard Reports
           </button>
           {isAdmin ? (
             <button onClick={() => setTab('builder')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${tab === 'builder' ? 'bg-[#4F46E5] text-white' : 'text-ink-muted hover:bg-slate-100'}`}>
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${tab === 'builder' ? 'bg-accent text-white' : 'text-ink-muted hover:bg-slate-100'}`}>
               <span className="flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" /> Custom Builder</span>
             </button>
           ) : (
             <button onClick={() => setTab('builder')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${tab === 'builder' ? 'bg-[#4F46E5] text-white' : 'text-ink-muted hover:bg-slate-100'}`}>
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${tab === 'builder' ? 'bg-accent text-white' : 'text-ink-muted hover:bg-slate-100'}`}>
               <span className="flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" /> Saved Reports</span>
             </button>
           )}

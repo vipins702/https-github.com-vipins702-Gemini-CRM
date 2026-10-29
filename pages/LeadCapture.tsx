@@ -96,9 +96,9 @@ export const LeadCapture: React.FC = () => {
         <Card title="Capture Endpoint">
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Source name</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Source name</label>
               <input className={inputCls} value={source} onChange={(e) => setSource(e.target.value)} placeholder="website-form" />
-              <p className="text-[11px] text-slate-400 mt-1">A label to identify where leads came from (used in the URL).</p>
+              <p className="text-xs text-slate-400 mt-1">A label to identify where leads came from (used in the URL).</p>
             </div>
 
             <div className="flex flex-wrap gap-4">
@@ -112,13 +112,13 @@ export const LeadCapture: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><Webhook className="w-3.5 h-3.5" /> POST URL</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5"><Webhook className="w-3.5 h-3.5" /> POST URL</label>
               <div className="flex gap-2">
                 <input readOnly value={url} className={`${inputCls} font-mono text-xs bg-slate-50`} />
                 <Button variant="secondary" size="sm" icon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} onClick={copyUrl}>{copied ? 'Copied' : 'Copy'}</Button>
               </div>
-              <p className="text-[11px] text-amber-600 mt-1.5">For external systems, replace the origin with your deployed backend URL.</p>
-              <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-2">
+              <p className="text-xs text-amber-600 mt-1.5">For external systems, replace the origin with your deployed backend URL.</p>
+              <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
                 {ingestKey
                   ? <>The <code>key</code> routes leads to this workspace — keep it secret.
                       <button type="button" className="text-indigo-600 hover:underline font-semibold disabled:opacity-50" onClick={rotateKey} disabled={rotating}>{rotating ? 'Generating…' : 'Generate new key'}</button></>
@@ -127,9 +127,9 @@ export const LeadCapture: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Example (cURL)</label>
-              <pre className="bg-slate-900 text-slate-100 text-[11px] rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{curl}</pre>
-              <p className="text-[11px] text-slate-400 mt-1.5">Accepts common aliases (name/first_name, email, phone/mobile, company/org, website, location…). Extra fields are kept on the lead.</p>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Example (cURL)</label>
+              <pre className="bg-[#1d1d1f] text-[#f5f5f7] text-xs rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{curl}</pre>
+              <p className="text-xs text-slate-400 mt-1.5">Accepts common aliases (name/first_name, email, phone/mobile, company/org, website, location…). Extra fields are kept on the lead.</p>
             </div>
           </div>
         </Card>
@@ -146,7 +146,7 @@ export const LeadCapture: React.FC = () => {
             <Button className="w-full justify-center" icon={sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} onClick={sendTest} disabled={sending}>
               {sending ? 'Capturing…' : 'Capture Lead'}
             </Button>
-            <p className="text-[11px] text-slate-400 flex items-center gap-1.5"><Globe className="w-3 h-3" /> Posts to the endpoint above as you, so the lead lands in this workspace.</p>
+            <p className="text-xs text-slate-400 flex items-center gap-1.5"><Globe className="w-3 h-3" /> Posts to the endpoint above as you, so the lead lands in this workspace.</p>
           </div>
         </Card>
       </div>

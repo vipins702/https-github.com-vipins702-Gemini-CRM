@@ -100,7 +100,7 @@ export const Quotes: React.FC<Props> = () => {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><FileText className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><FileText className="w-[18px] h-[18px] text-accent" /></span></span>
             Quotes
           </h1>
           <p className="text-ink-muted text-sm mt-1">Build, send and track quotes — in any currency.</p>
@@ -134,14 +134,14 @@ export const Quotes: React.FC<Props> = () => {
                 {quotes.map(q => (
                   <tr key={q.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3">
-                      <button onClick={() => openEdit(q.id)} className="text-sm font-semibold text-ink hover:text-[#4F46E5] transition-colors">
+                      <button onClick={() => openEdit(q.id)} className="text-sm font-semibold text-ink hover:text-accent transition-colors">
                         {q.quoteNumber}{busy === q.id && <Loader2 className="inline w-3 h-3 ml-1.5 animate-spin" />}
                       </button>
                       {q.title && <div className="text-xs text-ink-muted">{q.title}</div>}
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-soft">{q.customerName || '—'}</td>
                     <td className="px-4 py-3"><Badge status={q.status} /></td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-[#0F766E] tnum">{formatCurrency(q.total, q.currency)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-bold text-success-deep tnum">{formatCurrency(q.total, q.currency)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         {/* Stage transition — options come from the configurable quote process */}
@@ -312,7 +312,7 @@ const QuoteBuilder: React.FC<{
               </div>
             ))}
           </div>
-          <button onClick={addItem} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#4F46E5] hover:text-[#3730A3] transition-colors">
+          <button onClick={addItem} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-accent hover:text-accent-deep transition-colors">
             <Plus className="w-4 h-4" /> Add line
           </button>
         </div>
@@ -329,7 +329,7 @@ const QuoteBuilder: React.FC<{
             </div>
             <div className="flex justify-between pt-2 border-t border-slate-200">
               <span className="font-heading font-extrabold text-ink">Total</span>
-              <span className="font-heading font-extrabold text-[#0F766E] tnum text-lg">{formatCurrency(total, q.currency)}</span>
+              <span className="font-heading font-extrabold text-success-deep tnum text-lg">{formatCurrency(total, q.currency)}</span>
             </div>
           </div>
         </div>

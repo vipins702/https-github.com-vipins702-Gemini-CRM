@@ -44,6 +44,7 @@ import { ToastProvider } from './components/ui/Toast';
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [viewParams, setViewParams] = useState<any>(null); // State to hold navigation parameters
+  const [backStack, setBackStack] = useState<{ view: ViewState; params: any }[]>([]);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isPublicRoute, setIsPublicRoute] = useState(false);
 
@@ -113,31 +114,36 @@ const App: React.FC = () => {
   };
 
   const handleNavigate = (view: ViewState, params?: any) => {
+    setBackStack(stack => [...stack.slice(-19), { view: currentView, params: viewParams }]);
     setCurrentView(view);
-    if (params) {
-      setViewParams(params);
-    }
+    setViewParams(params ?? null);
+  };
+
+  // "Back" returns to wherever the user came from (falls back when opened directly).
+  const goBack = (fallback: ViewState) => {
+    const prev = backStack[backStack.length - 1];
+    setBackStack(stack => stack.slice(0, -1));
+    setCurrentView(prev?.view || fallback);
+    setViewParams(prev?.params ?? null);
   };
 
   // Helper wrapper for Sidebar which expects simple state setter
   const handleSidebarChange = (view: ViewState) => {
     setCurrentView(view);
+    setBackStack([]);
     setViewParams(null); // Reset params on sidebar click
   };
 
   if (!isReady) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-950 font-sans">
-        <div className="flex flex-col items-center gap-6 animate-in fade-in duration-700">
-          <div className="relative">
-            <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-2xl shadow-indigo-500/30 animate-pulse">
-              <span className="text-white font-black text-2xl tracking-tighter">F</span>
-            </div>
-            <div className="absolute inset-0 w-16 h-16 rounded-2xl bg-indigo-500/30 blur-xl animate-ping -z-10"></div>
+      <div className="h-screen flex items-center justify-center bg-canvas font-sans" role="status" aria-live="polite">
+        <div className="flex flex-col items-center gap-4 animate-fadeIn">
+          <div className="w-14 h-14 bg-gradient-to-b from-accent-400 to-accent-600 rounded-2xl flex items-center justify-center shadow-[var(--elev-3)]">
+            <span className="text-white font-semibold text-2xl">F</span>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="text-white font-extrabold text-base tracking-widest animate-pulse">BOOSTING FLOWCRM</div>
-            <div className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Metadata Engine Initializing</div>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-accent animate-spin" aria-hidden="true" />
+            Loading FlowCRM…
           </div>
         </div>
       </div>
@@ -183,9 +189,9 @@ const App: React.FC = () => {
       case 'reports':
         return <Reports schemas={schemas} />;
       case 'whatsapp':
-        return <WhatsAppInbox onNavigate={handleNavigate} />;
+        return <WhatsAppInbox key={viewParams?.phone || 'inbox'} initialPhone={viewParams?.phone} onNavigate={handleNavigate} />;
       case 'email-inbox':
-        return <EmailInbox onNavigate={handleNavigate} />;
+        return <EmailInbox key={viewParams?.email || 'inbox'} initialEmail={viewParams?.email} onNavigate={handleNavigate} />;
       case 'calendar':
         return <CalendarTasks onNavigate={handleNavigate} />;
       case 'quotes':
@@ -195,9 +201,9 @@ const App: React.FC = () => {
       case 'processes':
         return <ProcessBuilder />;
       case 'customer-360':
-        return <Customer360 customerId={viewParams?.customerId} onBack={() => setCurrentView('customer')} onNavigate={handleNavigate} />;
+        return <Customer360 customerId={viewParams?.customerId} onBack={() => goBack('customer')} onNavigate={handleNavigate} />;
       case 'lead-360':
-        return <Lead360 leadId={viewParams?.leadId} onBack={() => setCurrentView('pipeline')} onNavigate={handleNavigate} />;
+        return <Lead360 key={viewParams?.leadId} leadId={viewParams?.leadId} onBack={() => goBack('lead')} onNavigate={handleNavigate} />;
       case 'categories':
         return <CategoryManager />;
       case 'integrations':
@@ -217,7 +223,7 @@ const App: React.FC = () => {
       default:
         // Check if the current view matches an entity type
         if (schemas[currentView]) {
-          return <ModuleView entityType={currentView as EntityType} onNavigate={handleNavigate} />;
+          return <ModuleView key={`${currentView}:${viewParams?.editId || ''}`} entityType={currentView as EntityType} editRecordId={viewParams?.editId} onNavigate={handleNavigate} />;
         }
         return <Dashboard />;
     }

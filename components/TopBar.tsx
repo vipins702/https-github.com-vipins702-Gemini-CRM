@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Search, ChevronRight, X, Loader2, CornerDownLeft, Bell, CheckCheck, Clock, AlertCircle, Info } from 'lucide-react';
+import { Search, ChevronRight, X, Loader2, CornerDownLeft, Bell, CheckCheck, Clock, AlertCircle, Info, Sun, Moon } from 'lucide-react';
 import { ViewState, EntityDefinition, AppNotification } from '../types';
 import { api } from '../services/api';
+import { isDarkActive, onThemeChange, setPersonalTheme } from '../services/theme';
 
 interface TopBarProps {
   currentView: ViewState;
@@ -89,14 +90,14 @@ const NotificationCenter: React.FC<{ onClose: () => void; onNavigate: (v: ViewSt
   const unread = notifs.filter(n => !n.is_read).length;
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] ring-1 ring-slate-200 z-50 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden">
+    <div className="absolute right-0 top-full mt-2 w-80 bg-surface rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] ring-1 ring-slate-200 z-50 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
         <h3 className="font-semibold text-sm text-ink flex items-center gap-2">
           Notifications
-          {unread > 0 && <span className="bg-[#4F46E5] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unread}</span>}
+          {unread > 0 && <span className="bg-accent text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{unread}</span>}
         </h3>
         {unread > 0 && (
-          <button onClick={markAll} className="flex items-center gap-1 text-xs text-[#4F46E5] hover:text-[#3730A3] font-medium">
+          <button onClick={markAll} className="flex items-center gap-1 text-xs text-accent hover:text-accent-deep font-medium">
             <CheckCheck className="w-3.5 h-3.5" /> Mark all read
           </button>
         )}
@@ -121,9 +122,9 @@ const NotificationCenter: React.FC<{ onClose: () => void; onNavigate: (v: ViewSt
               <div className="flex-1 min-w-0">
                 <p className={`text-sm ${!n.is_read ? 'font-semibold text-ink' : 'text-slate-600'} truncate`}>{n.title}</p>
                 {n.body && <p className="text-xs text-ink-muted mt-0.5 line-clamp-2">{n.body}</p>}
-                <p className="text-[11px] text-ink-muted mt-1">{timeAgo(n.created_at)}</p>
+                <p className="text-xs text-ink-muted mt-1">{timeAgo(n.created_at)}</p>
               </div>
-              {!n.is_read && <span className="w-2 h-2 rounded-full bg-[#4F46E5] shrink-0 mt-1.5" />}
+              {!n.is_read && <span className="w-2 h-2 rounded-full bg-accent shrink-0 mt-1.5" />}
             </button>
           ))
         )}
@@ -145,6 +146,7 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
   const [activeIndex, setActiveIndex] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [dark, setDark] = useState(isDarkActive);
   const boxRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -160,6 +162,9 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
     const t = setInterval(fetchCount, 30000);
     return () => clearInterval(t);
   }, []);
+
+  // Keep the sun/moon icon in sync when the theme changes elsewhere (Settings, OS).
+  useEffect(() => onThemeChange(({ dark }) => setDark(dark)), []);
 
   // Debounced search
   useEffect(() => {
@@ -210,7 +215,7 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
   const entityLabel = (type: string) => schemas[type]?.label || type;
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-xl border-b border-[#E8E8EE] flex items-center gap-6 px-5 sm:px-6">
+    <header className="sticky top-0 z-30 h-16 bg-surface/80 backdrop-blur-xl backdrop-saturate-150 border-b border-gray-200/80 flex items-center gap-6 px-5 sm:px-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm shrink-0 min-w-0" aria-label="Breadcrumb">
         <button onClick={() => onNavigate('dashboard')} className="text-slate-500 hover:text-slate-900 font-medium transition-colors">Home</button>
@@ -235,7 +240,8 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
             role="combobox"
             aria-expanded={open && !!query.trim()}
             placeholder="Search…"
-            className="w-full h-10 pl-9 pr-16 text-sm rounded-lg bg-[#F3F3F7] border border-transparent text-slate-800 placeholder:text-[#9191A8] outline-none transition-colors focus:bg-white focus:border-[#DDDDE4] focus-ring"
+            aria-label="Search records"
+            className="w-full h-10 !pl-9 pr-16 text-sm !rounded-xl !bg-gray-100 !border-transparent text-gray-900 placeholder:text-gray-500 outline-none transition-colors focus:!bg-surface focus:!border-gray-200 focus-ring"
           />
           {query ? (
             <button onClick={() => { setQuery(''); setResults([]); inputRef.current?.focus(); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -249,7 +255,7 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
         </div>
 
         {open && query.trim() && (
-          <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-[var(--elev-pop)] ring-1 ring-slate-200 overflow-hidden max-h-96 overflow-y-auto z-40 animate-slideDown">
+          <div className="absolute top-full mt-2 w-full bg-surface rounded-xl shadow-[var(--elev-pop)] ring-1 ring-slate-200 overflow-hidden max-h-96 overflow-y-auto z-40 animate-slideDown">
             {loading && results.length === 0 ? (
               <div className="px-4 py-6 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" /> Searching…
@@ -277,16 +283,27 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
         )}
       </div>
 
+      {/* Light / dark toggle (your own preference, remembered on this device) */}
+      <button
+        onClick={() => setPersonalTheme(dark ? 'light' : 'dark')}
+        aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={dark ? 'Light mode' : 'Dark mode'}
+        className="shrink-0 p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+      >
+        {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </button>
+
       {/* Notification Bell */}
-      <div ref={notifRef} className="relative shrink-0">
+      <div ref={notifRef} className="relative shrink-0 -ml-4">
         <button
           onClick={() => { setShowNotifs(v => !v); setUnreadCount(0); }}
           className="relative p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+          aria-label="Notifications"
           title="Notifications"
         >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-[#4F46E5] text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+            <span className="absolute top-1 right-1 w-4 h-4 bg-accent text-white text-xs font-bold rounded-full flex items-center justify-center leading-none">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}

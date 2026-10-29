@@ -97,7 +97,7 @@ const NotesDrawer: React.FC<{
       <div className="flex-1 bg-black/20" />
       {/* Panel */}
       <div
-        className="w-[420px] bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200"
+        className="w-[420px] bg-surface shadow-2xl flex flex-col animate-in slide-in-from-right duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -138,7 +138,7 @@ const NotesDrawer: React.FC<{
                 {/* Stage divider */}
                 <div className="flex items-center gap-2 mb-3">
                   <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{stageName}</span>
+                  <span className="text-xs font-semibold text-slate-500">{stageName}</span>
                   <div className="flex-1 h-px bg-slate-200" />
                   <span className="text-xs text-slate-400">{stageNotes.length}</span>
                 </div>
@@ -147,15 +147,15 @@ const NotesDrawer: React.FC<{
                   {stageNotes.map(note => (
                     <div key={note.id} className="relative pl-4 border-l-2 border-slate-200">
                       <div className="flex items-start gap-2">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${NOTE_KIND_COLOR[note.kind] || NOTE_KIND_COLOR.comment}`}>
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium shrink-0 ${NOTE_KIND_COLOR[note.kind] || NOTE_KIND_COLOR.comment}`}>
                           {NOTE_KIND_ICON[note.kind] || NOTE_KIND_ICON.comment}
                           {note.kind}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-ink leading-relaxed">{note.note}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[11px] text-ink-muted">{note.actor_name || 'System'}</span>
-                            <span className="text-[11px] text-ink-muted flex items-center gap-0.5">
+                            <span className="text-xs text-ink-muted">{note.actor_name || 'System'}</span>
+                            <span className="text-xs text-ink-muted flex items-center gap-0.5">
                               <Clock className="w-3 h-3" />{timeAgo(note.created_at)}
                             </span>
                           </div>
@@ -177,7 +177,7 @@ const NotesDrawer: React.FC<{
               <button
                 key={k}
                 onClick={() => setKind(k)}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${kind === k ? NOTE_KIND_COLOR[k] : 'bg-white text-slate-500 border border-slate-200'}`}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${kind === k ? NOTE_KIND_COLOR[k] : 'bg-surface text-slate-500 border border-slate-200'}`}
               >
                 {NOTE_KIND_ICON[k]}{k}
               </button>
@@ -189,13 +189,13 @@ const NotesDrawer: React.FC<{
               onChange={e => setText(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit(); }}
               placeholder={`Add ${kind} note... (Ctrl+Enter to save)`}
-              className="flex-1 text-sm min-h-[60px] resize-none border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              className="flex-1 text-sm min-h-[60px] resize-none border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-surface"
               rows={2}
             />
             <button
               onClick={submit}
               disabled={saving || !text.trim()}
-              className="px-3 bg-[#4F46E5] text-white rounded-lg hover:bg-[#4338CA] disabled:opacity-40 transition-colors self-end mb-0.5"
+              className="px-3 bg-accent text-white rounded-lg hover:bg-accent-deep disabled:opacity-40 transition-colors self-end mb-0.5"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
@@ -280,7 +280,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
       <div className="flex items-center justify-between mb-5 shrink-0">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><GitBranch className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><GitBranch className="w-[18px] h-[18px] text-accent" /></span></span>
             {processName}
           </h1>
           <p className="text-ink-muted text-sm mt-1">Drag leads across stages — click 💬 to add notes. Configure stages in Process Builder.</p>
@@ -308,7 +308,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                 onDragOver={e => { e.preventDefault(); setOverStage(stage.name); }}
                 onDragLeave={() => setOverStage(s => s === stage.name ? null : s)}
                 onDrop={() => onDrop(stage.name)}
-                className={`flex flex-col w-72 shrink-0 rounded-2xl border transition-colors ${isOver ? 'border-[#4F46E5] bg-[#4F46E5]/[0.04]' : 'border-slate-200 bg-slate-50/60'}`}
+                className={`flex flex-col w-72 shrink-0 rounded-2xl border transition-colors ${isOver ? 'border-accent bg-accent/[0.04]' : 'border-slate-200 bg-slate-50/60'}`}
               >
                 <div className="px-3.5 py-3 flex items-center justify-between sticky top-0">
                   <div className="flex items-center gap-2 min-w-0">
@@ -316,7 +316,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                     <span className="font-heading font-bold text-sm text-ink truncate">{stage.name}</span>
                     <span className="text-xs text-ink-muted tnum">{items.length}</span>
                   </div>
-                  {sum > 0 && <span className="text-xs font-semibold text-[#0F766E] tnum">{formatCurrency(sum)}</span>}
+                  {sum > 0 && <span className="text-xs font-semibold text-success-deep tnum">{formatCurrency(sum)}</span>}
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
@@ -329,12 +329,12 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                       draggable
                       onDragStart={() => setDraggedId(card.id)}
                       onDragEnd={() => { setDraggedId(null); setOverStage(null); }}
-                      className={`bg-white border border-slate-200 rounded-xl p-3 cursor-grab active:cursor-grabbing transition-all hover:border-slate-300 hover:shadow-sm group ${draggedId === card.id ? 'opacity-40' : ''}`}
+                      className={`bg-surface border border-slate-200 rounded-xl p-3 cursor-grab active:cursor-grabbing transition-all hover:border-slate-300 hover:shadow-sm group ${draggedId === card.id ? 'opacity-40' : ''}`}
                       style={{ borderLeft: `3px solid ${accent}` }}
                     >
                       <div className="flex items-start justify-between gap-1">
                         <p
-                          className="text-sm font-semibold text-ink leading-snug flex-1 min-w-0 cursor-pointer hover:text-[#4F46E5] truncate"
+                          className="text-sm font-semibold text-ink leading-snug flex-1 min-w-0 cursor-pointer hover:text-accent truncate"
                           onClick={() => onNavigate?.('lead-360', { leadId: card.id })}
                         >
                           {card.name}
@@ -343,7 +343,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                           {savingId === card.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-ink-muted" />}
                           <button
                             onClick={e => { e.stopPropagation(); setNotesDrawer(card); }}
-                            className="p-1 text-slate-300 hover:text-[#4F46E5] hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-1 text-slate-300 hover:text-accent hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100"
                             title="View / add notes"
                           >
                             <MessageSquare className="w-3.5 h-3.5" />
@@ -353,9 +353,9 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                       {card.company && <p className="text-xs text-ink-muted mt-0.5 truncate">{card.company}</p>}
                       <div className="flex items-center justify-between mt-2">
                         {card.value > 0
-                          ? <span className="text-sm font-bold text-[#0F766E] tnum">{formatCurrency(card.value)}</span>
+                          ? <span className="text-sm font-bold text-success-deep tnum">{formatCurrency(card.value)}</span>
                           : <span />}
-                        {card.source && <span className="text-[10px] text-ink-muted bg-slate-100 px-1.5 py-0.5 rounded">{card.source}</span>}
+                        {card.source && <span className="text-xs text-ink-muted bg-slate-100 px-1.5 py-0.5 rounded">{card.source}</span>}
                       </div>
                     </div>
                   ))}
@@ -379,7 +379,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
       {/* Reason / note required to enter this stage */}
       {noteModal && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setNoteModal(null)}>
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-[var(--elev-pop)] w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-surface rounded-2xl border border-slate-200 shadow-[var(--elev-pop)] w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
             <h2 className="font-heading font-extrabold text-lg text-ink mb-1">Add a note</h2>
             <p className="text-sm text-ink-muted mb-4">
               Moving <strong>{noteModal.card.name}</strong> to <strong>{noteModal.stage}</strong> requires a reason.

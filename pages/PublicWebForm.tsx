@@ -56,7 +56,7 @@ export const PublicWebForm: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-[#4F46E5]" />
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     );
   }
@@ -64,7 +64,7 @@ export const PublicWebForm: React.FC = () => {
   if (error && !template) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+        <div className="max-w-md w-full bg-surface rounded-2xl shadow-xl p-8 text-center">
           <AlertTriangle className="w-12 h-12 text-rose-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-slate-800 mb-2">Form Unavailable</h2>
           <p className="text-slate-500 text-sm">{error}</p>
@@ -76,7 +76,7 @@ export const PublicWebForm: React.FC = () => {
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-10 text-center animate-in zoom-in-95 duration-300">
+        <div className="max-w-md w-full bg-surface rounded-2xl shadow-2xl p-10 text-center animate-in zoom-in-95 duration-300">
           <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-emerald-500" />
           </div>
@@ -86,7 +86,7 @@ export const PublicWebForm: React.FC = () => {
           <p className="text-slate-500 mb-8">Your response has been received. We'll be in touch shortly.</p>
           <button
             onClick={() => { setSuccess(false); setFormData({}); }}
-            className="px-6 py-2.5 bg-[#4F46E5] text-white rounded-lg font-medium hover:bg-[#4338CA] transition-colors"
+            className="px-6 py-2.5 bg-accent text-white rounded-lg font-medium hover:bg-accent-deep transition-colors"
           >
             Submit Another
           </button>
@@ -110,13 +110,13 @@ export const PublicWebForm: React.FC = () => {
       <div className="w-full max-w-xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#4F46E5] text-white font-black text-lg mb-4 shadow-lg">F</div>
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent text-white font-black text-lg mb-4 shadow-lg">F</div>
           <h1 className="text-2xl font-extrabold text-slate-900">{template.title || campaignName}</h1>
           {template.description && <p className="text-slate-500 mt-2 text-sm">{template.description}</p>}
         </div>
 
         {/* Form Card */}
-        <div className="bg-white rounded-2xl shadow-xl ring-1 ring-slate-200/60 p-8">
+        <div className="bg-surface rounded-2xl shadow-xl ring-1 ring-slate-200/60 p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {template.fields.filter(f => !f.hidden).map(field => (
               <div key={field.id}>
@@ -132,14 +132,14 @@ export const PublicWebForm: React.FC = () => {
                     placeholder={field.placeholder}
                     value={formData[field.id] || ''}
                     onChange={e => handleChange(field, e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20 outline-none transition-all resize-none"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all resize-none"
                   />
                 ) : field.type === 'select' ? (
                   <select
                     required={field.required}
                     value={formData[field.id] || ''}
                     onChange={e => handleChange(field, e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20 outline-none transition-all bg-white appearance-none"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all bg-surface appearance-none"
                   >
                     <option value="">Select an option...</option>
                     {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -151,7 +151,7 @@ export const PublicWebForm: React.FC = () => {
                       required={field.required}
                       checked={formData[field.id] === 'true'}
                       onChange={e => handleChange(field, String(e.target.checked))}
-                      className="w-4 h-4 rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5]"
+                      className="w-4 h-4 rounded border-slate-300 text-accent focus:ring-accent"
                     />
                     <span className="text-sm text-slate-600">{field.placeholder || field.label}</span>
                   </label>
@@ -162,7 +162,7 @@ export const PublicWebForm: React.FC = () => {
                     placeholder={field.placeholder}
                     value={formData[field.id] || ''}
                     onChange={e => handleChange(field, e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20 outline-none transition-all"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all"
                   />
                 )}
               </div>

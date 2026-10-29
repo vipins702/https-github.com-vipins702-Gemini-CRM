@@ -7,6 +7,8 @@ import { EmailConversation, EmailMessage, ViewState } from '../types';
 
 interface Props {
   onNavigate?: (view: ViewState, params?: any) => void;
+  /** Start a new email to this address (e.g. from a lead's 360 view). */
+  initialEmail?: string;
 }
 
 const fmtTime = (s: string) => {
@@ -18,7 +20,7 @@ const fmtTime = (s: string) => {
     : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-export const EmailInbox: React.FC<Props> = ({ onNavigate }) => {
+export const EmailInbox: React.FC<Props> = ({ onNavigate, initialEmail }) => {
   const [conversations, setConversations] = useState<EmailConversation[]>([]);
   const [activeEmail, setActiveEmail] = useState<string>('');
   const [thread, setThread] = useState<EmailMessage[]>([]);
@@ -26,10 +28,10 @@ export const EmailInbox: React.FC<Props> = ({ onNavigate }) => {
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
-  const [showCompose, setShowCompose] = useState(false);
+  const [showCompose, setShowCompose] = useState(!!initialEmail);
 
   // composer (reply or new)
-  const [to, setTo] = useState('');
+  const [to, setTo] = useState(initialEmail || '');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -108,7 +110,7 @@ export const EmailInbox: React.FC<Props> = ({ onNavigate }) => {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><Mail className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><Mail className="w-[18px] h-[18px] text-accent" /></span></span>
             Email
           </h1>
           <p className="text-ink-muted text-sm mt-1">
@@ -140,14 +142,14 @@ export const EmailInbox: React.FC<Props> = ({ onNavigate }) => {
                 key={c.contact_email}
                 onClick={() => setActiveEmail(c.contact_email)}
                 className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all ${activeEmail === c.contact_email
-                  ? 'bg-[#4F46E5]/[0.06] border-[#4F46E5]/30'
-                  : 'bg-white border-transparent hover:border-slate-200 hover:bg-slate-50'}`}
+                  ? 'bg-accent/[0.06] border-accent/30'
+                  : 'bg-surface border-transparent hover:border-slate-200 hover:bg-slate-50'}`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className={`text-sm font-semibold truncate ${activeEmail === c.contact_email ? 'text-[#3730A3]' : 'text-ink'}`}>
+                  <span className={`text-sm font-semibold truncate ${activeEmail === c.contact_email ? 'text-accent-deep' : 'text-ink'}`}>
                     {c.contact_email}
                   </span>
-                  <span className="text-[10px] text-ink-muted shrink-0 tnum">{fmtTime(c.last_at)}</span>
+                  <span className="text-xs text-ink-muted shrink-0 tnum">{fmtTime(c.last_at)}</span>
                 </div>
                 <p className="text-xs text-ink-muted truncate mt-0.5">{c.last_subject}</p>
               </button>
@@ -168,7 +170,7 @@ export const EmailInbox: React.FC<Props> = ({ onNavigate }) => {
               {/* Thread header */}
               <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="tri-ring w-9 h-9 shrink-0"><span className="flex items-center justify-center font-heading font-bold text-sm text-[#3730A3]">
+                  <span className="tri-ring w-9 h-9 shrink-0"><span className="flex items-center justify-center font-heading font-bold text-sm text-accent-deep">
                     {activeEmail.charAt(0).toUpperCase()}
                   </span></span>
                   <div className="min-w-0">
@@ -193,12 +195,12 @@ export const EmailInbox: React.FC<Props> = ({ onNavigate }) => {
                 {loadingThread ? (
                   <div className="space-y-3 pt-2"><Skeleton variant="card" className="h-24" /><Skeleton variant="card" className="h-24" /></div>
                 ) : thread.map(m => (
-                  <div key={m.id} className="bg-white border border-slate-200 rounded-xl p-4">
+                  <div key={m.id} className="bg-surface border border-slate-200 rounded-xl p-4">
                     <div className="flex items-center justify-between gap-3 mb-1.5">
                       <span className={`status-pill ${m.direction === 'outbound' ? 'status-blue' : 'status-neutral'}`}>
                         {m.direction === 'outbound' ? 'Sent' : 'Received'}
                       </span>
-                      <span className="text-[11px] text-ink-muted tnum">
+                      <span className="text-xs text-ink-muted tnum">
                         {fmtTime(m.created_at)}{m.status === 'simulated' ? ' · simulated' : m.status === 'failed' ? ' · failed' : ''}
                       </span>
                     </div>
@@ -216,7 +218,7 @@ export const EmailInbox: React.FC<Props> = ({ onNavigate }) => {
       {/* Compose modal */}
       {showCompose && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowCompose(false)}>
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-[var(--elev-pop)] w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-surface rounded-2xl border border-slate-200 shadow-[var(--elev-pop)] w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading font-extrabold text-lg text-ink">Compose email</h2>
               <button onClick={() => setShowCompose(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-ink-muted"><X className="w-4 h-4" /></button>

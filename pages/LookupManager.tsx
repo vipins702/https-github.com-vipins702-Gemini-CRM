@@ -262,7 +262,7 @@ export const LookupManager: React.FC = () => {
     return (
         <div className="h-screen flex flex-col bg-gray-50">
             {/* Header */}
-            <div className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
+            <div className="h-16 bg-surface border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                     <Database className="w-6 h-6 text-indigo-600" />
                     <h1 className="text-lg font-bold text-gray-900">Lookup Manager</h1>
@@ -274,9 +274,9 @@ export const LookupManager: React.FC = () => {
 
             <div className="flex-1 flex overflow-hidden">
                 {/* Left: Lookup List */}
-                <div className="w-72 bg-white border-r border-gray-200 flex flex-col">
+                <div className="w-72 bg-surface border-r border-gray-200 flex flex-col">
                     <div className="p-4 border-b border-gray-100 bg-gray-50">
-                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Lookups by Object</h3>
+                        <h3 className="text-xs font-bold text-gray-500">Lookups by Object</h3>
                     </div>
                     <div className="flex-1 overflow-y-auto p-2">
                         {lookups.length === 0 && !loading && (
@@ -296,7 +296,7 @@ export const LookupManager: React.FC = () => {
 
                             return Object.entries(grouped).map(([entity, entityLookups]) => (
                                 <div key={entity} className="mb-3">
-                                    <div className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider bg-gray-50 rounded-lg mb-1">
+                                    <div className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-gray-500 bg-gray-50 rounded-lg mb-1">
                                         <Database className="w-3 h-3" />
                                         {entity}
                                         <span className="ml-auto text-gray-400 font-normal">{entityLookups.length}</span>
@@ -334,7 +334,7 @@ export const LookupManager: React.FC = () => {
                         </div>
                     ) : (
                         <div className="max-w-2xl">
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div className="bg-surface rounded-xl shadow-sm border border-gray-200 p-6">
                                 <h2 className="text-lg font-bold text-gray-900 mb-6">
                                     Lookup: <span className="text-indigo-600">{selectedLookup}</span>
                                 </h2>
@@ -344,7 +344,7 @@ export const LookupManager: React.FC = () => {
                                     <div className="flex justify-between items-center mb-4">
                                         <div className="flex items-center gap-2">
                                             <div className={`w-8 h-4 rounded-full p-0.5 cursor-pointer transition-colors ${isLive ? 'bg-indigo-600' : 'bg-gray-300'}`} onClick={() => setIsLive(!isLive)}>
-                                                <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${isLive ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                <div className={`w-3 h-3 bg-surface rounded-full shadow-sm transition-transform ${isLive ? 'translate-x-4' : 'translate-x-0'}`} />
                                             </div>
                                             <span className="text-sm font-bold text-gray-900">Dynamic Live Source</span>
                                         </div>
@@ -360,7 +360,7 @@ export const LookupManager: React.FC = () => {
                                             <div>
                                                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Source Type</label>
                                                 <select
-                                                    className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm bg-white"
+                                                    className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm bg-surface"
                                                     value={liveSource?.source_type || 'users'}
                                                     onChange={(e) => setLiveSource({ ...liveSource, source_type: e.target.value } as any)}
                                                 >
@@ -374,7 +374,7 @@ export const LookupManager: React.FC = () => {
                                                 <div>
                                                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Entity Type</label>
                                                     <select
-                                                        className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm bg-white"
+                                                        className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm bg-surface"
                                                         value={liveSource?.source_entity || ''}
                                                         onChange={(e) => setLiveSource({ ...liveSource, source_entity: e.target.value } as any)}
                                                     >
@@ -548,7 +548,7 @@ export const LookupManager: React.FC = () => {
                                         {values.map(v => (
                                             <div
                                                 key={v.value_id}
-                                                className="grid grid-cols-12 gap-2 items-center bg-white border border-gray-200 rounded-lg px-3 py-3 hover:border-indigo-300 transition-colors"
+                                                className="grid grid-cols-12 gap-2 items-center bg-surface border border-gray-200 rounded-lg px-3 py-3 hover:border-indigo-300 transition-colors"
                                             >
                                                 <div className="col-span-4 text-sm font-mono text-gray-600">{v.value_id}</div>
                                                 <div className="col-span-6 text-sm text-gray-900">{v.value}</div>
@@ -573,7 +573,7 @@ export const LookupManager: React.FC = () => {
             {/* New Lookup Modal */}
             {isNewLookupModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+                    <div className="bg-surface rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-lg font-bold text-gray-900">Create New Lookup</h2>
                             <button onClick={() => setIsNewLookupModalOpen(false)} className="text-gray-400 hover:text-gray-600">
@@ -608,7 +608,7 @@ export const LookupManager: React.FC = () => {
             {/* Import from Table/SQL Modal */}
             {isImportModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200">
+                    <div className="bg-surface rounded-xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-lg font-bold text-gray-900">Import Lookup Values</h2>
                             <button onClick={() => setIsImportModalOpen(false)} className="text-gray-400 hover:text-gray-600">
