@@ -125,14 +125,15 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
   const subtitle = [lead.title, lead.company].filter(Boolean).join(' · ');
 
   return (
-    <div className="p-6 lg:p-8 font-sans max-w-[1400px] mx-auto panel-rise">
+    <div className="p-6 lg:p-8 font-sans panel-rise">
       <button onClick={onBack} className="flex items-center gap-1 text-sm font-medium text-accent hover:text-accent-deep transition-colors mb-4">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
 
       {/* Header: who, where they are in the pipeline, and what you can do */}
       <section className="glass-showcase p-6 mb-5" aria-label="Lead summary">
-        <div className="flex flex-col md:flex-row md:items-center gap-5">
+        <div className="flex flex-col xl:flex-row xl:items-center gap-5">
+          <div className="flex items-center gap-5 flex-1 min-w-0">
           <Avatar360 name={name} image={lead.profileImage} onUpload={handleAvatarUpload} uploading={uploadingAvatar} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
@@ -147,24 +148,27 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
               {lead.source && <span className="flex items-center gap-1.5"><Globe className="w-4 h-4" />{lead.source}</span>}
             </div>
           </div>
-          {!isConverted && (
-            <Button className="shrink-0" icon={converting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} onClick={() => setShowConvertConfirm(true)} disabled={converting}>
-              Convert to customer
-            </Button>
-          )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <QuickActions actions={contactActions({
+              phone: lead.phone || lead.mobile,
+              email: lead.email,
+              onWhatsApp: onNavigate && (() => onNavigate('whatsapp', { phone: lead.phone || lead.mobile })),
+              onEmail: onNavigate && (() => onNavigate('email-inbox', { email: lead.email })),
+              onNote: () => noteRef.current?.focus(),
+              onEdit: onNavigate && (() => onNavigate('lead', { editId: leadId })),
+            })} />
+            {!isConverted && (
+              <Button icon={converting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} onClick={() => setShowConvertConfirm(true)} disabled={converting}>
+                Convert to customer
+              </Button>
+            )}
+          </div>
         </div>
 
-        <div className="mt-5 pt-5 border-t border-gray-100 flex flex-col xl:flex-row xl:items-center gap-5">
-          <QuickActions actions={contactActions({
-            phone: lead.phone || lead.mobile,
-            email: lead.email,
-            onWhatsApp: onNavigate && (() => onNavigate('whatsapp', { phone: lead.phone || lead.mobile })),
-            onEmail: onNavigate && (() => onNavigate('email-inbox', { email: lead.email })),
-            onNote: () => noteRef.current?.focus(),
-            onEdit: onNavigate && (() => onNavigate('lead', { editId: leadId })),
-          })} />
-          {stages.length > 0 && <div className="flex-1 min-w-0"><StageProgress stages={stages} current={lead.status} /></div>}
-        </div>
+        {stages.length > 0 && (
+          <div className="mt-5 pt-5 border-t border-gray-100"><StageProgress stages={stages} current={lead.status} /></div>
+        )}
       </section>
 
       {/* Key numbers */}

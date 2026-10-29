@@ -511,8 +511,8 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ── Grid ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {/* ── Grid ── (dense flow lets smaller widgets fill gaps beside wide ones) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 grid-flow-row-dense gap-5">
         {visible.map((widget, i) => {
           const isDragging = draggedId  === widget.id;
           const isOver     = dragOverId === widget.id && draggedId !== widget.id;

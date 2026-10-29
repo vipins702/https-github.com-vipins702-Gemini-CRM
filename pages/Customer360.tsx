@@ -193,14 +193,15 @@ export const Customer360: React.FC<Props> = ({ customerId, onBack, onNavigate })
   ];
 
   return (
-    <div className="p-6 lg:p-8 font-sans max-w-[1400px] mx-auto panel-rise">
+    <div className="p-6 lg:p-8 font-sans panel-rise">
       <button onClick={onBack} className="flex items-center gap-1 text-sm font-medium text-accent hover:text-accent-deep transition-colors mb-4">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
 
       {/* Header */}
       <section className="glass-showcase p-6 mb-5" aria-label="Customer summary">
-        <div className="flex flex-col md:flex-row md:items-center gap-5">
+        <div className="flex flex-col xl:flex-row xl:items-center gap-5">
+          <div className="flex items-center gap-5 flex-1 min-w-0">
           <Avatar360 name={name} image={customer.profileImage} onUpload={handleAvatarUpload} uploading={uploadingAvatar} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
@@ -215,19 +216,22 @@ export const Customer360: React.FC<Props> = ({ customerId, onBack, onNavigate })
               {customer.website && <span className="flex items-center gap-1.5"><Globe className="w-4 h-4" />{customer.website}</span>}
             </div>
           </div>
+          </div>
+          <div className="shrink-0">
+            <QuickActions actions={contactActions({
+              phone,
+              email: customer.email,
+              onWhatsApp: onNavigate && (() => onNavigate('whatsapp', { phone })),
+              onEmail: onNavigate && (() => onNavigate('email-inbox', { email: customer.email })),
+              onNote: () => noteRef.current?.focus(),
+              onEdit: onNavigate && (() => onNavigate('customer', { editId: customerId })),
+            })} />
+          </div>
         </div>
 
-        <div className="mt-5 pt-5 border-t border-gray-100 flex flex-col xl:flex-row xl:items-center gap-5">
-          <QuickActions actions={contactActions({
-            phone,
-            email: customer.email,
-            onWhatsApp: onNavigate && (() => onNavigate('whatsapp', { phone })),
-            onEmail: onNavigate && (() => onNavigate('email-inbox', { email: customer.email })),
-            onNote: () => noteRef.current?.focus(),
-            onEdit: onNavigate && (() => onNavigate('customer', { editId: customerId })),
-          })} />
-          {stages.length > 0 && <div className="flex-1 min-w-0"><StageProgress stages={stages} current={customer.status} /></div>}
-        </div>
+        {stages.length > 0 && (
+          <div className="mt-5 pt-5 border-t border-gray-100"><StageProgress stages={stages} current={customer.status} /></div>
+        )}
       </section>
 
       {/* Key numbers */}

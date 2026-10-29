@@ -27,10 +27,12 @@ const FONT_FAMILIES: Record<string, string> = {
   mono: 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace',
 };
 
+// Root size that rem-based text scales from. "sm" stays at 15px so the smallest
+// labels (12px at default) never drop below ~11px.
 const FONT_SIZES: Record<string, string> = {
-  sm: '14px',
+  sm: '15px',
   md: '16px',
-  lg: '18px',
+  lg: '17px',
 };
 
 let tenantTheme: ThemeMode = 'light';
