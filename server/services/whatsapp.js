@@ -1,5 +1,7 @@
+import crypto from 'crypto';
 import db from '../database.js';
 import { v4 as uuidv4 } from 'uuid';
+import { WHATSAPP_ALLOW_UNSIGNED } from '../config.js';
 import { logAudit } from './audit.js';
 import { lookupByPhone, normalizePhone, createLeadFromCall } from './cti.js';
 import { getResolvedConfig, isValidVerifyToken, resolveTenantByWhatsAppPhoneId } from './integrations.js';
@@ -33,9 +35,43 @@ export async function verifyWebhook(query) {
     return null;
 }
 
-/** Resolve the owning tenant for an inbound webhook from its phone_number_id. */
+/** Resolve the owning tenant for an inbound webhook from its phone_number_id, or null if unknown. */
 export async function resolveTenant(phoneNumberId) {
-    return (await resolveTenantByWhatsAppPhoneId(phoneNumberId)) || 'default';
+    return resolveTenantByWhatsAppPhoneId(phoneNumberId);
+}
+
+/** True if `signature` (the X-Hub-Signature-256 header) is Meta's HMAC of rawBody under appSecret. */
+export function isValidSignature(rawBody, signature, appSecret) {
+    if (!rawBody || !signature || !appSecret) return false;
+    const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
+    const a = Buffer.from(String(signature));
+    const b = Buffer.from(expected);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+/**
+ * Keep only messages that are genuinely from Meta: each must route to a known tenant
+ * and the request signature must verify against that tenant's app secret.
+ * Returns [{ tenantId, msg }].
+ */
+export async function authenticateMessages(messages, rawBody, signature) {
+    const accepted = [];
+    for (const msg of messages) {
+        const tenantId = await resolveTenant(msg.phoneNumberId);
+        if (!tenantId) {
+            console.warn(`[whatsapp] dropped message for unknown phone_number_id ${msg.phoneNumberId}`);
+            continue;
+        }
+        const { appSecret } = await getResolvedConfig(tenantId, 'whatsapp');
+        if (appSecret ? isValidSignature(rawBody, signature, appSecret) : WHATSAPP_ALLOW_UNSIGNED) {
+            accepted.push({ tenantId, msg });
+        } else if (appSecret) {
+            console.warn(`[whatsapp] rejected message for tenant ${tenantId}: invalid signature`);
+        } else {
+            console.warn(`[whatsapp] rejected message for tenant ${tenantId}: no app secret configured (set it in Integrations or WHATSAPP_APP_SECRET)`);
+        }
+    }
+    return accepted;
 }
 
 async function storeMessage(tenantId, msg) {

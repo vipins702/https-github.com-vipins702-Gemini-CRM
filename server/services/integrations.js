@@ -1,8 +1,9 @@
+import crypto from 'crypto';
 import db from '../database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { logAudit } from './audit.js';
 import {
-    WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN,
+    WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, WHATSAPP_APP_SECRET,
     SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, EMAIL_FROM,
 } from '../config.js';
 
@@ -24,7 +25,7 @@ export const PROVIDERS = ['whatsapp', 'facebook', 'instagram', 'email'];
 
 // Which fields per provider are secrets (masked to the client, preserved on blank save).
 const SECRET_FIELDS = {
-    whatsapp:  ['token'],
+    whatsapp:  ['token', 'appSecret'],
     facebook:  ['appSecret', 'pageAccessToken'],
     instagram: ['appSecret', 'accessToken'],
     email:     ['smtpPass'],
@@ -60,6 +61,7 @@ export async function getResolvedConfig(tenantId, provider) {
             token:         c.token         || WHATSAPP_TOKEN,
             phoneNumberId: c.phoneNumberId || WHATSAPP_PHONE_NUMBER_ID,
             verifyToken:   c.verifyToken   || WHATSAPP_VERIFY_TOKEN,
+            appSecret:     c.appSecret     || WHATSAPP_APP_SECRET,
         };
     }
     if (provider === 'email') {
@@ -91,6 +93,37 @@ export async function resolveTenantByWhatsAppPhoneId(phoneNumberId) {
     // Fall back to env-configured default number.
     if (WHATSAPP_PHONE_NUMBER_ID && phoneNumberId === WHATSAPP_PHONE_NUMBER_ID) return 'default';
     return null;
+}
+
+const newIngestKey = () => 'ik_' + crypto.randomBytes(24).toString('hex');
+
+/** The tenant's ingest key for public inbound endpoints, created on first use. */
+export async function getIngestKey(tenantId) {
+    await db.run(
+        'INSERT INTO ingest_keys (tenant_id, ingest_key) VALUES (?, ?) ON CONFLICT(tenant_id) DO NOTHING',
+        tenantId, newIngestKey()
+    );
+    const row = await db.get('SELECT ingest_key FROM ingest_keys WHERE tenant_id = ?', tenantId);
+    return row.ingest_key;
+}
+
+/** Replace the tenant's ingest key; URLs carrying the old key stop working immediately. */
+export async function rotateIngestKey(tenantId, actorId = 'system') {
+    await getIngestKey(tenantId);
+    const key = newIngestKey();
+    await db.run(
+        'UPDATE ingest_keys SET ingest_key = ?, created_at = CURRENT_TIMESTAMP WHERE tenant_id = ?',
+        key, tenantId
+    );
+    await logAudit({ tenantId, entityType: 'integration', recordId: 'ingest_key', action: 'rotate', actorId, details: {} });
+    return key;
+}
+
+/** Tenant that owns an ingest key, or null. */
+export async function resolveTenantByIngestKey(key) {
+    if (!key) return null;
+    const row = await db.get('SELECT tenant_id FROM ingest_keys WHERE ingest_key = ?', String(key));
+    return row ? row.tenant_id : null;
 }
 
 /** True if the given verify token matches the env default or any enabled tenant config. */

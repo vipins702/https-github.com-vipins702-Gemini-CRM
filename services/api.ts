@@ -518,11 +518,10 @@ export const api = {
     return fetchWithAuth(`${API_BASE}/leads/${leadId}/convert`, { method: 'POST' });
   },
   async simulateIncomingCall(phone: string): Promise<{ ok: boolean; matched: boolean; entityType?: string; recordId?: string; name?: string; isNew?: boolean; created?: any }> {
-    const res = await fetch(`${API_BASE}/cti/incoming`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    return fetchWithAuth(`${API_BASE}/cti/incoming`, {
+      method: 'POST',
       body: JSON.stringify({ From: phone, Direction: 'inbound', CallStatus: 'ringing' }),
     });
-    return res.json();
   },
   async routeInbound(payload: { recordId?: string; entityType?: string; name?: string; text?: string; manualIntent?: 'support' | 'sales' }): Promise<{ created: 'case' | 'opportunity'; id: string; title: string; intent: { intent: string; product: string; reason: string; source: string } }> {
     return fetchWithAuth(`${API_BASE}/cti/route`, { method: 'POST', body: JSON.stringify(payload) });
@@ -647,12 +646,17 @@ export const api = {
     if (opts?.dedupe === false) params.set('dedupe', '0');
     if (opts?.ai) params.set('ai', '1');
     const qs = params.toString();
-    const res = await fetch(`${API_BASE}/ingest/${encodeURIComponent(source)}${qs ? `?${qs}` : ''}`, {
+    return fetchWithAuth(`${API_BASE}/ingest/${encodeURIComponent(source)}${qs ? `?${qs}` : ''}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return res.json();
+  },
+  // Secret key that routes public webhook calls to this tenant (admin only).
+  async getIngestKey(): Promise<{ key: string }> {
+    return fetchWithAuth(`${API_BASE}/ingest-key`);
+  },
+  async rotateIngestKey(): Promise<{ key: string }> {
+    return fetchWithAuth(`${API_BASE}/ingest-key/rotate`, { method: 'POST' });
   },
 
   // --- AI (Gemini) ---

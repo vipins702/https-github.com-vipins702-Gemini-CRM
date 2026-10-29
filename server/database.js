@@ -570,6 +570,17 @@ export async function initDB() {
         `);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_integrations_tenant ON integrations(tenant_id, provider)`);
 
+        // 26b. Per-tenant ingest keys. Public inbound endpoints (/api/ingest, /api/cti/incoming)
+        // resolve the tenant from this secret key — never from a caller-supplied tenant id.
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS ingest_keys (
+                tenant_id TEXT PRIMARY KEY,
+                ingest_key TEXT NOT NULL UNIQUE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+
         // 27. Scoring Rules (auto-score leads based on field values)
         await dbInstance.exec(`
             CREATE TABLE IF NOT EXISTS scoring_rules (

@@ -18,9 +18,11 @@ export const LeadCapture: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [captured, setCaptured] = useState<CRMRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ingestKey, setIngestKey] = useState<string | null>(null);
+  const [rotating, setRotating] = useState(false);
 
   const safeSource = encodeURIComponent(source.trim() || 'website-form');
-  const params = [!dedupe ? 'dedupe=0' : '', useAI ? 'ai=1' : ''].filter(Boolean).join('&');
+  const params = [`key=${ingestKey || 'YOUR_INGEST_KEY'}`, !dedupe ? 'dedupe=0' : '', useAI ? 'ai=1' : ''].filter(Boolean).join('&');
   const url = `${window.location.origin}/api/ingest/${safeSource}${params ? `?${params}` : ''}`;
   const curl = `curl -X POST "${url}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"Jane Doe","email":"jane@acme.com","phone":"555-1234","company":"Acme Inc"}'`;
 
@@ -36,6 +38,7 @@ export const LeadCapture: React.FC = () => {
   useEffect(() => {
     (async () => {
       try { setAiAvailable((await api.getAIStatus()).enabled); } catch { /* ignore */ }
+      try { setIngestKey((await api.getIngestKey()).key); } catch { /* non-admins can't see the key */ }
       await loadCaptured();
       setLoading(false);
     })();
@@ -45,6 +48,19 @@ export const LeadCapture: React.FC = () => {
     navigator.clipboard?.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const rotateKey = async () => {
+    if (!confirm('Generate a new key? Every form or webhook using the current URL will stop working until you update it.')) return;
+    setRotating(true);
+    try {
+      setIngestKey((await api.rotateIngestKey()).key);
+      addToast('New ingest key generated — update your forms and webhooks', 'success');
+    } catch (e: any) {
+      addToast(e.message || 'Could not rotate key', 'error');
+    } finally {
+      setRotating(false);
+    }
   };
 
   const sendTest = async () => {
@@ -102,6 +118,12 @@ export const LeadCapture: React.FC = () => {
                 <Button variant="secondary" size="sm" icon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} onClick={copyUrl}>{copied ? 'Copied' : 'Copy'}</Button>
               </div>
               <p className="text-[11px] text-amber-600 mt-1.5">For external systems, replace the origin with your deployed backend URL.</p>
+              <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-2">
+                {ingestKey
+                  ? <>The <code>key</code> routes leads to this workspace — keep it secret.
+                      <button type="button" className="text-indigo-600 hover:underline font-semibold disabled:opacity-50" onClick={rotateKey} disabled={rotating}>{rotating ? 'Generating…' : 'Generate new key'}</button></>
+                  : <>Ask an admin for this workspace's ingest key.</>}
+              </p>
             </div>
 
             <div>
@@ -124,7 +146,7 @@ export const LeadCapture: React.FC = () => {
             <Button className="w-full justify-center" icon={sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} onClick={sendTest} disabled={sending}>
               {sending ? 'Capturing…' : 'Capture Lead'}
             </Button>
-            <p className="text-[11px] text-slate-400 flex items-center gap-1.5"><Globe className="w-3 h-3" /> Posts to the endpoint above (public, no auth) — exactly like an external form would.</p>
+            <p className="text-[11px] text-slate-400 flex items-center gap-1.5"><Globe className="w-3 h-3" /> Posts to the endpoint above as you, so the lead lands in this workspace.</p>
           </div>
         </Card>
       </div>

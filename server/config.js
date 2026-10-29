@@ -15,6 +15,11 @@ export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 export const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || '';
 export const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
 export const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'flowcrm-wa-verify';
+// Meta App Secret — inbound webhooks are rejected unless their X-Hub-Signature-256
+// verifies against it (tenant config overrides this). WHATSAPP_ALLOW_UNSIGNED=true
+// accepts unsigned webhooks when no secret is set; local development only.
+export const WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET || '';
+export const WHATSAPP_ALLOW_UNSIGNED = process.env.WHATSAPP_ALLOW_UNSIGNED === 'true';
 
 // Email (SMTP). Leave SMTP_HOST empty to run in simulated mode — outbound email is
 // stored + logged to the contact timeline and marked 'simulated' instead of being sent.

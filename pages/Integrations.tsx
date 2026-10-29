@@ -4,7 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../services/api';
-import { IntegrationConfig, AuthSession } from '../types';
+import { IntegrationConfig } from '../types';
 import {
   MessageCircle, Facebook, Instagram, Mail, Loader2, Save, Plug, ShieldCheck, Lock, ExternalLink,
 } from 'lucide-react';
@@ -23,6 +23,7 @@ const PROVIDER_META: Record<string, {
     fields: [
       { key: 'phoneNumberId', label: 'Phone Number ID', placeholder: '1234567890', help: 'From Meta → WhatsApp → API Setup' },
       { key: 'token', label: 'Permanent Access Token', secret: true, type: 'password', placeholder: 'EAAG…' },
+      { key: 'appSecret', label: 'App Secret', secret: true, type: 'password', help: 'From Meta → App settings → Basic. Required: inbound messages are rejected unless signed with it.' },
       { key: 'verifyToken', label: 'Webhook Verify Token', placeholder: 'flowcrm-wa-verify', help: 'Use this same value in the Meta webhook config' },
     ],
   },
@@ -71,11 +72,12 @@ const ProviderCard: React.FC<{ data: IntegrationConfig; onSaved: (c: Integration
   const [enabled, setEnabled] = useState(data.enabled);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [session, setSession] = useState<AuthSession | null>(null);
+  const [ingestKey, setIngestKey] = useState('');
 
   useEffect(() => {
-    api.getSession().then(s => setSession(s));
-  }, []);
+    if (data.provider === 'facebook') api.getIngestKey().then(r => setIngestKey(r.key)).catch(() => {});
+  }, [data.provider]);
+  const webhookUrl = `${window.location.origin}/api/ingest/facebook?key=${ingestKey}`;
 
   const set = (k: string, v: any) => { setForm(p => ({ ...p, [k]: v })); setDirty(true); };
 
@@ -172,14 +174,14 @@ const ProviderCard: React.FC<{ data: IntegrationConfig; onSaved: (c: Integration
             <input
               type="text"
               readOnly
-              value={`${window.location.origin}/api/ingest/facebook?tenant=${session?.tenantId || 'default'}`}
+              value={webhookUrl}
               className="flex-1 px-3 py-2 border border-blue-200 bg-white rounded-lg text-[13px] font-mono text-slate-600 outline-none"
               onClick={e => (e.target as HTMLInputElement).select()}
             />
             <Button
               variant="secondary"
               onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/api/ingest/facebook?tenant=${session?.tenantId || 'default'}`);
+                navigator.clipboard.writeText(webhookUrl);
                 addToast('Webhook URL copied!', 'success');
               }}
             >

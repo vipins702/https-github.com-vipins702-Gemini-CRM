@@ -22,8 +22,8 @@ import { ingestLead, mapPayload } from './services/ingest.js';
 import { lookupByPhone, logCall, getRecentCalls, convertLeadToCustomer, handleInboundCall, routeInbound } from './services/cti.js';
 import { listReports, runReport, listPacks, runPack } from './services/reporting.js';
 import { reportCache } from './services/reportCache.js';
-import { verifyWebhook, parseWebhookPayload, handleIncomingMessage, sendMessage, getConversations, getThread, isConfigured as waConfigured, resolveTenant as waResolveTenant } from './services/whatsapp.js';
-import { listForClient as listIntegrations, getForClient as getIntegration, saveIntegration } from './services/integrations.js';
+import { verifyWebhook, parseWebhookPayload, handleIncomingMessage, sendMessage, getConversations, getThread, isConfigured as waConfigured, authenticateMessages as waAuthenticateMessages } from './services/whatsapp.js';
+import { listForClient as listIntegrations, getForClient as getIntegration, saveIntegration, getIngestKey, rotateIngestKey, resolveTenantByIngestKey } from './services/integrations.js';
 import { listQuotes, getQuote, saveQuote, setQuoteStatus, emailQuote, convertQuote } from './services/quotes.js';
 import { getProcess, saveProcess, configurableEntities, findStage, missingForStage, runStageEntryActions } from './services/processes.js';
 import { getTree as getCategoryTree, saveTree as saveCategoryTree, ensureDefaultTree } from './services/categories.js';
@@ -36,7 +36,25 @@ import { createReadStream } from 'fs';
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+    // Webhook signatures are computed over the exact bytes received, so keep them.
+    verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/webhooks/')) req.rawBody = buf; },
+}));
+
+// Tenant for public inbound endpoints (lead ingest, telephony). A logged-in caller
+// uses their own tenant; an external system must present the tenant's ingest key
+// (?key= or X-Ingest-Key). The tenant is never taken from the request itself.
+const resolveInboundTenant = async (req, res, next) => {
+    if (req.headers['authorization']) return authenticateToken(req, res, next);
+    try {
+        const tenantId = await resolveTenantByIngestKey(req.get('x-ingest-key') || req.query.key);
+        if (!tenantId) return res.status(401).json({ error: 'Valid ingest key required' });
+        req.tenantId = tenantId;
+        next();
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to verify ingest key' });
+    }
+};
 
 // --- Uploads (attachments) ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -2062,11 +2080,11 @@ app.get('/api/cti/lookup', authenticateToken, async (req, res) => {
 
 // Inbound call webhook — telephony provider posts here on a call.
 // Exotel/Knowlarity send form/query params like From, To, CallSid, Direction, CallStatus.
-app.post('/api/cti/incoming', async (req, res) => {
+app.post('/api/cti/incoming', resolveInboundTenant, async (req, res) => {
     try {
-        if (INGEST_KEY && req.query.key !== INGEST_KEY) return res.status(401).json({ error: 'Invalid key' });
-        const tenantId = String(req.query.tenant || 'default');
-        const body = { ...req.query, ...req.body };
+        const tenantId = req.tenantId;
+        const { key: _key, ...query } = req.query;
+        const body = { ...query, ...req.body };
         const from = body.From || body.from || body.CallFrom || body.caller || body.source;
         const to = body.To || body.to || body.CallTo || body.destination;
         const callSid = body.CallSid || body.CallId || body.uuid;
@@ -2169,8 +2187,8 @@ app.post('/api/reports/packs/:packId/run', authenticateToken, async (req, res) =
 });
 
 // ---- WhatsApp Business (Meta Cloud API) ----
-// Public webhook — Meta calls these. Tenant is resolved to 'default' for now
-// (single-number setups); multi-number tenants would map to_number -> tenant.
+// Public webhook — Meta calls these. Each message routes to the tenant that owns its
+// phone_number_id and must carry a valid X-Hub-Signature-256 for that tenant's app secret.
 app.get('/api/webhooks/whatsapp', async (req, res) => {
     const challenge = await verifyWebhook(req.query);
     if (challenge) return res.status(200).send(challenge);
@@ -2178,13 +2196,21 @@ app.get('/api/webhooks/whatsapp', async (req, res) => {
 });
 
 app.post('/api/webhooks/whatsapp', async (req, res) => {
-    // Always 200 quickly — Meta retries on non-2xx and we must not loop.
+    const messages = parseWebhookPayload(req.body);
+    let accepted;
+    try {
+        accepted = await waAuthenticateMessages(messages, req.rawBody, req.get('x-hub-signature-256'));
+    } catch (e) {
+        console.error('[whatsapp] webhook verification error:', e.message);
+        return res.sendStatus(500);
+    }
+    // Payloads with messages but none authentic are forged or misrouted. Status-only
+    // payloads (no messages) are acknowledged so Meta does not retry them.
+    if (messages.length > 0 && accepted.length === 0) return res.sendStatus(401);
+    // Acknowledge quickly — Meta retries on non-2xx and we must not loop.
     res.sendStatus(200);
     try {
-        const messages = parseWebhookPayload(req.body);
-        for (const msg of messages) {
-            // Route to the tenant that owns this WhatsApp number (falls back to 'default').
-            const tenantId = await waResolveTenant(msg.phoneNumberId);
+        for (const { tenantId, msg } of accepted) {
             const r = await handleIncomingMessage(tenantId, msg);
             if (r.isNewLead) console.log(`[whatsapp] New lead from ${msg.from} (${msg.profileName || 'unknown'}) → tenant ${tenantId}`);
         }
@@ -2274,6 +2300,17 @@ app.post('/api/integrations/:provider', authenticateToken, requireAdmin, async (
         const saved = await saveIntegration(req.tenantId, req.params.provider, { config, enabled }, req.user.id);
         res.json(saved);
     } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Tenant ingest key for public inbound URLs (lead capture, telephony webhooks).
+app.get('/api/ingest-key', authenticateToken, requireAdmin, async (req, res) => {
+    try { res.json({ key: await getIngestKey(req.tenantId) }); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/ingest-key/rotate', authenticateToken, requireAdmin, async (req, res) => {
+    try { res.json({ key: await rotateIngestKey(req.tenantId, req.user.id) }); }
+    catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ---- Email (SMTP, simulated when unconfigured) ----
@@ -2433,16 +2470,10 @@ app.post('/api/leads/:id/convert', authenticateToken, async (req, res) => {
 
 // --- Lead Ingestion Pipeline (public capture: webhook / web form) ---
 
-const INGEST_KEY = process.env.INGEST_KEY || '';
-
-app.post('/api/ingest/:source', async (req, res) => {
+app.post('/api/ingest/:source', resolveInboundTenant, async (req, res) => {
     try {
-        // Optional shared-secret gate (set INGEST_KEY in env to require ?key=)
-        if (INGEST_KEY && req.query.key !== INGEST_KEY) {
-            return res.status(401).json({ error: 'Invalid ingest key' });
-        }
         const source = req.params.source || 'webhook';
-        const tenantId = String(req.query.tenant || 'default');
+        const tenantId = req.tenantId;
         const useAI = req.query.ai === '1' || req.body?._ai === true;
         const dedupe = req.query.dedupe !== '0';
 
