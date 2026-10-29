@@ -48,13 +48,25 @@ export const api = {
 
   // --- AUTH ---
   async login(email: string, password: string): Promise<AuthSession> {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+    } catch {
+      throw new Error('Can’t reach the server. Check your internet connection and try again.');
+    }
 
-    if (!res.ok) throw new Error('Login failed');
+    if (!res.ok) {
+      // Say what actually went wrong instead of always blaming the password.
+      const body = await res.json().catch(() => null);
+      if (res.status === 401) throw new Error('That email or password is incorrect.');
+      if (res.status === 429) throw new Error('Too many sign-in attempts. Wait a minute and try again.');
+      if (res.status === 403 && body?.error) throw new Error(body.error);
+      throw new Error('The server isn’t responding right now. If it was idle, wait a minute and try again.');
+    }
 
     const data = await res.json();
     const session: AuthSession = { ...data, user: data.user };

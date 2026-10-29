@@ -24,7 +24,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
          const session = await api.login(email, password);
          onLogin(session);
       } catch (err) {
-         setError('That email or password is incorrect.');
+         setError(err instanceof Error && err.message ? err.message : 'Something went wrong. Please try again.');
          setShake(true);
          setTimeout(() => setShake(false), 500);
       } finally {
