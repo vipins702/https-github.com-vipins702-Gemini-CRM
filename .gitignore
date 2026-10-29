@@ -38,3 +38,6 @@ dist-ssr
 
 # Uploaded files
 server/uploads/
+
+# Local-only admin password file (written by npm run admin:reset-password)
+server/admin-password.txt
