@@ -29,7 +29,7 @@ export const Card: React.FC<CardProps> = ({
     glass: "glass-showcase",
     showcase: "glass-showcase",
     // Accent (blue job)
-    gradient: "rounded-2xl bg-[linear-gradient(135deg,#1E40AF_0%,#2563EB_55%,#3B82F6_100%)] text-white border-0 shadow-[var(--elev-3)]",
+    gradient: "rounded-2xl bg-[linear-gradient(135deg,#3730A3_0%,#4F46E5_55%,#6366F1_100%)] text-white border-0 shadow-[var(--elev-3)]",
   };
 
   return (

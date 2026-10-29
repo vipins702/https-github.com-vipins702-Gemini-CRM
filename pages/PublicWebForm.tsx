@@ -56,7 +56,7 @@ export const PublicWebForm: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-[#2563EB]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#4F46E5]" />
       </div>
     );
   }
@@ -86,7 +86,7 @@ export const PublicWebForm: React.FC = () => {
           <p className="text-slate-500 mb-8">Your response has been received. We'll be in touch shortly.</p>
           <button
             onClick={() => { setSuccess(false); setFormData({}); }}
-            className="px-6 py-2.5 bg-[#2563EB] text-white rounded-lg font-medium hover:bg-[#1D4ED8] transition-colors"
+            className="px-6 py-2.5 bg-[#4F46E5] text-white rounded-lg font-medium hover:bg-[#4338CA] transition-colors"
           >
             Submit Another
           </button>
@@ -103,14 +103,14 @@ export const PublicWebForm: React.FC = () => {
     );
   }
 
-  const btnColor = template.theme?.buttonColor || '#2563EB';
+  const btnColor = template.theme?.buttonColor || '#4F46E5';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4 font-sans">
       <div className="w-full max-w-xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#2563EB] text-white font-black text-lg mb-4 shadow-lg">F</div>
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#4F46E5] text-white font-black text-lg mb-4 shadow-lg">F</div>
           <h1 className="text-2xl font-extrabold text-slate-900">{template.title || campaignName}</h1>
           {template.description && <p className="text-slate-500 mt-2 text-sm">{template.description}</p>}
         </div>
@@ -132,14 +132,14 @@ export const PublicWebForm: React.FC = () => {
                     placeholder={field.placeholder}
                     value={formData[field.id] || ''}
                     onChange={e => handleChange(field, e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 outline-none transition-all resize-none"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20 outline-none transition-all resize-none"
                   />
                 ) : field.type === 'select' ? (
                   <select
                     required={field.required}
                     value={formData[field.id] || ''}
                     onChange={e => handleChange(field, e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 outline-none transition-all bg-white appearance-none"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20 outline-none transition-all bg-white appearance-none"
                   >
                     <option value="">Select an option...</option>
                     {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -151,7 +151,7 @@ export const PublicWebForm: React.FC = () => {
                       required={field.required}
                       checked={formData[field.id] === 'true'}
                       onChange={e => handleChange(field, String(e.target.checked))}
-                      className="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
+                      className="w-4 h-4 rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5]"
                     />
                     <span className="text-sm text-slate-600">{field.placeholder || field.label}</span>
                   </label>
@@ -162,7 +162,7 @@ export const PublicWebForm: React.FC = () => {
                     placeholder={field.placeholder}
                     value={formData[field.id] || ''}
                     onChange={e => handleChange(field, e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 outline-none transition-all"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20 outline-none transition-all"
                   />
                 )}
               </div>

@@ -195,7 +195,7 @@ const NotesDrawer: React.FC<{
             <button
               onClick={submit}
               disabled={saving || !text.trim()}
-              className="px-3 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] disabled:opacity-40 transition-colors self-end mb-0.5"
+              className="px-3 bg-[#4F46E5] text-white rounded-lg hover:bg-[#4338CA] disabled:opacity-40 transition-colors self-end mb-0.5"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
@@ -280,7 +280,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
       <div className="flex items-center justify-between mb-5 shrink-0">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><GitBranch className="w-[18px] h-[18px] text-[#2563EB]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><GitBranch className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
             {processName}
           </h1>
           <p className="text-ink-muted text-sm mt-1">Drag leads across stages — click 💬 to add notes. Configure stages in Process Builder.</p>
@@ -308,7 +308,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                 onDragOver={e => { e.preventDefault(); setOverStage(stage.name); }}
                 onDragLeave={() => setOverStage(s => s === stage.name ? null : s)}
                 onDrop={() => onDrop(stage.name)}
-                className={`flex flex-col w-72 shrink-0 rounded-2xl border transition-colors ${isOver ? 'border-[#2563EB] bg-[#2563EB]/[0.04]' : 'border-slate-200 bg-slate-50/60'}`}
+                className={`flex flex-col w-72 shrink-0 rounded-2xl border transition-colors ${isOver ? 'border-[#4F46E5] bg-[#4F46E5]/[0.04]' : 'border-slate-200 bg-slate-50/60'}`}
               >
                 <div className="px-3.5 py-3 flex items-center justify-between sticky top-0">
                   <div className="flex items-center gap-2 min-w-0">
@@ -316,7 +316,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                     <span className="font-heading font-bold text-sm text-ink truncate">{stage.name}</span>
                     <span className="text-xs text-ink-muted tnum">{items.length}</span>
                   </div>
-                  {sum > 0 && <span className="text-xs font-semibold text-[#047857] tnum">{formatCurrency(sum)}</span>}
+                  {sum > 0 && <span className="text-xs font-semibold text-[#0F766E] tnum">{formatCurrency(sum)}</span>}
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
@@ -334,7 +334,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                     >
                       <div className="flex items-start justify-between gap-1">
                         <p
-                          className="text-sm font-semibold text-ink leading-snug flex-1 min-w-0 cursor-pointer hover:text-[#2563EB] truncate"
+                          className="text-sm font-semibold text-ink leading-snug flex-1 min-w-0 cursor-pointer hover:text-[#4F46E5] truncate"
                           onClick={() => onNavigate?.('lead-360', { leadId: card.id })}
                         >
                           {card.name}
@@ -343,7 +343,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                           {savingId === card.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-ink-muted" />}
                           <button
                             onClick={e => { e.stopPropagation(); setNotesDrawer(card); }}
-                            className="p-1 text-slate-300 hover:text-[#2563EB] hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-1 text-slate-300 hover:text-[#4F46E5] hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100"
                             title="View / add notes"
                           >
                             <MessageSquare className="w-3.5 h-3.5" />
@@ -353,7 +353,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                       {card.company && <p className="text-xs text-ink-muted mt-0.5 truncate">{card.company}</p>}
                       <div className="flex items-center justify-between mt-2">
                         {card.value > 0
-                          ? <span className="text-sm font-bold text-[#047857] tnum">{formatCurrency(card.value)}</span>
+                          ? <span className="text-sm font-bold text-[#0F766E] tnum">{formatCurrency(card.value)}</span>
                           : <span />}
                         {card.source && <span className="text-[10px] text-ink-muted bg-slate-100 px-1.5 py-0.5 rounded">{card.source}</span>}
                       </div>

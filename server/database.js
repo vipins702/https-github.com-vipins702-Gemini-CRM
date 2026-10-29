@@ -1,6 +1,8 @@
 
 import { SQLiteAdapter } from './db/sqlite.js';
-// import { PostgresAdapter } from './db/postgres.js'; // Future
+import { PostgresAdapter } from './db/postgres.js';
+import bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
 
 const DB_TYPE = process.env.DB_TYPE || 'sqlite';
 
@@ -8,9 +10,10 @@ let dbInstance;
 
 if (DB_TYPE === 'sqlite') {
     dbInstance = new SQLiteAdapter();
+} else if (DB_TYPE === 'postgres') {
+    dbInstance = new PostgresAdapter();
 } else {
-    // dbInstance = new PostgresAdapter();
-    throw new Error('Postgres not implemented yet');
+    throw new Error(`Unsupported DB_TYPE: ${DB_TYPE}`);
 }
 
 export default dbInstance;
@@ -567,6 +570,79 @@ export async function initDB() {
         `);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_integrations_tenant ON integrations(tenant_id, provider)`);
 
+        // 27. Scoring Rules (auto-score leads based on field values)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS scoring_rules (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                field TEXT NOT NULL,
+                operator TEXT NOT NULL,
+                value TEXT,
+                points INTEGER NOT NULL DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+
+        // 28. Assignment Rules (route leads to users by conditions)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS assignment_rules (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                conditions TEXT NOT NULL DEFAULT '{}',
+                assign_to TEXT,
+                mode TEXT DEFAULT 'specific',
+                priority INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+
+        // 29. Assignment State (tracks round-robin position per tenant)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS assignment_state (
+                tenant_id TEXT PRIMARY KEY,
+                last_assigned_user_id TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // 30. Drip Sequences
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS sequences (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                entity_type TEXT NOT NULL DEFAULT 'lead',
+                steps TEXT NOT NULL DEFAULT '[]',
+                is_active INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+
+        // 31. Sequence Enrollments
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS sequence_enrollments (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                sequence_id TEXT NOT NULL,
+                record_id TEXT NOT NULL,
+                step_index INTEGER DEFAULT 0,
+                next_step_at DATETIME,
+                status TEXT DEFAULT 'active',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+                FOREIGN KEY (sequence_id) REFERENCES sequences(id)
+            )
+        `);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_seq_enrollments_due ON sequence_enrollments(status, next_step_at)`);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_seq_enrollments_record ON sequence_enrollments(tenant_id, record_id)`);
+
         // Indexes
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_attachments_record ON attachments(tenant_id, entity_type, record_id)`);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_email_messages_tenant_contact ON email_messages(tenant_id, contact_email, created_at)`);
@@ -643,6 +719,42 @@ export async function initDB() {
                 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
             `, 'default_workflow', 'default', 'Lead Nurturing Flow', 'lead', 'create', JSON.stringify(conditions), JSON.stringify(actions), JSON.stringify(flowData));
             console.log('Seeded default workflow');
+        }
+
+        // Seed initial admin user if no users exist
+        const adminUser = await dbInstance.get('SELECT * FROM users WHERE email = ?', 'admin@flowcrm.com');
+        if (!adminUser) {
+            const adminEmail = 'admin@flowcrm.com';
+            // Default to env variable or generate a random one securely
+            const password = process.env.ADMIN_PASSWORD || Math.random().toString(36).slice(-10) + 'A1!';
+            const hashedPassword = bcrypt.hashSync(password, 10);
+            
+            const newUser = {
+                id: uuidv4(),
+                tenant_id: 'default',
+                email: adminEmail,
+                password_hash: hashedPassword,
+                role: 'admin',
+                first_name: 'System',
+                last_name: 'Admin'
+            };
+            
+            // Note: Postgres adapter converts object to parameterized, but SQLite adapter doesn't natively do named params in .run except if handled. 
+            // Better to use positional parameters:
+            await dbInstance.run(
+                'INSERT INTO users (id, tenant_id, email, password_hash, role, first_name, last_name) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+                newUser.id, newUser.tenant_id, newUser.email, newUser.password_hash, newUser.role, newUser.first_name, newUser.last_name
+            );
+            
+            console.log('====================================================');
+            console.log(' SEEDED ADMIN USER');
+            console.log(` Email: ${adminEmail}`);
+            if (!process.env.ADMIN_PASSWORD) {
+                console.log(` Password: ${password}   <-- SAVE THIS!`);
+            } else {
+                console.log(` Password: [Loaded from ADMIN_PASSWORD env var]`);
+            }
+            console.log('====================================================');
         }
 
     } catch (err) {

@@ -103,7 +103,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({ template, onChange, en
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               tab === t
-                ? 'text-ink border-b-2 border-[#2563EB]'
+                ? 'text-ink border-b-2 border-[#4F46E5]'
                 : 'text-ink-muted hover:text-ink'
             }`}
           >
@@ -196,7 +196,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({ template, onChange, en
 
           {/* Field Editor */}
           {editingField && (
-            <Card title="Edit Field" className="border-2 border-[#2563EB]">
+            <Card title="Edit Field" className="border-2 border-[#4F46E5]">
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -329,7 +329,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({ template, onChange, en
               <button
                 type="button"
                 className="w-full py-2 rounded-lg font-medium text-white"
-                style={{ backgroundColor: template.theme?.buttonColor || '#2563EB' }}
+                style={{ backgroundColor: template.theme?.buttonColor || '#4F46E5' }}
                 disabled
               >
                 {template.theme?.buttonText || 'Submit'}

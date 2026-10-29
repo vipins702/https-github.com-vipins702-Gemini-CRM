@@ -38,7 +38,7 @@ const CreateTenantModal: React.FC<{ onClose: () => void; onCreated: (t: Tenant) 
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-[#1E40AF]"><Building2 className="w-5 h-5" /></span>
+            <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-[#3730A3]"><Building2 className="w-5 h-5" /></span>
             <h2 className="font-heading text-lg font-extrabold text-ink">New Tenant</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"><X className="w-5 h-5" /></button>
@@ -117,7 +117,7 @@ export const Platform: React.FC<Props> = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-3">
-            <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-[#1E40AF]"><Globe className="w-5 h-5" /></span>
+            <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-[#3730A3]"><Globe className="w-5 h-5" /></span>
             <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink">Platform Console</h1>
           </div>
           <p className="text-sm text-ink-muted mt-1 ml-12">Manage every tenant workspace on this CRM.</p>
@@ -186,7 +186,7 @@ export const Platform: React.FC<Props> = () => {
                         ) : (
                           <div className="flex items-center gap-2 group">
                             <span className="font-semibold text-ink truncate">{t.name}</span>
-                            <button onClick={() => { setEditId(t.id); setEditName(t.name); }} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-[#2563EB]"><Pencil className="w-3 h-3" /></button>
+                            <button onClick={() => { setEditId(t.id); setEditName(t.name); }} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-[#4F46E5]"><Pencil className="w-3 h-3" /></button>
                           </div>
                         )}
                         <div className="text-[11px] text-ink-muted font-mono truncate">{t.id}</div>

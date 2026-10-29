@@ -47,7 +47,7 @@ const DrillRow: React.FC<{
     </div>
     <div className="flex items-center gap-2 shrink-0">
       {badge && <Badge status={badge} />}
-      {meta && <span className="text-xs font-bold text-[#047857] tnum">{meta}</span>}
+      {meta && <span className="text-xs font-bold text-[#0F766E] tnum">{meta}</span>}
       {onClick && <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />}
     </div>
   </button>
@@ -193,9 +193,9 @@ export const Customer360: React.FC<Props> = ({ customerId, onBack, onNavigate })
   );
 
   const kpiChips = [
-    { label: 'LTV', value: formatCurrency(ltv), color: 'text-[#047857]', bg: 'bg-emerald-50', icon: DollarSign },
-    { label: 'Open Cases', value: openCasesCount, color: openCasesCount > 0 ? 'text-rose-600' : 'text-[#047857]', bg: openCasesCount > 0 ? 'bg-rose-50' : 'bg-emerald-50', icon: AlertCircle },
-    { label: 'Leads', value: relatedLeads.length, color: 'text-[#1E40AF]', bg: 'bg-blue-50', icon: Target },
+    { label: 'LTV', value: formatCurrency(ltv), color: 'text-[#0F766E]', bg: 'bg-emerald-50', icon: DollarSign },
+    { label: 'Open Cases', value: openCasesCount, color: openCasesCount > 0 ? 'text-rose-600' : 'text-[#0F766E]', bg: openCasesCount > 0 ? 'bg-rose-50' : 'bg-emerald-50', icon: AlertCircle },
+    { label: 'Leads', value: relatedLeads.length, color: 'text-[#3730A3]', bg: 'bg-blue-50', icon: Target },
     { label: 'Products', value: relatedProducts.length, color: 'text-[#7C3AED]', bg: 'bg-purple-50', icon: Package },
   ];
 
@@ -226,11 +226,11 @@ export const Customer360: React.FC<Props> = ({ customerId, onBack, onNavigate })
             <span className="tri-ring w-20 h-20">
               {customer.profileImage
                 ? <img src={customer.profileImage} className="w-full h-full object-cover rounded-full" alt={name} />
-                : <span className="flex items-center justify-center font-heading font-extrabold text-2xl text-[#1E40AF]">{initials}</span>
+                : <span className="flex items-center justify-center font-heading font-extrabold text-2xl text-[#3730A3]">{initials}</span>
               }
             </span>
           </div>
-          <label className="flex items-center gap-1 text-xs font-medium text-[#2563EB] hover:text-[#1E40AF] cursor-pointer transition-colors">
+          <label className="flex items-center gap-1 text-xs font-medium text-[#4F46E5] hover:text-[#3730A3] cursor-pointer transition-colors">
             <Camera className="w-3.5 h-3.5" />
             {customer.profileImage ? 'Change photo' : 'Add photo'}
             <input type="file" accept="image/*" className="sr-only" onChange={handleAvatarUpload} />
@@ -290,7 +290,7 @@ export const Customer360: React.FC<Props> = ({ customerId, onBack, onNavigate })
                   {ltv > 0 && (
                     <div className="mt-4 pt-4 border-t border-slate-100">
                       <div className="mono-label text-[10px] mb-1">Lifetime Value</div>
-                      <div className="font-heading text-2xl font-extrabold text-[#047857] tnum">{formatCurrency(ltv)}</div>
+                      <div className="font-heading text-2xl font-extrabold text-[#0F766E] tnum">{formatCurrency(ltv)}</div>
                     </div>
                   )}
                 </div>
@@ -396,14 +396,14 @@ export const Customer360: React.FC<Props> = ({ customerId, onBack, onNavigate })
                         <div className="text-xs text-ink-muted">Qty: {p.qty}</div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-sm font-bold text-[#047857] tnum">{formatCurrency(p.price * p.qty, p.currency)}</div>
+                        <div className="text-sm font-bold text-[#0F766E] tnum">{formatCurrency(p.price * p.qty, p.currency)}</div>
                         <div className="text-[10px] text-ink-muted tnum">@ {formatCurrency(p.price, p.currency)}/unit</div>
                       </div>
                     </div>
                   ))}
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-b-xl">
                     <span className="mono-label text-[10px]">Total Products Revenue</span>
-                    <span className="font-heading font-extrabold text-[#047857] tnum">
+                    <span className="font-heading font-extrabold text-[#0F766E] tnum">
                       {formatCurrency(relatedProducts.reduce((s, p) => s + p.price * p.qty, 0))}
                     </span>
                   </div>

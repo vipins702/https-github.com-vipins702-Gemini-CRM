@@ -55,7 +55,7 @@ export const Campaigns: React.FC = () => {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><Megaphone className="w-[18px] h-[18px] text-[#2563EB]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><Megaphone className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
             Campaigns
           </h1>
           <p className="text-ink-muted text-sm mt-1">Bulk outreach to a segment via Email or WhatsApp, with open tracking.</p>
@@ -94,7 +94,7 @@ export const Campaigns: React.FC = () => {
               {items.map(c => (
                 <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
-                    <button onClick={() => { setEditing(c); setView('edit'); }} className="text-sm font-semibold text-ink hover:text-[#2563EB]">{c.name}</button>
+                    <button onClick={() => { setEditing(c); setView('edit'); }} className="text-sm font-semibold text-ink hover:text-[#4F46E5]">{c.name}</button>
                     <div className="text-xs text-ink-muted">{c.entityType}</div>
                   </td>
                   <td className="px-4 py-3">
@@ -105,8 +105,8 @@ export const Campaigns: React.FC = () => {
                   <td className="px-4 py-3"><Badge status={c.status} /></td>
                   <td className="px-4 py-3 text-right text-sm tnum">{c.audienceCount || '—'}</td>
                   <td className="px-4 py-3 text-right text-sm tnum">{c.sentCount || '—'}{c.failedCount ? <span className="text-red-500"> /{c.failedCount}✗</span> : ''}</td>
-                  <td className="px-4 py-3 text-right text-sm tnum text-[#047857]">{c.channel === 'web_form' ? '—' : (c.openedCount || '—')}</td>
-                  <td className="px-4 py-3 text-right text-sm tnum text-[#2563EB]">{c.channel === 'web_form' ? (c.submissionCount || 0) : '—'}</td>
+                  <td className="px-4 py-3 text-right text-sm tnum text-[#0F766E]">{c.channel === 'web_form' ? '—' : (c.openedCount || '—')}</td>
+                  <td className="px-4 py-3 text-right text-sm tnum text-[#4F46E5]">{c.channel === 'web_form' ? (c.submissionCount || 0) : '—'}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       {c.status !== 'Sent' && <Button size="sm" icon={busy === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} onClick={() => send(c.id)} disabled={busy === c.id}>Send</Button>}
@@ -226,7 +226,7 @@ const Builder: React.FC<{
               </div>
             ))}
           </div>
-          <button onClick={addFilter} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#2563EB] hover:text-[#1E40AF]"><Plus className="w-4 h-4" /> Add filter</button>
+          <button onClick={addFilter} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#4F46E5] hover:text-[#3730A3]"><Plus className="w-4 h-4" /> Add filter</button>
         </div>
 
         {/* Web Form Builder */}

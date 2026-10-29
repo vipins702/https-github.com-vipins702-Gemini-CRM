@@ -20,12 +20,12 @@ import { api } from '../services/api';
 import { formatCurrency } from '../services/currency';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const TRI   = ['#2563EB', '#059669', '#EA7317', '#1E40AF', '#047857', '#C75D08'];
-const ACCENT = { blue: '#2563EB', green: '#059669', orange: '#EA7317' } as Record<string, string>;
-const ORB    = { blue: 'bg-[#2563EB]', green: 'bg-[#059669]', orange: 'bg-[#EA7317]' } as Record<string, string>;
-const ICON_BG = { blue: 'bg-[#2563EB]/12 text-[#1E40AF]', green: 'bg-[#059669]/12 text-[#047857]', orange: 'bg-[#EA7317]/14 text-[#C75D08]' } as Record<string, string>;
-const axisTick = { fill: '#6E7490', fontSize: 11, fontWeight: 500 };
-const tipStyle = { backgroundColor: '#101528', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '12px' } as React.CSSProperties;
+const TRI   = ['#4F46E5', '#0D9488', '#D97706', '#3730A3', '#0F766E', '#B45309'];
+const ACCENT = { blue: '#4F46E5', green: '#0D9488', orange: '#D97706' } as Record<string, string>;
+const ORB    = { blue: 'bg-[#4F46E5]', green: 'bg-[#0D9488]', orange: 'bg-[#D97706]' } as Record<string, string>;
+const ICON_BG = { blue: 'bg-[#4F46E5]/10 text-[#3730A3]', green: 'bg-[#0D9488]/10 text-[#0F766E]', orange: 'bg-[#D97706]/12 text-[#B45309]' } as Record<string, string>;
+const axisTick = { fill: '#64668A', fontSize: 11, fontWeight: 500 };
+const tipStyle = { backgroundColor: '#0C0F1D', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '12px' } as React.CSSProperties;
 
 const WIDTH_CYCLE: Array<WidgetConfig['width']> = ['third', 'half', 'full'];
 const WIDTH_LABEL: Record<string, string> = { third: '1/3', half: '1/2', full: 'Full' };
@@ -50,7 +50,7 @@ const KpiStrip: React.FC<{ ds: KpiDataset; title: string }> = ({ ds, title }) =>
           <div key={col.key} className="relative overflow-hidden">
             <div className={`absolute -right-4 -top-4 w-14 h-14 rounded-full blur-xl opacity-20 ${ORB[accent] || ORB.blue}`} />
             <p className="mono-label text-[10px]">{col.label}</p>
-            <p className={`font-heading text-xl font-extrabold tnum mt-1 ${accent === 'green' ? 'text-[#047857]' : accent === 'orange' ? 'text-[#C75D08]' : 'text-ink'}`}>
+            <p className={`font-heading text-xl font-extrabold tnum mt-1 ${accent === 'green' ? 'text-[#0F766E]' : accent === 'orange' ? 'text-[#B45309]' : 'text-ink'}`}>
               {fmtKpi(col.type, ds.row[col.key])}
             </p>
           </div>
@@ -73,7 +73,7 @@ const KpiStatCard: React.FC<{ col: KpiColumnMeta; value: any; trend?: string }> 
         </h3>
         {trend && (
           <div className="flex items-center gap-1.5 mt-3">
-            <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#047857] bg-[#059669]/10 ring-1 ring-inset ring-[#059669]/20 px-1.5 py-0.5 rounded-md">
+            <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#0F766E] bg-[#0D9488]/10 ring-1 ring-inset ring-[#0D9488]/20 px-1.5 py-0.5 rounded-md">
               <TrendingUp className="w-3.5 h-3.5" />{trend}
             </span>
             <span className="text-[11px] font-medium text-ink-muted">vs last month</span>
@@ -104,7 +104,7 @@ const TimeseriesTile: React.FC<{ ds: TimeseriesDataset; title: string }> = ({ ds
               </linearGradient>
             ))}
           </defs>
-          <CartesianGrid strokeDasharray="2 4" vertical={false} stroke="#cdd7e6" />
+          <CartesianGrid strokeDasharray="2 4" vertical={false} stroke="#DDDDE4" />
           <XAxis dataKey="period" axisLine={false} tickLine={false} tick={axisTick} />
           <YAxis axisLine={false} tickLine={false} tick={axisTick} />
           <Tooltip contentStyle={tipStyle} />
@@ -153,10 +153,10 @@ const AggregateTile: React.FC<{ ds: AggregateDataset; title: string }> = ({ ds, 
     <Card variant="showcase" title={title} className="h-full">
       <ResponsiveContainer width="100%" height={180}>
         <BarChart data={ds.rows}>
-          <CartesianGrid strokeDasharray="2 4" vertical={false} stroke="#cdd7e6" />
+          <CartesianGrid strokeDasharray="2 4" vertical={false} stroke="#DDDDE4" />
           <XAxis dataKey={nKey} axisLine={false} tickLine={false} tick={axisTick} />
           <YAxis axisLine={false} tickLine={false} tick={axisTick} />
-          <Tooltip formatter={(v: any) => fmt(v)} cursor={{ fill: 'rgba(37,99,235,0.06)' }} contentStyle={tipStyle} />
+          <Tooltip formatter={(v: any) => fmt(v)} cursor={{ fill: 'rgba(79,70,229,0.05)' }} contentStyle={tipStyle} />
           <Bar dataKey={vKey} fill={accent} radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive animationDuration={1100} />
         </BarChart>
       </ResponsiveContainer>
@@ -182,7 +182,7 @@ const TableTile: React.FC<{ ds: TableDataset; title: string }> = ({ ds, title })
                 {cols.map(c => (
                   <td key={c.key} className="px-3 py-2 text-xs text-ink truncate max-w-[160px]">
                     {c.type === 'status'   ? <Badge status={r[c.key]} /> :
-                     c.type === 'currency' ? <span className="text-[#047857] font-semibold tnum">{formatCurrency(r[c.key])}</span> :
+                     c.type === 'currency' ? <span className="text-[#0F766E] font-semibold tnum">{formatCurrency(r[c.key])}</span> :
                      c.type === 'date'     ? new Date(r[c.key]).toLocaleDateString() :
                      String(r[c.key] ?? '—')}
                   </td>
@@ -258,14 +258,14 @@ interface AddPanelProps {
 
 const TileOption: React.FC<{ title: string; desc: string; icon: React.ReactNode; added: boolean; onAdd: () => void }> = ({ title, desc, icon, added, onAdd }) => (
   <div className="flex items-start gap-3 p-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
-    <div className="shrink-0 mt-0.5 p-2 rounded-lg bg-[#2563EB]/10 text-[#1E40AF]">{icon}</div>
+    <div className="shrink-0 mt-0.5 p-2 rounded-lg bg-[#4F46E5]/10 text-[#3730A3]">{icon}</div>
     <div className="flex-1 min-w-0">
       <p className="text-sm font-semibold text-ink leading-snug">{title}</p>
       <p className="text-xs text-ink-muted mt-0.5 line-clamp-2">{desc}</p>
     </div>
     <button onClick={onAdd} disabled={added}
       className={`shrink-0 mt-0.5 h-7 w-7 flex items-center justify-center rounded-lg transition-colors ${
-        added ? 'bg-slate-100 text-slate-400 cursor-default' : 'bg-[#2563EB] text-white hover:bg-[#1E40AF]'
+        added ? 'bg-slate-100 text-slate-400 cursor-default' : 'bg-[#4F46E5] text-white hover:bg-[#3730A3]'
       }`}>
       {added ? '✓' : <Plus className="w-3.5 h-3.5" />}
     </button>
@@ -298,7 +298,7 @@ const AddPanel: React.FC<AddPanelProps> = ({ open, onClose, onAdd, packs, existi
                     return (
                       <div key={ds.id} className="p-3 rounded-xl bg-white border border-slate-200">
                         <p className="text-sm font-semibold text-ink mb-2 flex items-center gap-2">
-                          <Hash className="w-4 h-4 text-[#1E40AF]" /> {ds.label}
+                          <Hash className="w-4 h-4 text-[#3730A3]" /> {ds.label}
                         </p>
                         <div className="pl-6 space-y-1.5">
                           {/* full KPI strip */}
@@ -479,15 +479,15 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="p-6 lg:p-8 font-sans animate-in fade-in duration-500">
       {/* ── Hero ── */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-7 bg-[linear-gradient(110deg,#0b1220_0%,#10204a_55%,#0b1220_100%)] p-7 rounded-3xl text-white shadow-[0_18px_40px_-16px_rgba(30,50,120,0.45)] relative overflow-hidden panel-rise">
-        <div className="absolute right-0 top-0 w-72 h-72 bg-[#2563EB]/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -right-10 bottom-0 w-56 h-56 bg-[#3B82F6]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-7 bg-[linear-gradient(110deg,#0E0D13_0%,#1A1646_55%,#0E0D13_100%)] p-7 rounded-3xl text-white shadow-[0_18px_40px_-16px_rgba(55,48,163,0.40)] relative overflow-hidden panel-rise">
+        <div className="absolute right-0 top-0 w-72 h-72 bg-[#4F46E5]/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -right-10 bottom-0 w-56 h-56 bg-[#6366F1]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="z-10">
           <h1 className="font-heading text-3xl font-extrabold tracking-tight">
             {greeting()}, <span className="gradient-text">{userName}</span>
           </h1>
           <p className="text-slate-300 text-sm mt-1.5 flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-[#60A5FA]" />
+            <Calendar className="w-4 h-4 text-[#A5B4FC]" />
             {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
@@ -507,7 +507,7 @@ export const Dashboard: React.FC = () => {
 
       {/* ── Edit hint ── */}
       {isEditMode && (
-        <div className="flex items-center gap-3 mb-5 px-4 py-3 rounded-xl bg-[#2563EB]/8 border border-[#2563EB]/20 text-[#1E40AF] text-sm font-medium">
+        <div className="flex items-center gap-3 mb-5 px-4 py-3 rounded-xl bg-[#4F46E5]/8 border border-[#4F46E5]/20 text-[#3730A3] text-sm font-medium">
           <GripVertical className="w-4 h-4 shrink-0" />
           Drag to reorder · click size to cycle width · eye to hide · ✕ to remove
         </div>
@@ -520,7 +520,7 @@ export const Dashboard: React.FC = () => {
           const isOver     = dragOverId === widget.id && draggedId !== widget.id;
           return (
             <div key={widget.id}
-              className={`${colSpan(widget.width)} relative group transition-all duration-200 panel-rise stagger-${Math.min(i + 1, 6)} ${isDragging ? 'opacity-40 scale-[0.97]' : ''} ${isOver ? 'ring-2 ring-[#2563EB]/50 rounded-2xl' : ''}`}
+              className={`${colSpan(widget.width)} relative group transition-all duration-200 panel-rise stagger-${Math.min(i + 1, 6)} ${isDragging ? 'opacity-40 scale-[0.97]' : ''} ${isOver ? 'ring-2 ring-[#4F46E5]/50 rounded-2xl' : ''}`}
               draggable={isEditMode}
               onDragStart={() => onDragStart(widget.id)}
               onDragOver={e  => onDragOver(e, widget.id)}
@@ -530,7 +530,7 @@ export const Dashboard: React.FC = () => {
               {isEditMode && (
                 <div className="absolute -top-2.5 -right-2.5 z-20 flex items-center gap-0.5 bg-white shadow-md rounded-xl p-1 border border-slate-200 animate-in zoom-in duration-200">
                   <span className="cursor-grab p-1.5 text-slate-400"><GripVertical className="w-3.5 h-3.5" /></span>
-                  <button onClick={() => cycleWidth(widget.id)} className="px-1.5 py-1 text-[11px] font-bold text-slate-500 hover:text-[#1E40AF] rounded-lg" title="Cycle width">
+                  <button onClick={() => cycleWidth(widget.id)} className="px-1.5 py-1 text-[11px] font-bold text-slate-500 hover:text-[#3730A3] rounded-lg" title="Cycle width">
                     {WIDTH_LABEL[widget.width || 'third']}
                   </button>
                   <button onClick={() => toggleVis(widget.id)} className={`p-1.5 rounded-lg hover:bg-slate-50 ${!widget.visible ? 'text-red-400' : 'text-slate-400'}`}>

@@ -42,7 +42,7 @@ export function applySettings(settings: Partial<SystemSettings> | null | undefin
   const root = document.documentElement;
 
   // Brand color -> CSS variables (used by .btn-primary-brand and focus rings)
-  const palette = BRAND_PALETTES[settings?.primaryColor || 'blue'] || BRAND_PALETTES.blue;
+  const palette = BRAND_PALETTES[settings?.primaryColor || 'indigo'] || BRAND_PALETTES.indigo;
   root.style.setProperty('--brand-500', palette.c500);
   root.style.setProperty('--brand-600', palette.c600);
   root.style.setProperty('--brand-700', palette.c700);

@@ -123,10 +123,10 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
           <span className="tri-ring w-16 h-16">
             {lead.profileImage
               ? <img src={lead.profileImage} className="w-full h-full object-cover rounded-full" alt={name} />
-              : <span className="flex items-center justify-center font-heading font-extrabold text-xl text-[#1E40AF]">{initials}</span>
+              : <span className="flex items-center justify-center font-heading font-extrabold text-xl text-[#3730A3]">{initials}</span>
             }
           </span>
-          <label className="flex items-center gap-1 cursor-pointer text-[10px] text-[#2563EB] hover:underline font-medium">
+          <label className="flex items-center gap-1 cursor-pointer text-[10px] text-[#4F46E5] hover:underline font-medium">
             {uploadingAvatar ? <Loader2 className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
             {lead.profileImage ? 'Change photo' : 'Add photo'}
             <input type="file" accept="image/*" className="sr-only" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
@@ -178,15 +178,15 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
               {lead.value > 0 && (
                 <div className="pt-3.5 border-t border-slate-100">
                   <div className="mono-label text-[10px] mb-1">Deal Value</div>
-                  <div className="font-heading text-2xl font-extrabold text-[#047857] tnum">{formatCurrency(Number(lead.value))}</div>
+                  <div className="font-heading text-2xl font-extrabold text-[#0F766E] tnum">{formatCurrency(Number(lead.value))}</div>
                 </div>
               )}
               {score > 0 && (
                 <div className="pt-3.5 border-t border-slate-100">
                   <div className="mono-label text-[10px] mb-1.5 flex items-center gap-1"><Target className="w-3 h-3" /> Lead Score</div>
                   <div className="flex items-center gap-2">
-                    <div className="text-2xl font-extrabold text-[#1E40AF] tnum leading-none">{score}</div>
-                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-[#2563EB] rounded-full" style={{ width: `${Math.min(score, 100)}%` }} /></div>
+                    <div className="text-2xl font-extrabold text-[#3730A3] tnum leading-none">{score}</div>
+                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-[#4F46E5] rounded-full" style={{ width: `${Math.min(score, 100)}%` }} /></div>
                   </div>
                 </div>
               )}
@@ -234,7 +234,7 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
                       {activity.quotes.slice(0, 5).map(q => (
                         <button key={q.id} onClick={() => onNavigate?.('quotes', { recordId: q.id })} className="w-full flex items-center justify-between gap-2 p-2 rounded-lg hover:bg-slate-50 text-left">
                           <span className="text-xs font-semibold text-ink truncate">{q.quoteNumber}</span>
-                          <span className="flex items-center gap-2 shrink-0"><span className="text-xs font-bold text-[#047857] tnum">{formatCurrency(q.total, q.currency)}</span><Badge status={q.status} /></span>
+                          <span className="flex items-center gap-2 shrink-0"><span className="text-xs font-bold text-[#0F766E] tnum">{formatCurrency(q.total, q.currency)}</span><Badge status={q.status} /></span>
                         </button>
                       ))}
                     </div>

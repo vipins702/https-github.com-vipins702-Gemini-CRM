@@ -31,6 +31,10 @@ import { Quotes } from './pages/Quotes';
 import { Pipeline } from './pages/Pipeline';
 import { ProcessBuilder } from './pages/ProcessBuilder';
 import { Login } from './pages/Login';
+import { AuditLog } from './pages/AuditLog';
+import { ScoringRules } from './pages/ScoringRules';
+import { AssignmentRules } from './pages/AssignmentRules';
+import { Sequences } from './pages/Sequences';
 import { ViewState, WidgetConfig, EntityDefinition, EntityType, AuthSession } from './types';
 import { api } from './services/api';
 import { applySettings } from './services/theme';
@@ -202,6 +206,14 @@ const App: React.FC = () => {
         return <Platform onNavigate={handleNavigate} />;
       case 'settings':
         return <Settings />;
+      case 'audit-log':
+        return <AuditLog />;
+      case 'scoring-rules':
+        return <ScoringRules />;
+      case 'assignment-rules':
+        return <AssignmentRules />;
+      case 'sequences':
+        return <Sequences />;
       default:
         // Check if the current view matches an entity type
         if (schemas[currentView]) {

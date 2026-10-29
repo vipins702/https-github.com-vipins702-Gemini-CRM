@@ -55,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
     const IconComponent = (iconName && (Icons as any)[iconName]) || Icons.Circle;
     return (
       <IconComponent
-        className={`w-[18px] h-[18px] shrink-0 transition-colors duration-150 ${isActive ? 'text-[#1E40AF]' : 'text-slate-400 group-hover:text-slate-200'}`}
+        className={`w-[18px] h-[18px] shrink-0 transition-colors duration-150 ${isActive ? 'text-[#6366F1]' : 'text-[#8B8BA3] group-hover:text-slate-200'}`}
         strokeWidth={2}
         aria-hidden="true"
       />
@@ -82,7 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
       return (
         <div key={item.id} className="mt-6 first:mt-1">
           <div className="px-3 mb-1.5">
-            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.12em]">{item.label}</span>
+            <span className="text-[10px] font-semibold text-[#6B6B85] uppercase tracking-[0.12em]">{item.label}</span>
           </div>
           <div className="space-y-0.5">
             {visibleChildren.map(child => renderItem(child, depth + 1))}
@@ -99,7 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
         aria-current={isActive ? 'page' : undefined}
         className={`nav-pill group relative w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'justify-start px-3 gap-3'} h-9 text-[13.5px] font-medium ${isActive
           ? 'nav-pill-active'
-          : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-100'
+          : 'text-[#8B8BA3] hover:bg-white/[0.06] hover:text-slate-100'
           }`}
       >
         {renderIcon(item.icon, isActive)}
@@ -119,19 +119,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
   };
 
   return (
-    <aside className={`${isCollapsed ? 'w-[72px]' : 'w-64'} bg-slate-950 text-white flex flex-col h-screen fixed left-0 top-0 border-r border-slate-800/70 z-50 transition-[width] duration-300 ease-in-out`}>
+    <aside className={`${isCollapsed ? 'w-[72px]' : 'w-64'} bg-[#0E0D13] text-white flex flex-col h-screen fixed left-0 top-0 border-r border-[#1E1D2A] z-50 transition-[width] duration-300 ease-in-out`}>
       {/* Brand Header */}
-      <div className={`h-16 px-4 flex items-center shrink-0 border-b border-slate-800/70 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+      <div className={`h-16 px-4 flex items-center shrink-0 border-b border-[#1E1D2A] ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
         <div className="flex items-center gap-2.5 overflow-hidden">
           <div className="tri-ring-sq w-9 h-9 shrink-0">
             <div className="flex items-center justify-center">
-              <Icons.Hexagon className="w-[18px] h-[18px] text-[#2563EB]" strokeWidth={2.4} />
+              <Icons.Hexagon className="w-[18px] h-[18px] text-[#6366F1]" strokeWidth={2.4} />
             </div>
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
               <h1 className="font-heading text-[16px] font-extrabold tracking-tight gradient-text leading-tight">FlowCRM</h1>
-              <p className="mono-label !text-[9px] !text-slate-500 leading-tight">Enterprise</p>
+              <p className="mono-label !text-[9px] !text-[#5A5A72] leading-tight">Enterprise</p>
             </div>
           )}
         </div>
@@ -140,7 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
         <button
           onClick={onToggle}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className={`${isCollapsed ? 'absolute -right-3 top-5 bg-slate-800 ring-1 ring-slate-700 hover:bg-slate-700' : 'text-slate-500 hover:text-white hover:bg-white/5'} p-1.5 rounded-lg transition-colors z-50`}
+          className={`${isCollapsed ? 'absolute -right-3 top-5 bg-[#1E1D2A] ring-1 ring-[#2D2C3A] hover:bg-[#2D2C3A]' : 'text-[#5A5A72] hover:text-white hover:bg-white/5'} p-1.5 rounded-lg transition-colors z-50`}
         >
           {isCollapsed ? <Icons.ChevronRight className="w-4 h-4 text-white" /> : <Icons.ChevronLeft className="w-4 h-4" />}
         </button>
@@ -150,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
         {menuItems.map(item => renderItem(item))}
       </nav>
 
-      <div className="p-3 border-t border-slate-800/70 shrink-0">
+      <div className="p-3 border-t border-[#1E1D2A] shrink-0">
         {(() => {
           const isSuper = !!currentUser && (currentUser as any).isSuperadmin;
           if (!isSuper) return null;
@@ -159,9 +159,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
             <button
               onClick={() => onChangeView('platform')}
               aria-current={isActive ? 'page' : undefined}
-              className={`nav-pill group flex items-center ${isCollapsed ? 'justify-center' : 'justify-start gap-3 px-3'} h-9 w-full text-[13.5px] font-medium mb-1 ${isActive ? 'nav-pill-active' : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-100'}`}
+              className={`nav-pill group flex items-center ${isCollapsed ? 'justify-center' : 'justify-start gap-3 px-3'} h-9 w-full text-[13.5px] font-medium mb-1 ${isActive ? 'nav-pill-active' : 'text-[#8B8BA3] hover:bg-white/[0.06] hover:text-slate-100'}`}
             >
-              <Icons.Globe className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-[#1E40AF]' : 'text-slate-400 group-hover:text-slate-200'}`} strokeWidth={2} aria-hidden="true" />
+              <Icons.Globe className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-[#6366F1]' : 'text-[#8B8BA3] group-hover:text-slate-200'}`} strokeWidth={2} aria-hidden="true" />
               {!isCollapsed && <span>Platform</span>}
             </button>
           );
@@ -174,9 +174,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
             <button
               onClick={() => onChangeView('integrations')}
               aria-current={isActive ? 'page' : undefined}
-              className={`nav-pill group flex items-center ${isCollapsed ? 'justify-center' : 'justify-start gap-3 px-3'} h-9 w-full text-[13.5px] font-medium mb-1 ${isActive ? 'nav-pill-active' : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-100'}`}
+              className={`nav-pill group flex items-center ${isCollapsed ? 'justify-center' : 'justify-start gap-3 px-3'} h-9 w-full text-[13.5px] font-medium mb-1 ${isActive ? 'nav-pill-active' : 'text-[#8B8BA3] hover:bg-white/[0.06] hover:text-slate-100'}`}
             >
-              <Icons.Plug className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-[#1E40AF]' : 'text-slate-400 group-hover:text-slate-200'}`} strokeWidth={2} aria-hidden="true" />
+              <Icons.Plug className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-[#6366F1]' : 'text-[#8B8BA3] group-hover:text-slate-200'}`} strokeWidth={2} aria-hidden="true" />
               {!isCollapsed && <span>Integrations</span>}
             </button>
           );
@@ -188,9 +188,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
             <button
               onClick={() => onChangeView('settings')}
               aria-current={isSettings ? 'page' : undefined}
-              className={`nav-pill group flex items-center ${isCollapsed ? 'justify-center' : 'justify-start gap-3 px-3'} h-9 w-full text-[13.5px] font-medium ${isSettings ? 'nav-pill-active' : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-100'}`}
+              className={`nav-pill group flex items-center ${isCollapsed ? 'justify-center' : 'justify-start gap-3 px-3'} h-9 w-full text-[13.5px] font-medium ${isSettings ? 'nav-pill-active' : 'text-[#8B8BA3] hover:bg-white/[0.06] hover:text-slate-100'}`}
             >
-              <Icons.Settings className={`w-[18px] h-[18px] shrink-0 ${isSettings ? 'text-[#1E40AF]' : 'text-slate-400 group-hover:text-slate-200'}`} strokeWidth={2} aria-hidden="true" />
+              <Icons.Settings className={`w-[18px] h-[18px] shrink-0 ${isSettings ? 'text-[#6366F1]' : 'text-[#8B8BA3] group-hover:text-slate-200'}`} strokeWidth={2} aria-hidden="true" />
               {!isCollapsed && <span>Settings</span>}
             </button>
           );
@@ -201,9 +201,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
           return settingsButtonEl;
         })()}
 
-        <div className={`mt-2 pt-2 border-t border-slate-800/50 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-1'}`}>
+        <div className={`mt-2 pt-2 border-t border-[#1E1D2A]/80 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-1'}`}>
           <div className="relative shrink-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#059669] ring-2 ring-slate-950 absolute -bottom-0.5 -right-0.5 z-10"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#0D9488] ring-2 ring-[#0E0D13] absolute -bottom-0.5 -right-0.5 z-10"></span>
             <div className="tri-ring w-8 h-8">
               <div className="flex items-center justify-center text-xs font-semibold text-ink">
                 {currentUser ? currentUser.name.charAt(0).toUpperCase() : 'U'}
@@ -214,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
             <>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium truncate text-slate-200">{currentUser?.name || 'User'}</p>
-                <p className="text-[11px] text-slate-500 truncate">{currentUser?.email || 'user@flowcrm.com'}</p>
+                <p className="text-[11px] text-[#5A5A72] truncate">{currentUser?.email || 'user@flowcrm.com'}</p>
               </div>
               <button onClick={onLogout} aria-label="Sign out" className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-white/5 transition-colors">
                 <Icons.LogOut className="w-4 h-4" />

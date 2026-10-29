@@ -109,7 +109,7 @@ export const WhatsAppInbox: React.FC<Props> = ({ onNavigate }) => {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><MessageCircle className="w-[18px] h-[18px] text-[#2563EB]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><MessageCircle className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
             WhatsApp Inbox
           </h1>
           <p className="text-ink-muted text-sm mt-1">
@@ -141,17 +141,17 @@ export const WhatsAppInbox: React.FC<Props> = ({ onNavigate }) => {
                 key={c.phone}
                 onClick={() => setActivePhone(c.phone)}
                 className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all ${activePhone === c.phone
-                  ? 'bg-[#2563EB]/[0.06] border-[#2563EB]/30'
+                  ? 'bg-[#4F46E5]/[0.06] border-[#4F46E5]/30'
                   : 'bg-white border-transparent hover:border-slate-200 hover:bg-slate-50'}`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className={`text-sm font-semibold truncate ${activePhone === c.phone ? 'text-[#1E40AF]' : 'text-ink'}`}>
+                  <span className={`text-sm font-semibold truncate ${activePhone === c.phone ? 'text-[#3730A3]' : 'text-ink'}`}>
                     {c.profile_name || `+${c.phone}`}
                   </span>
                   <span className="text-[10px] text-ink-muted shrink-0 tnum">{fmtTime(c.last_at)}</span>
                 </div>
                 <p className="text-xs text-ink-muted truncate mt-0.5">
-                  {c.last_direction === 'outbound' && <span className="text-[#2563EB]">You: </span>}
+                  {c.last_direction === 'outbound' && <span className="text-[#4F46E5]">You: </span>}
                   {c.last_body}
                 </p>
               </button>
@@ -172,7 +172,7 @@ export const WhatsAppInbox: React.FC<Props> = ({ onNavigate }) => {
               {/* Thread header */}
               <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="tri-ring w-9 h-9 shrink-0"><span className="flex items-center justify-center font-heading font-bold text-sm text-[#1E40AF]">
+                  <span className="tri-ring w-9 h-9 shrink-0"><span className="flex items-center justify-center font-heading font-bold text-sm text-[#3730A3]">
                     {(activeConv?.profile_name || '#').charAt(0).toUpperCase()}
                   </span></span>
                   <div className="min-w-0">
@@ -194,7 +194,7 @@ export const WhatsAppInbox: React.FC<Props> = ({ onNavigate }) => {
                 ) : thread.map(m => (
                   <div key={m.id} className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[72%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed border ${m.direction === 'outbound'
-                      ? 'bg-[#2563EB] text-white border-transparent rounded-br-md'
+                      ? 'bg-[#4F46E5] text-white border-transparent rounded-br-md'
                       : 'bg-white text-ink border-slate-200 rounded-bl-md'}`}
                     >
                       <p className="whitespace-pre-wrap break-words">{m.body}</p>

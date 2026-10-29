@@ -6,7 +6,7 @@ import { useToast } from '../components/ui/Toast';
 import { api } from '../services/api';
 import { ProcessDefinition, ProcessStage } from '../types';
 
-const SWATCHES = ['#2563EB', '#059669', '#EA7317', '#DC2626', '#7C3AED', '#0891B2', '#6E7490', '#1E40AF'];
+const SWATCHES = ['#4F46E5', '#0D9488', '#D97706', '#DC2626', '#7C3AED', '#0891B2', '#6E7490', '#3730A3'];
 const TYPE_OPTS: ProcessStage['type'][] = ['open', 'won', 'lost'];
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
@@ -72,7 +72,7 @@ export const ProcessBuilder: React.FC = () => {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><Workflow className="w-[18px] h-[18px] text-[#2563EB]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><Workflow className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
             Process Builder
           </h1>
           <p className="text-ink-muted text-sm mt-1">Define the stages each record moves through. Drives the Pipeline board and reporting.</p>
@@ -118,8 +118,8 @@ export const ProcessBuilder: React.FC = () => {
                 <div key={s.id} className="bg-white border border-slate-200 rounded-xl">
                   <div className="grid grid-cols-12 gap-2 items-center p-2">
                     <div className="col-span-1 flex flex-col items-center text-slate-300">
-                      <button onClick={() => move(i, -1)} disabled={i === 0} className="hover:text-[#2563EB] disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => move(i, 1)} disabled={i === stages.length - 1} className="hover:text-[#2563EB] disabled:opacity-30"><ArrowDown className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => move(i, -1)} disabled={i === 0} className="hover:text-[#4F46E5] disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => move(i, 1)} disabled={i === stages.length - 1} className="hover:text-[#4F46E5] disabled:opacity-30"><ArrowDown className="w-3.5 h-3.5" /></button>
                     </div>
                     <input className="col-span-11 sm:col-span-4" value={s.name} onChange={e => setStage(i, { name: e.target.value })} placeholder="Stage name" />
                     <div className="col-span-7 sm:col-span-3 flex items-center gap-1">
@@ -132,9 +132,9 @@ export const ProcessBuilder: React.FC = () => {
                     <select className="col-span-4 sm:col-span-2 !text-sm" value={s.type} onChange={e => setStage(i, { type: e.target.value as ProcessStage['type'] })}>
                       {TYPE_OPTS.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
-                    <button className="col-span-1 flex justify-center text-slate-400 hover:text-[#2563EB]" onClick={() => setOpenStage(open ? -1 : i)} title="Rules & automations">
+                    <button className="col-span-1 flex justify-center text-slate-400 hover:text-[#4F46E5]" onClick={() => setOpenStage(open ? -1 : i)} title="Rules & automations">
                       {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                      {ruleCount > 0 && !open && <span className="text-[10px] font-bold text-[#2563EB]">{ruleCount}</span>}
+                      {ruleCount > 0 && !open && <span className="text-[10px] font-bold text-[#4F46E5]">{ruleCount}</span>}
                     </button>
                     <button className="col-span-1 text-slate-400 hover:text-red-500 flex justify-center" onClick={() => removeStage(i)} disabled={stages.length === 1}>
                       <Trash2 className="w-4 h-4" />
@@ -155,7 +155,7 @@ export const ProcessBuilder: React.FC = () => {
                       </div>
 
                       <label className="flex items-center gap-2 text-sm text-ink-soft cursor-pointer select-none">
-                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-[#2563EB]"
+                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-[#4F46E5]"
                           checked={!!s.requireNote} onChange={e => setStage(i, { requireNote: e.target.checked })} />
                         Require a note/reason when moving into this stage
                         <span className="text-[11px] text-ink-muted">(e.g. "Lost reason")</span>
@@ -188,9 +188,9 @@ export const ProcessBuilder: React.FC = () => {
                           ))}
                         </div>
                         <div className="flex gap-1.5 mt-2">
-                          <button onClick={() => addAction(i, 'create_task')} className="text-xs font-semibold text-[#2563EB] hover:text-[#1E40AF] flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Task</button>
-                          <button onClick={() => addAction(i, 'email')} className="text-xs font-semibold text-[#2563EB] hover:text-[#1E40AF] flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Email</button>
-                          <button onClick={() => addAction(i, 'webhook')} className="text-xs font-semibold text-[#2563EB] hover:text-[#1E40AF] flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Webhook</button>
+                          <button onClick={() => addAction(i, 'create_task')} className="text-xs font-semibold text-[#4F46E5] hover:text-[#3730A3] flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Task</button>
+                          <button onClick={() => addAction(i, 'email')} className="text-xs font-semibold text-[#4F46E5] hover:text-[#3730A3] flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Email</button>
+                          <button onClick={() => addAction(i, 'webhook')} className="text-xs font-semibold text-[#4F46E5] hover:text-[#3730A3] flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Webhook</button>
                         </div>
                       </div>
                     </div>
@@ -199,12 +199,12 @@ export const ProcessBuilder: React.FC = () => {
                 );
               })}
             </div>
-            <button onClick={addStage} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#2563EB] hover:text-[#1E40AF]">
+            <button onClick={addStage} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#4F46E5] hover:text-[#3730A3]">
               <Plus className="w-4 h-4" /> Add stage
             </button>
           </div>
 
-          <div className="flex items-start gap-2 px-3.5 py-3 rounded-xl bg-[#2563EB]/8 border border-[#2563EB]/20 text-[#1E40AF] text-xs">
+          <div className="flex items-start gap-2 px-3.5 py-3 rounded-xl bg-[#4F46E5]/8 border border-[#4F46E5]/20 text-[#3730A3] text-xs">
             <GripVertical className="w-4 h-4 shrink-0 mt-0.5" />
             <span><strong>Type</strong> drives semantics: <em>won</em> stages count as closed-won in reporting, <em>lost</em> as closed-lost, <em>open</em> as in-progress. Per-stage required fields & automations are coming next.</span>
           </div>

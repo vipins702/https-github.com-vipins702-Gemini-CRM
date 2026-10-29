@@ -18,7 +18,7 @@ import { sendEmail, getConversations as getEmailConversations, getThread as getE
 import { evaluateWorkflows } from './services/workflow.js';
 import { runLeadRule, runAllActiveRules, evaluateRealtimeLeadRules, startLeadRuleScheduler } from './services/leadgen.js';
 import { generateCustomerInsight, isAIEnabled, generateLeadFollowupTasks } from './services/ai.js';
-import { ingestLead } from './services/ingest.js';
+import { ingestLead, mapPayload } from './services/ingest.js';
 import { lookupByPhone, logCall, getRecentCalls, convertLeadToCustomer, handleInboundCall, routeInbound } from './services/cti.js';
 import { listReports, runReport, listPacks, runPack } from './services/reporting.js';
 import { reportCache } from './services/reportCache.js';
@@ -28,6 +28,10 @@ import { listQuotes, getQuote, saveQuote, setQuoteStatus, emailQuote, convertQuo
 import { getProcess, saveProcess, configurableEntities, findStage, missingForStage, runStageEntryActions } from './services/processes.js';
 import { getTree as getCategoryTree, saveTree as saveCategoryTree, ensureDefaultTree } from './services/categories.js';
 import { listCampaigns, getCampaign, saveCampaign as saveCampaignSvc, previewAudience, sendCampaign, trackOpen } from './services/campaigns.js';
+import { calculateLeadScore } from './services/scoring.js';
+import { assignLead } from './services/assignment.js';
+import { listSequences, getSequence, saveSequence, deleteSequence, enrollRecord, getEnrollments, unenrollRecord, startSequenceScheduler } from './services/sequences.js';
+import { createReadStream } from 'fs';
 
 const app = express();
 
@@ -290,33 +294,6 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
 
     try {
         const user = await db.get('SELECT * FROM users WHERE email = ?', email);
-
-        // For Dev/Demo: If user doesn't exist and it's admin, create it (Auto-Seed)
-        if (!user && email === 'admin@flowcrm.com') {
-            const hashedPassword = bcrypt.hashSync('Admin@123', 10);
-            const newUser = {
-                id: uuidv4(),
-                tenant_id: 'default',
-                email: 'admin@flowcrm.com',
-                password_hash: hashedPassword,
-                role: 'admin',
-                first_name: 'System',
-                last_name: 'Admin'
-            };
-            await db.run('INSERT INTO users (id, tenant_id, email, password_hash, role, first_name, last_name) VALUES (@id, @tenant_id, @email, @password_hash, @role, @first_name, @last_name)', newUser);
-
-            const token = jwt.sign({ id: newUser.id, email: newUser.email, role: newUser.role, tenantId: newUser.tenant_id }, JWT_SECRET, { expiresIn: '24h' });
-            return res.json({
-                token,
-                user: {
-                    id: newUser.id,
-                    email: newUser.email,
-                    role: newUser.role,
-                    name: newUser.first_name + ' ' + newUser.last_name,
-                    permissions: { admin: true }
-                }
-            });
-        }
 
         if (!user) {
             console.log('Login failed: User not found', email);
@@ -600,14 +577,146 @@ app.post('/api/web-presenter/execute-sql', authenticateToken, async (req, res) =
         return res.status(400).json({ error: 'Query contains forbidden keywords.' });
     }
 
+    // Security enhancement: ensure query always scopes to tenant
+    if (!cleanQuery.includes('tenant_id')) {
+        return res.status(400).json({ error: 'Query must include tenant_id filter for security.' });
+    }
+
     try {
-        // Inject tenantId automatically
-        const safeQuery = query.replace(/:tenantId/gi, `'${req.tenantId}'`);
-        const rows = await db.all(safeQuery);
+        // Use parameterized binding instead of string replacement for :tenantId
+        const paramMatches = query.match(/:tenantId/gi) || [];
+        const safeQuery = query.replace(/:tenantId/gi, '?');
+        const params = paramMatches.map(() => req.tenantId);
+
+        const rows = await db.all(safeQuery, ...params);
         res.json(rows);
     } catch (error) {
         console.error('Execute SQL error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+// --- Saved Reports & Analytics Engine ---
+
+app.get('/api/saved-reports', authenticateToken, async (req, res) => {
+    try {
+        const rows = await db.all('SELECT * FROM saved_reports WHERE tenant_id = ? ORDER BY created_at DESC', req.tenantId);
+        res.json(rows.map(r => ({
+            ...r,
+            columns: JSON.parse(r.columns || '[]'),
+            filters: JSON.parse(r.filters || '[]'),
+            groupBy: JSON.parse(r.group_by || '[]'),
+            sortBy: JSON.parse(r.sort_by || '[]')
+        })));
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch saved reports' });
+    }
+});
+
+app.post('/api/saved-reports', authenticateToken, async (req, res) => {
+    const { id, name, description, entityType, columns, filters, groupBy, sortBy, vizType } = req.body;
+    try {
+        const reportId = id || uuidv4();
+        await db.run(`
+            INSERT INTO saved_reports (id, tenant_id, name, description, entity_type, columns, filters, group_by, sort_by, viz_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name, description = excluded.description, entity_type = excluded.entity_type,
+                columns = excluded.columns, filters = excluded.filters, group_by = excluded.group_by,
+                sort_by = excluded.sort_by, viz_type = excluded.viz_type
+        `, reportId, req.tenantId, name, description || '', entityType, 
+           JSON.stringify(columns || []), JSON.stringify(filters || []), 
+           JSON.stringify(groupBy || []), JSON.stringify(sortBy || []), vizType || 'table');
+        res.json({ success: true, id: reportId });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to save report' });
+    }
+});
+
+app.delete('/api/saved-reports/:id', authenticateToken, async (req, res) => {
+    try {
+        await db.run('DELETE FROM saved_reports WHERE id = ? AND tenant_id = ?', req.params.id, req.tenantId);
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to delete report' });
+    }
+});
+
+app.post('/api/saved-reports/run', authenticateToken, async (req, res) => {
+    const { entityType, columns = [], filters = [], groupBy = [], sortBy = [] } = req.body;
+    
+    if (!entityType) return res.status(400).json({ error: 'Entity type is required' });
+
+    try {
+        let selectParts = [];
+        let groupByParts = [];
+        let params = [req.tenantId, entityType];
+        
+        let sql = `SELECT `;
+        const fromClause = ` FROM records WHERE tenant_id = ? AND entity_type = ?`;
+        
+        // 1. SELECT and GROUP BY Builder
+        if (groupBy.length > 0) {
+            // Group By mode
+            for (const g of groupBy) {
+                const path = db.buildJsonPath('data', g);
+                selectParts.push(`${path} AS "${g}"`);
+                groupByParts.push(`"${g}"`);
+            }
+            // Aggregations
+            let hasAgg = false;
+            for (const c of columns) {
+                if (c.aggregate) {
+                    const path = db.buildJsonPath('data', c.field);
+                    selectParts.push(`${c.aggregate.toUpperCase()}(${path}) AS "${c.field}"`);
+                    hasAgg = true;
+                }
+            }
+            if (!hasAgg) selectParts.push(`COUNT(id) as "count"`);
+            
+            sql += selectParts.join(', ') + fromClause;
+            sql += ` GROUP BY ` + groupByParts.join(', ');
+        } else {
+            // Raw mode
+            selectParts.push('id');
+            for (const c of columns) {
+                const path = db.buildJsonPath('data', c.field);
+                selectParts.push(`${path} AS "${c.field}"`);
+            }
+            if (selectParts.length === 1) selectParts.push('data'); // Fallback to raw JSON if no cols
+            sql += selectParts.join(', ') + fromClause;
+        }
+
+        // 2. Filter Builder
+        for (const f of filters) {
+            if (!f.field || !f.value) continue;
+            const path = db.buildJsonPath('data', f.field);
+            switch (f.op) {
+                case 'eq': sql += ` AND ${path} = ?`; params.push(f.value); break;
+                case 'neq': sql += ` AND ${path} != ?`; params.push(f.value); break;
+                case 'contains': sql += ` AND ${path} LIKE ?`; params.push('%' + f.value + '%'); break;
+                case 'gt': sql += ` AND CAST(${path} AS NUMERIC) > CAST(? AS NUMERIC)`; params.push(f.value); break;
+                case 'lt': sql += ` AND CAST(${path} AS NUMERIC) < CAST(? AS NUMERIC)`; params.push(f.value); break;
+            }
+        }
+
+        // 3. Sort Builder
+        if (sortBy.length > 0) {
+            const sorts = sortBy.map(s => `"${s.field}" ${s.dir.toUpperCase() === 'DESC' ? 'DESC' : 'ASC'}`);
+            sql += ` ORDER BY ` + sorts.join(', ');
+        } else {
+            if (groupBy.length === 0) sql += ` ORDER BY created_at DESC`;
+        }
+
+        sql += ` LIMIT 1000`; // Safety limit
+
+        const rows = await db.all(sql, ...params);
+        res.json({ rows, total: rows.length });
+    } catch (e) {
+        console.error('Report Run Error:', e);
+        res.status(500).json({ error: 'Failed to run report: ' + e.message });
     }
 });
 
@@ -768,10 +877,19 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
 
         } else {
             // Create
+            // Auto-score leads before insert
+            let finalData = { ...jsonData };
+            if (entityType === 'lead') {
+                try {
+                    const computedScore = await calculateLeadScore(finalData, req.tenantId);
+                    if (computedScore > 0) finalData.score = computedScore;
+                } catch (_) { /* non-fatal */ }
+            }
+
             await db.run(`
             INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data)
             VALUES (?, ?, ?, ?, ?, ?)
-        `, id, req.tenantId, entityType, primaryDisplay, status, JSON.stringify(jsonData));
+        `, id, req.tenantId, entityType, primaryDisplay, status, JSON.stringify(finalData));
 
             // Log Audit
             await logAudit({
@@ -780,15 +898,20 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
                 recordId: id,
                 action: 'create',
                 actorId,
-                details: jsonData
+                details: finalData
             });
+
+            // Auto-assign leads
+            if (entityType === 'lead') {
+                try { await assignLead(req.tenantId, id, finalData); } catch (_) { /* non-fatal */ }
+            }
 
             // Trigger Workflows (include the server-generated id so actions can target this record)
             await evaluateWorkflows({
                 tenantId: req.tenantId,
                 entityType,
                 triggerType: 'create',
-                record: { ...recordData, id },
+                record: { ...finalData, id },
                 actorId
             });
 
@@ -796,7 +919,7 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             await evaluateRealtimeLeadRules({
                 tenantId: req.tenantId,
                 entityType,
-                record: { ...recordData, id },
+                record: { ...finalData, id },
                 actorId
             });
         }
@@ -1656,7 +1779,8 @@ app.post('/api/users', authenticateToken, async (req, res) => {
             await db.run(updateQuery, ...params);
         } else {
             // Create
-            const hashedPassword = bcrypt.hashSync(password || 'Admin@123', 10);
+            const defaultPassword = Math.random().toString(36).slice(-10) + 'A1!';
+            const hashedPassword = bcrypt.hashSync(password || defaultPassword, 10);
             await db.run(`
                 INSERT INTO users (id, tenant_id, email, password_hash, role, is_active, first_name, last_name, must_change_password)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
@@ -3018,9 +3142,329 @@ app.put('/api/notifications/read-all', authenticateToken, async (req, res) => {
     }
 });
 
+// ═══════════════════════════════════════════════════════
+// CSV IMPORT ROUTES
+// ═══════════════════════════════════════════════════════
+
+// Download a CSV template dynamically built from entity field definitions
+app.get('/api/data/:entityType/import-template', authenticateToken, async (req, res) => {
+    const { entityType } = req.params;
+    try {
+        const defRow = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
+        if (!defRow) return res.status(404).json({ error: 'Entity not found' });
+        const def = JSON.parse(defRow.config);
+        const skipTypes = ['image', 'iframe', 'attachment'];
+        const fields = def.fields.filter(f => !skipTypes.includes(f.type));
+        const headers = fields.map(f => f.name).join(',');
+        const sampleRow1 = fields.map(f => {
+            if (f.type === 'email') return 'john.doe@example.com';
+            if (f.type === 'phone') return '9876543210';
+            if (f.type === 'number' || f.type === 'currency') return '0';
+            if (f.options && f.options.length) return f.options[0];
+            return `Sample ${f.label}`;
+        }).join(',');
+        const sampleRow2 = fields.map(f => {
+            if (f.type === 'email') return 'jane.smith@example.com';
+            if (f.type === 'phone') return '9123456789';
+            if (f.type === 'number' || f.type === 'currency') return '100';
+            if (f.options && f.options.length) return f.options[0];
+            return `Another ${f.label}`;
+        }).join(',');
+        const csv = [headers, sampleRow1, sampleRow2].join('\n');
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${entityType}_import_template.csv"`);
+        res.send(csv);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// CSV upload for bulk import
+const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+app.post('/api/data/:entityType/import', authenticateToken, csvUpload.single('file'), async (req, res) => {
+    const { entityType } = req.params;
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+        const content = req.file.buffer.toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const lines = content.split('\n').filter(l => l.trim());
+        if (lines.length < 2) return res.status(400).json({ error: 'CSV must have at least a header row and one data row' });
+
+        const columnMap = req.body.columnMap ? JSON.parse(req.body.columnMap) : null;
+        const rawHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+
+        // Get entity definition for field types
+        const defRow = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
+        const def = defRow ? JSON.parse(defRow.config) : { fields: [] };
+
+        let imported = 0, skipped = 0;
+        const errors = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+            if (!line.trim()) continue;
+            // Simple CSV parse (handles quoted fields)
+            const values = [];
+            let cur = '', inQuote = false;
+            for (const ch of line) {
+                if (ch === '"') { inQuote = !inQuote; }
+                else if (ch === ',' && !inQuote) { values.push(cur.trim()); cur = ''; }
+                else { cur += ch; }
+            }
+            values.push(cur.trim());
+
+            // Build raw row object from CSV headers
+            const raw = {};
+            rawHeaders.forEach((h, idx) => {
+                const targetField = columnMap ? (columnMap[h] || h) : h;
+                raw[targetField] = values[idx] !== undefined ? values[idx] : '';
+            });
+
+            // Map aliases (for leads)
+            const mapped = entityType === 'lead' ? mapPayload(raw) : raw;
+
+            // Dedupe for leads: by email
+            if (entityType === 'lead' && mapped.email) {
+                const existEmail = await db.get(
+                    `SELECT id FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND json_extract(data, '$.email') = ?`,
+                    req.tenantId, mapped.email
+                );
+                if (existEmail) { skipped++; continue; }
+            }
+
+            // Dedupe for leads: by phone
+            if (entityType === 'lead' && (mapped.phone || mapped.mobile)) {
+                const phone = mapped.phone || mapped.mobile;
+                const existPhone = await db.get(
+                    `SELECT id FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND json_extract(data, '$.phone') = ?`,
+                    req.tenantId, phone
+                );
+                if (existPhone) { skipped++; continue; }
+            }
+
+            try {
+                const recordId = uuidv4();
+                const primaryDisplay = mapped.name ||
+                    [mapped.firstName, mapped.lastName].filter(Boolean).join(' ') ||
+                    mapped.email || mapped.company || 'Imported Record';
+                const status = mapped.status || 'New';
+
+                // Auto-score leads
+                if (entityType === 'lead') {
+                    try {
+                        const score = await calculateLeadScore(mapped, req.tenantId);
+                        if (score > 0) mapped.score = score;
+                    } catch (_) {}
+                }
+
+                mapped._imported_via = 'csv';
+                mapped._imported_at = new Date().toISOString();
+
+                await db.run(
+                    'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)',
+                    recordId, req.tenantId, entityType, primaryDisplay, status, JSON.stringify(mapped)
+                );
+
+                await logAudit({ tenantId: req.tenantId, entityType, recordId, action: 'create', actorId: req.user.id, details: { ...mapped, _via: 'csv_import' } });
+
+                // Auto-assign leads
+                if (entityType === 'lead') {
+                    try { await assignLead(req.tenantId, recordId, mapped); } catch (_) {}
+                }
+
+                imported++;
+            } catch (e) {
+                errors.push({ row: i, error: e.message });
+            }
+        }
+
+        reportCache.invalidateTenant(req.tenantId);
+        res.json({ success: true, imported, skipped, errors, total: lines.length - 1 });
+    } catch (err) {
+        console.error('[import]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════
+// DUPLICATE CHECK
+// ═══════════════════════════════════════════════════════
+
+app.get('/api/leads/check-duplicate', authenticateToken, async (req, res) => {
+    const { phone, email } = req.query;
+    try {
+        if (phone) {
+            const suffix = String(phone).replace(/\D/g, '').slice(-10);
+            const leads = await db.all(`SELECT id, primary_display, data FROM records WHERE tenant_id = ? AND entity_type = 'lead'`, req.tenantId);
+            for (const r of leads) {
+                const d = JSON.parse(r.data || '{}');
+                const p = String(d.phone || d.mobile || '').replace(/\D/g, '').slice(-10);
+                if (p && p === suffix) return res.json({ duplicate: true, type: 'lead', id: r.id, name: r.primary_display });
+            }
+            const customers = await db.all(`SELECT id, primary_display, data FROM records WHERE tenant_id = ? AND entity_type = 'customer'`, req.tenantId);
+            for (const r of customers) {
+                const d = JSON.parse(r.data || '{}');
+                const p = String(d.phone || d.mobile || '').replace(/\D/g, '').slice(-10);
+                if (p && p === suffix) return res.json({ duplicate: true, type: 'customer', id: r.id, name: r.primary_display });
+            }
+        }
+        if (email) {
+            const emailLower = email.toLowerCase();
+            const lead = await db.get(`SELECT id, primary_display FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND json_extract(data,'$.email') = ?`, req.tenantId, emailLower);
+            if (lead) return res.json({ duplicate: true, type: 'lead', id: lead.id, name: lead.primary_display });
+        }
+        res.json({ duplicate: false });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════
+// AUDIT LOG VIEWER
+// ═══════════════════════════════════════════════════════
+
+app.get('/api/audit-logs', authenticateToken, async (req, res) => {
+    const { entityType, action, userId, from, to, page = 1, pageSize = 50 } = req.query;
+    try {
+        let sql = `SELECT al.*, u.email as actor_email, u.first_name as actor_first, u.last_name as actor_last
+                   FROM audit_logs al
+                   LEFT JOIN users u ON u.id = al.actor_id
+                   WHERE al.tenant_id = ?`;
+        const params = [req.tenantId];
+        if (entityType) { sql += ` AND al.entity_type = ?`; params.push(entityType); }
+        if (action) { sql += ` AND al.action = ?`; params.push(action); }
+        if (userId) { sql += ` AND al.actor_id = ?`; params.push(userId); }
+        if (from) { sql += ` AND al.created_at >= ?`; params.push(from); }
+        if (to) { sql += ` AND al.created_at <= ?`; params.push(to); }
+        sql += ` ORDER BY al.created_at DESC`;
+        const offset = (Number(page) - 1) * Number(pageSize);
+        sql += ` LIMIT ? OFFSET ?`;
+        params.push(Number(pageSize), offset);
+        const rows = await db.all(sql, ...params);
+        const countRow = await db.get(`SELECT COUNT(*) as total FROM audit_logs WHERE tenant_id = ?`, req.tenantId);
+        res.json({ rows: rows.map(r => ({ ...r, details: (() => { try { return JSON.parse(r.details); } catch { return r.details; } })() })), total: countRow.total });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════
+// SCORING RULES
+// ═══════════════════════════════════════════════════════
+
+app.get('/api/scoring-rules', authenticateToken, async (req, res) => {
+    try {
+        const rows = await db.all('SELECT * FROM scoring_rules WHERE tenant_id = ? ORDER BY created_at ASC', req.tenantId);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/scoring-rules', authenticateToken, async (req, res) => {
+    const { id, name, field, operator, value, points, is_active } = req.body;
+    try {
+        const ruleId = id || uuidv4();
+        await db.run(
+            `INSERT INTO scoring_rules (id, tenant_id, name, field, operator, value, points, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET name=excluded.name, field=excluded.field, operator=excluded.operator,
+             value=excluded.value, points=excluded.points, is_active=excluded.is_active`,
+            ruleId, req.tenantId, name, field, operator, value ?? null, Number(points) || 0, is_active !== false ? 1 : 0
+        );
+        res.json({ success: true, id: ruleId });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/scoring-rules/:id', authenticateToken, async (req, res) => {
+    try {
+        await db.run('DELETE FROM scoring_rules WHERE id = ? AND tenant_id = ?', req.params.id, req.tenantId);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ═══════════════════════════════════════════════════════
+// ASSIGNMENT RULES
+// ═══════════════════════════════════════════════════════
+
+app.get('/api/assignment-rules', authenticateToken, async (req, res) => {
+    try {
+        const rows = await db.all('SELECT * FROM assignment_rules WHERE tenant_id = ? ORDER BY priority DESC, created_at ASC', req.tenantId);
+        res.json(rows.map(r => ({ ...r, conditions: (() => { try { return JSON.parse(r.conditions); } catch { return {}; } })() })));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/assignment-rules', authenticateToken, async (req, res) => {
+    const { id, name, conditions, assign_to, mode, priority, is_active } = req.body;
+    try {
+        const ruleId = id || uuidv4();
+        await db.run(
+            `INSERT INTO assignment_rules (id, tenant_id, name, conditions, assign_to, mode, priority, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET name=excluded.name, conditions=excluded.conditions,
+             assign_to=excluded.assign_to, mode=excluded.mode, priority=excluded.priority, is_active=excluded.is_active`,
+            ruleId, req.tenantId, name, JSON.stringify(conditions || {}),
+            assign_to || null, mode || 'specific', Number(priority) || 0, is_active !== false ? 1 : 0
+        );
+        res.json({ success: true, id: ruleId });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/assignment-rules/:id', authenticateToken, async (req, res) => {
+    try {
+        await db.run('DELETE FROM assignment_rules WHERE id = ? AND tenant_id = ?', req.params.id, req.tenantId);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ═══════════════════════════════════════════════════════
+// DRIP SEQUENCES
+// ═══════════════════════════════════════════════════════
+
+app.get('/api/sequences', authenticateToken, async (req, res) => {
+    try { res.json(await listSequences(req.tenantId)); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/sequences/:id', authenticateToken, async (req, res) => {
+    try {
+        const seq = await getSequence(req.tenantId, req.params.id);
+        if (!seq) return res.status(404).json({ error: 'Sequence not found' });
+        res.json(seq);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/sequences', authenticateToken, async (req, res) => {
+    try { res.json(await saveSequence(req.tenantId, req.body)); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/sequences/:id', authenticateToken, async (req, res) => {
+    try { res.json(await deleteSequence(req.tenantId, req.params.id)); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/sequences/:id/enroll', authenticateToken, async (req, res) => {
+    const { recordId } = req.body;
+    if (!recordId) return res.status(400).json({ error: 'recordId is required' });
+    try { res.json(await enrollRecord(req.tenantId, req.params.id, recordId, req.user.id)); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/sequences/enrollments/:recordId', authenticateToken, async (req, res) => {
+    try { res.json(await getEnrollments(req.tenantId, req.params.recordId)); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/sequences/enrollments/:enrollmentId/cancel', authenticateToken, async (req, res) => {
+    try { res.json(await unenrollRecord(req.tenantId, req.params.enrollmentId)); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ═══════════════════════════════════════════════════════
+// SERVER START
+// ═══════════════════════════════════════════════════════
+
 const server = app.listen(PORT, () => {
     console.log(`FlowCRM Backend running on http://localhost:${PORT}`);
     startLeadRuleScheduler();
+    startSequenceScheduler();
 });
 
 server.on('error', (err) => {

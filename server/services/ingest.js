@@ -29,7 +29,7 @@ function pick(obj, keys) {
     return undefined;
 }
 
-function mapPayload(payload) {
+export function mapPayload(payload) {
     const mapped = {};
     for (const [field, aliases] of Object.entries(ALIASES)) {
         const v = pick(payload, aliases);

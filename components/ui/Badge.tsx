@@ -26,11 +26,11 @@ const jobOf = (status: string): Job => {
 };
 
 const dotColor: Record<Job, string> = {
-  blue: 'bg-[#2563EB]',
-  green: 'bg-[#059669]',
-  orange: 'bg-[#EA7317]',
+  blue: 'bg-[#4F46E5]',
+  green: 'bg-[#0D9488]',
+  orange: 'bg-[#D97706]',
   red: 'bg-[#DC2626]',
-  neutral: 'bg-[#6E7490]',
+  neutral: 'bg-[#64668A]',
 };
 
 export const Badge: React.FC<BadgeProps> = ({ status, variant = 'default', size = 'sm' }) => {

@@ -230,7 +230,7 @@ export interface FlowNodeData {
 export type FlowNode = Node<FlowNodeData>;
 export type FlowEdge = Edge;
 
-export type ViewState = 'dashboard' | 'autoflow' | 'layout' | 'settings' | 'web-presenter' | 'users' | 'object-manager' | 'campaigns' | 'menu-manager' | 'lookups' | 'customer-360' | 'lead-rules' | 'lead-capture' | 'agent-console' | 'reports' | 'whatsapp' | 'email-inbox' | 'calendar' | 'quotes' | 'pipeline' | 'processes' | 'lead-360' | 'categories' | 'integrations' | 'platform' | EntityType;
+export type ViewState = 'dashboard' | 'autoflow' | 'layout' | 'settings' | 'web-presenter' | 'users' | 'object-manager' | 'campaigns' | 'menu-manager' | 'lookups' | 'customer-360' | 'lead-rules' | 'lead-capture' | 'agent-console' | 'reports' | 'whatsapp' | 'email-inbox' | 'calendar' | 'quotes' | 'pipeline' | 'processes' | 'lead-360' | 'categories' | 'integrations' | 'platform' | 'audit-log' | 'scoring-rules' | 'assignment-rules' | 'sequences' | EntityType;
 
 // --- Integrations (per-tenant credentials) ---
 export interface IntegrationConfig {

@@ -18,11 +18,11 @@ module.exports = {
             },
             colors: {
                 brand: {
-                    blue: '#2563EB', bluedeep: '#1E40AF',
-                    green: '#059669', greendeep: '#047857',
-                    orange: '#EA7317', orangedeep: '#C75D08',
+                    blue: '#4F46E5', bluedeep: '#3730A3',
+                    green: '#0D9488', greendeep: '#0F766E',
+                    orange: '#D97706', orangedeep: '#B45309',
                 },
-                ink: { DEFAULT: '#101528', soft: '#3B415A', muted: '#6E7490' },
+                ink: { DEFAULT: '#0C0F1D', soft: '#2E3347', muted: '#64668A' },
             },
         },
     },

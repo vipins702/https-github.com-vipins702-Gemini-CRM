@@ -2,6 +2,9 @@ import db from '../database.js';
 import { sendEmail } from './email.js';
 import { logAudit } from './audit.js';
 import { v4 as uuidv4 } from 'uuid';
+import { calculateLeadScore } from './scoring.js';
+import { assignLead } from './assignment.js';
+import { evaluateRealtimeLeadRules } from './leadgen.js';
 
 /**
  * Workflow / Journey execution engine.
@@ -73,7 +76,11 @@ function interpolateFields(fields, record) {
     return out;
 }
 
-export async function evaluateWorkflows({ tenantId, entityType, triggerType, record, actorId }) {
+export async function evaluateWorkflows({ tenantId, entityType, triggerType, record, actorId, depth = 0 }) {
+    if (depth > 5) {
+        console.warn(`[workflow] Recursion guard triggered at depth ${depth}`);
+        return;
+    }
     try {
         const workflows = await db.all(
             `SELECT * FROM workflows
@@ -90,7 +97,7 @@ export async function evaluateWorkflows({ tenantId, entityType, triggerType, rec
             console.log(`[workflow] Executing "${wf.name}" (${actions.length} action(s))`);
             for (const action of actions) {
                 try {
-                    await runAction(action, { tenantId, entityType, record, actorId: actorId || 'system', workflowName: wf.name });
+                    await runAction(action, { tenantId, entityType, record, actorId: actorId || 'system', workflowName: wf.name, depth });
                 } catch (err) {
                     console.error(`[workflow] Action "${action.type}" failed:`, err.message);
                 }
@@ -157,6 +164,13 @@ async function runUpdateRecord(action, ctx) {
         details: { ...applied, _via: 'workflow', _rule: ctx.workflowName },
     });
     console.log(`[workflow] update_record applied to ${entityType}:${record.id}`);
+
+    // Cascade update triggers
+    const cascadedRecord = { ...merged, id: record.id };
+    await evaluateWorkflows({
+        tenantId, entityType, triggerType: 'update', record: cascadedRecord,
+        actorId, depth: (ctx.depth || 0) + 1
+    });
 }
 
 async function runCreateRecord(targetEntity, action, ctx) {
@@ -199,4 +213,26 @@ async function runCreateRecord(targetEntity, action, ctx) {
         details: { ...fields },
     });
     console.log(`[workflow] create ${targetEntity}:${id} ("${primaryDisplay}")`);
+
+    // Cascade creation triggers
+    try {
+        if (targetEntity === 'lead') {
+            const computedScore = await calculateLeadScore(fields, tenantId);
+            if (computedScore > 0) {
+                fields.score = computedScore;
+                await db.run('UPDATE records SET data = ? WHERE id = ? AND tenant_id = ?', JSON.stringify(fields), id, tenantId);
+            }
+            await assignLead(tenantId, id, fields);
+        }
+        await evaluateWorkflows({
+            tenantId, entityType: targetEntity, triggerType: 'create',
+            record: { ...fields, id }, actorId, depth: (ctx.depth || 0) + 1
+        });
+        await evaluateRealtimeLeadRules({
+            tenantId, entityType: targetEntity, record: { ...fields, id },
+            actorId, depth: (ctx.depth || 0) + 1
+        });
+    } catch (err) {
+        console.error(`[workflow] Cascade failed after record creation:`, err.message);
+    }
 }

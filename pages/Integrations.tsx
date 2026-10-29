@@ -134,7 +134,7 @@ const ProviderCard: React.FC<{ data: IntegrationConfig; onSaved: (c: Integration
           <button
             type="button"
             onClick={() => { setEnabled(e => !e); setDirty(true); }}
-            className={`relative w-10 h-5 rounded-full transition-colors ${enabled ? 'bg-[#2563EB]' : 'bg-slate-300'}`}
+            className={`relative w-10 h-5 rounded-full transition-colors ${enabled ? 'bg-[#4F46E5]' : 'bg-slate-300'}`}
           >
             <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : ''}`} />
           </button>
@@ -228,7 +228,7 @@ export const Integrations: React.FC<Props> = () => {
   return (
     <div className="p-6 lg:p-8 font-sans animate-in fade-in duration-300 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-1">
-        <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-[#1E40AF]"><Plug className="w-5 h-5" /></span>
+        <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-[#3730A3]"><Plug className="w-5 h-5" /></span>
         <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink">Integrations</h1>
       </div>
       <p className="text-sm text-ink-muted mb-6 ml-12">

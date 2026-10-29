@@ -36,6 +36,19 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
    const [errors, setErrors] = useState<Record<string, string>>({});
    const { addToast } = useToast();
 
+   // Import state
+   const [showImportModal, setShowImportModal] = useState(false);
+   const [importFile, setImportFile] = useState<File | null>(null);
+   const [importPreview, setImportPreview] = useState<string[][]>([]);
+   const [importHeaders, setImportHeaders] = useState<string[]>([]);
+   const [importColMap, setImportColMap] = useState<Record<string, string>>({});
+   const [importing, setImporting] = useState(false);
+   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: any[] } | null>(null);
+   const [importStep, setImportStep] = useState<'upload' | 'map' | 'done'>('upload');
+
+   // Duplicate check
+   const [dupWarning, setDupWarning] = useState<{ type: string; name: string; id: string } | null>(null);
+
    // Lookup values state - keyed by lookupId
    const [lookupValues, setLookupValues] = useState<Record<string, { value_id: string; value: string }[]>>({});
 
@@ -200,6 +213,72 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
       }
    };
 
+   const handlePhoneBlur = async (phone: string) => {
+      if (!phone || entityType !== 'lead') { setDupWarning(null); return; }
+      try {
+         const session = localStorage.getItem('flowcrm_session');
+         const token = session ? JSON.parse(session).token : '';
+         const res = await fetch(`/api/leads/check-duplicate?phone=${encodeURIComponent(phone)}`, {
+            headers: { Authorization: `Bearer ${token}` }
+         });
+         const data = await res.json();
+         if (data.duplicate && data.id !== selectedRecord?.id) {
+            setDupWarning({ type: data.type, name: data.name, id: data.id });
+         } else {
+            setDupWarning(null);
+         }
+      } catch { setDupWarning(null); }
+   };
+
+   const handleImportFileSelect = (file: File) => {
+      setImportFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+         const text = (e.target?.result as string) || '';
+         const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
+         if (lines.length < 1) return;
+         const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+         const preview = lines.slice(1, 6).map(l => l.split(',').map(v => v.trim().replace(/^"|"$/g, '')));
+         setImportHeaders(headers);
+         setImportPreview(preview);
+         // Auto-map columns with exact or alias matches
+         const defaultMap: Record<string, string> = {};
+         headers.forEach(h => { defaultMap[h] = h; });
+         setImportColMap(defaultMap);
+         setImportStep('map');
+      };
+      reader.readAsText(file);
+   };
+
+   const handleImport = async () => {
+      if (!importFile) return;
+      setImporting(true);
+      try {
+         const session = localStorage.getItem('flowcrm_session');
+         const token = session ? JSON.parse(session).token : '';
+         const form = new FormData();
+         form.append('file', importFile);
+         form.append('columnMap', JSON.stringify(importColMap));
+         const res = await fetch(`/api/data/${entityType}/import`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: form,
+         });
+         const result = await res.json();
+         setImportResult(result);
+         setImportStep('done');
+         if (result.imported > 0) {
+            // Reload data
+            const newData = await api.getRecords(entityType);
+            setData(newData);
+         }
+      } catch (e: any) {
+         addToast('Import failed: ' + e.message, 'error');
+      } finally {
+         setImporting(false);
+      }
+   };
+
    const updateRecordField = (field: string, value: any) => {
       if (!selectedRecord) return;
       setSelectedRecord({ ...selectedRecord, [field]: value });
@@ -236,6 +315,12 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
          return <div className="py-2 text-sm text-gray-900 font-medium border-b border-gray-100">{display}</div>;
       }
       const handleChange = (e: any) => updateRecordField(field.name, e.target.value);
+
+      // Phone field gets blur handler for dup detection (leads only)
+      const isPhoneField = ['phone', 'mobile', 'phoneNumber'].includes(field.name);
+      const phoneBlurProps = (entityType === 'lead' && isPhoneField)
+         ? { onBlur: (e: React.FocusEvent<HTMLInputElement>) => handlePhoneBlur(e.target.value) }
+         : {};
 
       switch (field.type) {
          case 'textarea':
@@ -364,7 +449,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
             if (!url) return <div className="text-gray-400 text-sm italic">No URL configured</div>;
             return <div className="w-full h-64 border rounded-lg bg-gray-100"><iframe src={url} className="w-full h-full" title={field.label} /></div>;
          default:
-            return <input type={field.type} className={baseClasses} value={value || ''} onChange={handleChange} />;
+            return <input type={field.type} className={baseClasses} value={value || ''} onChange={handleChange} {...phoneBlurProps} />;
       }
    };
 
@@ -770,8 +855,173 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
       { icon: Briefcase, label: 'Showing', value: filteredData.length, tint: 'text-violet-600 bg-violet-50' },
    ];
 
+   // --- DUPLICATE WARNING BANNER ---
+   const DupBanner = dupWarning ? (
+      <div className="mx-6 mt-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+         <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+         <span className="text-sm text-amber-800">
+            ⚠️ A <strong>{dupWarning.type}</strong> with this phone number already exists: <strong>{dupWarning.name}</strong>
+         </span>
+         <button
+            onClick={() => setDupWarning(null)}
+            className="ml-auto text-amber-500 hover:text-amber-700"
+         >
+            <X className="w-4 h-4" />
+         </button>
+      </div>
+   ) : null;
+
+   // --- IMPORT MODAL ---
+   const ImportModal = showImportModal ? (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+               <div className="flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-indigo-600" />
+                  <h2 className="font-bold text-slate-800">Import {schema?.pluralLabel}</h2>
+               </div>
+               <button onClick={() => setShowImportModal(false)} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                  <X className="w-5 h-5 text-slate-500" />
+               </button>
+            </div>
+
+            {/* Step indicators */}
+            <div className="flex border-b border-slate-100">
+               {[['upload', 'Upload File'], ['map', 'Map Columns'], ['done', 'Results']].map(([key, label], i) => (
+                  <div key={key} className={`flex-1 py-2 text-center text-xs font-semibold ${
+                     importStep === key ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-400'
+                  }`}>{i + 1}. {label}</div>
+               ))}
+            </div>
+
+            <div className="p-6">
+               {/* Step 1: Upload */}
+               {importStep === 'upload' && (
+                  <div className="space-y-4">
+                     <div
+                        className="border-2 border-dashed border-slate-300 rounded-xl p-10 text-center hover:border-indigo-400 hover:bg-indigo-50/20 transition-all cursor-pointer"
+                        onClick={() => document.getElementById('csv-upload-input')?.click()}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImportFileSelect(f); }}
+                     >
+                        <CloudUpload className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+                        <p className="font-semibold text-slate-600">Drop your CSV here or click to browse</p>
+                        <p className="text-sm text-slate-400 mt-1">Max 5MB · UTF-8 encoding</p>
+                        <input
+                           id="csv-upload-input"
+                           type="file"
+                           accept=".csv,text/csv"
+                           className="hidden"
+                           onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFileSelect(f); }}
+                        />
+                     </div>
+                     <div className="flex items-center justify-center">
+                        <a
+                           href={`/api/data/${entityType}/import-template`}
+                           onClick={e => {
+                              e.preventDefault();
+                              const session = localStorage.getItem('flowcrm_session');
+                              const token = session ? JSON.parse(session).token : '';
+                              fetch(`/api/data/${entityType}/import-template`, { headers: { Authorization: `Bearer ${token}` } })
+                                 .then(r => r.blob())
+                                 .then(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${entityType}_import_template.csv`; a.click(); });
+                           }}
+                           className="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                        >
+                           <Download className="w-4 h-4" /> Download import template
+                        </a>
+                     </div>
+                  </div>
+               )}
+
+               {/* Step 2: Map Columns */}
+               {importStep === 'map' && (
+                  <div className="space-y-4">
+                     <p className="text-sm text-slate-600">
+                        Showing {importPreview.length} preview rows from <strong>{importFile?.name}</strong>.
+                        Map your CSV columns to CRM fields:
+                     </p>
+                     <div className="max-h-64 overflow-y-auto">
+                        <table className="min-w-full text-xs border border-slate-200 rounded-xl overflow-hidden">
+                           <thead className="bg-slate-50">
+                              <tr>
+                                 {importHeaders.map(h => (
+                                    <th key={h} className="px-3 py-2 text-left font-bold text-slate-500">
+                                       <select
+                                          className="text-xs border border-slate-300 rounded px-1 py-0.5 w-full"
+                                          value={importColMap[h] || h}
+                                          onChange={e => setImportColMap(prev => ({ ...prev, [h]: e.target.value }))}
+                                       >
+                                          {schema?.fields.filter(f => !['image', 'iframe', 'attachment'].includes(f.type)).map(f => (
+                                             <option key={f.name} value={f.name}>{f.label}</option>
+                                          ))}
+                                       </select>
+                                       <span className="block text-[10px] text-slate-400 mt-0.5">← {h}</span>
+                                    </th>
+                                 ))}
+                              </tr>
+                           </thead>
+                           <tbody>
+                              {importPreview.map((row, i) => (
+                                 <tr key={i} className="border-t border-slate-100">
+                                    {row.map((cell, j) => (
+                                       <td key={j} className="px-3 py-1.5 text-slate-600 whitespace-nowrap">{cell || '-'}</td>
+                                    ))}
+                                 </tr>
+                              ))}
+                           </tbody>
+                        </table>
+                     </div>
+                     <div className="flex gap-2">
+                        <Button variant="secondary" onClick={() => setImportStep('upload')}>Back</Button>
+                        <Button variant="primary" icon={importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} onClick={handleImport} disabled={importing}>
+                           {importing ? 'Importing…' : 'Import Now'}
+                        </Button>
+                     </div>
+                  </div>
+               )}
+
+               {/* Step 3: Done */}
+               {importStep === 'done' && importResult && (
+                  <div className="text-center space-y-4">
+                     <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                        <Check className="w-8 h-8 text-emerald-600" />
+                     </div>
+                     <h3 className="font-bold text-slate-800 text-lg">Import Complete</h3>
+                     <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-emerald-50 rounded-xl p-4">
+                           <div className="text-2xl font-bold text-emerald-600">{importResult.imported}</div>
+                           <div className="text-xs text-emerald-700 mt-1">Imported</div>
+                        </div>
+                        <div className="bg-amber-50 rounded-xl p-4">
+                           <div className="text-2xl font-bold text-amber-600">{importResult.skipped}</div>
+                           <div className="text-xs text-amber-700 mt-1">Skipped (dupes)</div>
+                        </div>
+                        <div className="bg-red-50 rounded-xl p-4">
+                           <div className="text-2xl font-bold text-red-600">{importResult.errors.length}</div>
+                           <div className="text-xs text-red-700 mt-1">Errors</div>
+                        </div>
+                     </div>
+                     {importResult.errors.length > 0 && (
+                        <div className="text-left bg-red-50 rounded-xl p-3 max-h-32 overflow-y-auto">
+                           {importResult.errors.map((e, i) => (
+                              <p key={i} className="text-xs text-red-700">Row {e.row}: {e.error}</p>
+                           ))}
+                        </div>
+                     )}
+                     <Button variant="primary" onClick={() => { setShowImportModal(false); setImportStep('upload'); }}>Done</Button>
+                  </div>
+               )}
+            </div>
+         </div>
+      </div>
+   ) : null;
+
    return (
-      <div className="min-h-screen">
+      <div className="relative">
+         {ImportModal}
+         <div className="min-h-screen">
          {/* Page Header */}
          <div className="bg-white border-b border-slate-200">
             <div className="max-w-7xl mx-auto px-6 py-5">
@@ -779,7 +1029,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                   <div>
                      <h1 className="font-heading text-xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
                         {schema.pluralLabel}
-                        <span className="px-2 py-0.5 bg-[#2563EB]/10 text-[#1E40AF] text-xs font-semibold rounded-md tnum">
+                        <span className="px-2 py-0.5 bg-[#4F46E5]/10 text-[#3730A3] text-xs font-semibold rounded-md tnum">
                            {totalRecords}
                         </span>
                      </h1>
@@ -788,6 +1038,13 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                   <div className="flex gap-2">
                      <Button variant="secondary" icon={<Filter className="w-4 h-4" />}>Filter</Button>
                      <Button variant="secondary" icon={<Download className="w-4 h-4" />}>Export</Button>
+                     <Button
+                        variant="secondary"
+                        icon={<Upload className="w-4 h-4" />}
+                        onClick={() => { setShowImportModal(true); setImportStep('upload'); setImportFile(null); setImportPreview([]); setImportResult(null); }}
+                     >
+                        Import
+                     </Button>
                      <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={() => { setSelectedRecord({ id: '' } as CRMRecord); setRelatedRecords({}); setActivity(null); setActivities([]); setView('detail'); }}>
                         New {schema.label}
                      </Button>
@@ -795,6 +1052,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                </div>
             </div>
          </div>
+
+         {DupBanner}
 
          <div className="max-w-7xl mx-auto px-6 py-6">
             {/* Stats Row */}
@@ -836,7 +1095,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                      <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
                            <th className="px-4 py-3 text-left w-10">
-                              <input type="checkbox" aria-label="Select all" className="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]" />
+                              <input type="checkbox" aria-label="Select all" className="w-4 h-4 rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5]" />
                            </th>
                            {columns.map(col => (
                               <th key={col.name} className="px-4 py-3 text-left mono-label whitespace-nowrap">
@@ -931,6 +1190,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate }
                )}
             </Card>
          </div>
+         </div>
       </div>
    );
 };
+

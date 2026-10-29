@@ -51,7 +51,7 @@ export const CategoryManager: React.FC = () => {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
-            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><Layers className="w-[18px] h-[18px] text-[#2563EB]" /></span></span>
+            <span className="tri-ring-sq w-9 h-9"><span className="flex items-center justify-center"><Layers className="w-[18px] h-[18px] text-[#4F46E5]" /></span></span>
             Product Categories
           </h1>
           <p className="text-ink-muted text-sm mt-1">Cascading matrix (Category → Subcategory). Used on Product, Lead & Case forms.</p>
@@ -66,7 +66,7 @@ export const CategoryManager: React.FC = () => {
           {tree.map((cat, i) => (
             <div key={i} className="border border-slate-200 rounded-xl p-3">
               <div className="flex items-center gap-2 mb-2.5">
-                <ChevronRight className="w-4 h-4 text-[#2563EB] shrink-0" />
+                <ChevronRight className="w-4 h-4 text-[#4F46E5] shrink-0" />
                 <input value={cat.name} onChange={e => renameCategory(i, e.target.value)} className="!h-9 font-semibold flex-1" />
                 <button onClick={() => removeCategory(i)} className="text-slate-400 hover:text-red-500 shrink-0"><Trash2 className="w-4 h-4" /></button>
               </div>

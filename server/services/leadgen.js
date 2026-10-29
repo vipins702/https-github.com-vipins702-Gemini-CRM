@@ -1,6 +1,9 @@
 import db from '../database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { logAudit } from './audit.js';
+import { calculateLeadScore } from './scoring.js';
+import { assignLead } from './assignment.js';
+import { evaluateWorkflows } from './workflow.js';
 
 /**
  * Lead Generation Engine
@@ -93,6 +96,11 @@ function buildLeadData(sourceRecord, rule) {
  */
 export async function runLeadRule(rule, tenantId, actorId, opts = {}) {
     const dryRun = !!opts.dryRun;
+    const depth = opts.depth || 0;
+    if (depth > 5) {
+        console.warn(`[leadgen] Recursion guard triggered in runLeadRule at depth ${depth}`);
+        return { matched: 0, created: 0, skipped: 0, preview: [] };
+    }
     const conditions = rule.conditions ? JSON.parse(rule.conditions) : { match: 'all', rules: [] };
     const targetEntity = rule.target_entity || 'lead';
 
@@ -159,6 +167,28 @@ export async function runLeadRule(rule, tenantId, actorId, opts = {}) {
             });
             created++;
             existingSourceIds.add(sourceRecord.id);
+
+            // Cascade
+            try {
+                if (targetEntity === 'lead') {
+                    const computedScore = await calculateLeadScore(leadData, tenantId);
+                    if (computedScore > 0) {
+                        leadData.score = computedScore;
+                        await db.run('UPDATE records SET data = ? WHERE id = ? AND tenant_id = ?', JSON.stringify(leadData), id, tenantId);
+                    }
+                    await assignLead(tenantId, id, leadData);
+                }
+                await evaluateWorkflows({
+                    tenantId, entityType: targetEntity, triggerType: 'create',
+                    record: { ...leadData, id }, actorId, depth: depth + 1
+                });
+                await evaluateRealtimeLeadRules({
+                    tenantId, entityType: targetEntity, record: { ...leadData, id },
+                    actorId, depth: depth + 1
+                });
+            } catch (err) {
+                console.error(`[leadgen] Cascade failed after runLeadRule:`, err.message);
+            }
         }
     }
 
@@ -196,7 +226,11 @@ export async function runAllActiveRules(tenantId, actorId) {
  * Run a single source record against all active "realtime" rules for its entity.
  * Called from the record create path. Inserts leads directly (no recursion through the API).
  */
-export async function evaluateRealtimeLeadRules({ tenantId, entityType, record, actorId }) {
+export async function evaluateRealtimeLeadRules({ tenantId, entityType, record, actorId, depth = 0 }) {
+    if (depth > 5) {
+        console.warn(`[leadgen] Recursion guard triggered in realtime rules at depth ${depth}`);
+        return;
+    }
     try {
         const rules = await db.all(
             `SELECT * FROM lead_rules WHERE tenant_id = ? AND source_entity = ? AND is_active = 1 AND schedule = 'realtime'`,
@@ -242,6 +276,28 @@ export async function evaluateRealtimeLeadRules({ tenantId, entityType, record, 
                 details: { ...leadData, _via: 'lead_rule_realtime', _rule_name: rule.name },
             });
             console.log(`[leadgen] Realtime rule "${rule.name}" created lead ${id}`);
+
+            // Cascade
+            try {
+                if (targetEntity === 'lead') {
+                    const computedScore = await calculateLeadScore(leadData, tenantId);
+                    if (computedScore > 0) {
+                        leadData.score = computedScore;
+                        await db.run('UPDATE records SET data = ? WHERE id = ? AND tenant_id = ?', JSON.stringify(leadData), id, tenantId);
+                    }
+                    await assignLead(tenantId, id, leadData);
+                }
+                await evaluateWorkflows({
+                    tenantId, entityType: targetEntity, triggerType: 'create',
+                    record: { ...leadData, id }, actorId, depth: depth + 1
+                });
+                await evaluateRealtimeLeadRules({
+                    tenantId, entityType: targetEntity, record: { ...leadData, id },
+                    actorId, depth: depth + 1
+                });
+            } catch (err) {
+                console.error(`[leadgen] Cascade failed after realtime rule:`, err.message);
+            }
         }
     } catch (error) {
         console.error('Realtime lead rule evaluation failed:', error);

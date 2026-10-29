@@ -32,7 +32,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
    };
 
-   const inputCls = "w-full h-12 pl-11 pr-4 text-[15px] border border-[#dbe3ef] rounded-xl outline-none transition-colors bg-white/90 placeholder:text-ink-muted/70 focus:border-[#2563EB] focus-ring";
+   const inputCls = "w-full h-12 pl-11 pr-4 text-[15px] border border-[#dbe3ef] rounded-xl outline-none transition-colors bg-white/90 placeholder:text-ink-muted/70 focus:border-[#4F46E5] focus-ring";
 
    return (
       <div className="min-h-dvh flex items-center justify-center font-sans p-5 sm:p-8 relative overflow-hidden bg-hero">
@@ -42,7 +42,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <div className="hidden lg:flex flex-col justify-between p-10 xl:p-12 bg-white/20 border-r border-white/40">
                <div className="flex items-center gap-2.5">
                   <div className="tri-ring-sq w-10 h-10">
-                     <div className="flex items-center justify-center"><Hexagon className="w-5 h-5 text-[#2563EB]" strokeWidth={2.4} /></div>
+                     <div className="flex items-center justify-center"><Hexagon className="w-5 h-5 text-[#4F46E5]" strokeWidth={2.4} /></div>
                   </div>
                   <span className="font-heading text-xl font-extrabold tracking-tight gradient-text">FlowCRM</span>
                </div>
@@ -56,9 +56,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   </p>
                   <ul className="mt-8 space-y-3">
                      {[
-                        { icon: Workflow, text: 'Visual workflow automation', tint: 'text-[#2563EB] bg-[#2563EB]/10' },
-                        { icon: Zap, text: 'AI lead capture & routing', tint: 'text-[#EA7317] bg-[#EA7317]/10' },
-                        { icon: ShieldCheck, text: 'Role-based access & audit trail', tint: 'text-[#059669] bg-[#059669]/10' },
+                        { icon: Workflow, text: 'Visual workflow automation', tint: 'text-[#4F46E5] bg-[#4F46E5]/10' },
+                        { icon: Zap, text: 'AI lead capture & routing', tint: 'text-[#D97706] bg-[#D97706]/10' },
+                        { icon: ShieldCheck, text: 'Role-based access & audit trail', tint: 'text-[#0D9488] bg-[#0D9488]/10' },
                      ].map(({ icon: Icon, text, tint }) => (
                         <li key={text} className="flex items-center gap-3 text-ink-soft text-sm font-medium">
                            <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${tint}`}>
@@ -80,7 +80,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             {/* Right — form */}
             <div className="p-8 sm:p-10 xl:p-12 bg-white/55">
                <div className="lg:hidden flex items-center gap-2.5 mb-8">
-                  <div className="tri-ring-sq w-9 h-9"><div className="flex items-center justify-center"><Hexagon className="w-[18px] h-[18px] text-[#2563EB]" strokeWidth={2.4} /></div></div>
+                  <div className="tri-ring-sq w-9 h-9"><div className="flex items-center justify-center"><Hexagon className="w-[18px] h-[18px] text-[#4F46E5]" strokeWidth={2.4} /></div></div>
                   <span className="font-heading text-lg font-extrabold tracking-tight gradient-text">FlowCRM</span>
                </div>
 
@@ -105,7 +105,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <div className="space-y-1.5">
                      <div className="flex items-center justify-between">
                         <label htmlFor="login-password" className="block text-sm font-medium text-ink-soft">Password</label>
-                        <a href="#" className="text-sm text-[#2563EB] hover:text-[#1E40AF] font-semibold">Forgot?</a>
+                        <a href="#" className="text-sm text-[#4F46E5] hover:text-[#3730A3] font-semibold">Forgot?</a>
                      </div>
                      <div className="relative">
                         <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-[18px] h-[18px]" aria-hidden="true" />
@@ -122,7 +122,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   </div>
 
                   <label htmlFor="remember" className="flex items-center gap-2 text-sm text-ink-soft select-none cursor-pointer">
-                     <input type="checkbox" id="remember" className="rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB] w-4 h-4" />
+                     <input type="checkbox" id="remember" className="rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5] w-4 h-4" />
                      Keep me signed in
                   </label>
 
@@ -142,15 +142,15 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                </form>
 
                <p className="mt-8 text-center text-sm text-ink-muted">
-                  Don't have an account? <a href="#" className="text-[#2563EB] font-semibold hover:underline">Create a workspace</a>
+                  Don't have an account? <a href="#" className="text-[#4F46E5] font-semibold hover:underline">Create a workspace</a>
                </p>
 
                <div className="mt-8 pt-6 border-t border-white/50">
                   <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-1.5 text-xs text-ink-muted">
                      <span className="mono-label !text-[10px]">Demo</span>
-                     <button onClick={() => { setEmail('admin@flowcrm.com'); setPassword('Admin@123'); }} className="font-medium text-ink-soft hover:text-[#2563EB] transition-colors">admin@flowcrm.com</button>
+                     <button onClick={() => { setEmail('admin@flowcrm.com'); setPassword('Admin@123'); }} className="font-medium text-ink-soft hover:text-[#4F46E5] transition-colors">admin@flowcrm.com</button>
                      <span className="text-slate-300">·</span>
-                     <button onClick={() => { setEmail('sarah@flowcrm.com'); setPassword('Admin@123'); }} className="font-medium text-ink-soft hover:text-[#2563EB] transition-colors">sarah@flowcrm.com</button>
+                     <button onClick={() => { setEmail('sarah@flowcrm.com'); setPassword('Admin@123'); }} className="font-medium text-ink-soft hover:text-[#4F46E5] transition-colors">sarah@flowcrm.com</button>
                   </div>
                </div>
             </div>

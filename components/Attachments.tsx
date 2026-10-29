@@ -49,7 +49,7 @@ export const Attachments: React.FC<Props> = ({ entityType, recordId, compact }) 
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1.5 text-xs font-semibold text-[#2563EB] hover:text-[#1E40AF] disabled:opacity-50"
+          className="flex items-center gap-1.5 text-xs font-semibold text-[#4F46E5] hover:text-[#3730A3] disabled:opacity-50"
         >
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload
         </button>
@@ -59,7 +59,7 @@ export const Attachments: React.FC<Props> = ({ entityType, recordId, compact }) 
       {loading ? (
         <p className="text-xs text-ink-muted py-3 text-center">Loading…</p>
       ) : items.length === 0 ? (
-        <button onClick={() => inputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-xl text-xs text-ink-muted hover:border-[#2563EB]/40 hover:text-[#2563EB] transition-colors">
+        <button onClick={() => inputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-xl text-xs text-ink-muted hover:border-[#4F46E5]/40 hover:text-[#4F46E5] transition-colors">
           Drop files or click to upload
         </button>
       ) : (

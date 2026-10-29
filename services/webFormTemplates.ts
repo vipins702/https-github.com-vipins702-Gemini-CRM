@@ -28,7 +28,7 @@ export const PREDEFINED_TEMPLATES: Record<string, WebFormTemplate> = {
     successMessage: '✅ Thank you! We\'ll be in touch soon.',
     theme: {
       backgroundColor: '#FFFFFF',
-      buttonColor: '#2563EB',
+      buttonColor: '#4F46E5',
       buttonText: 'Submit',
     },
   },
@@ -49,7 +49,7 @@ export const PREDEFINED_TEMPLATES: Record<string, WebFormTemplate> = {
     successMessage: '📅 Demo request received! Check your email for next steps.',
     theme: {
       backgroundColor: '#F8FAFC',
-      buttonColor: '#2563EB',
+      buttonColor: '#4F46E5',
       buttonText: 'Schedule Demo',
     },
   },

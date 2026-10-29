@@ -93,10 +93,10 @@ const NotificationCenter: React.FC<{ onClose: () => void; onNavigate: (v: ViewSt
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
         <h3 className="font-semibold text-sm text-ink flex items-center gap-2">
           Notifications
-          {unread > 0 && <span className="bg-[#2563EB] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unread}</span>}
+          {unread > 0 && <span className="bg-[#4F46E5] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unread}</span>}
         </h3>
         {unread > 0 && (
-          <button onClick={markAll} className="flex items-center gap-1 text-xs text-[#2563EB] hover:text-[#1D4ED8] font-medium">
+          <button onClick={markAll} className="flex items-center gap-1 text-xs text-[#4F46E5] hover:text-[#3730A3] font-medium">
             <CheckCheck className="w-3.5 h-3.5" /> Mark all read
           </button>
         )}
@@ -123,7 +123,7 @@ const NotificationCenter: React.FC<{ onClose: () => void; onNavigate: (v: ViewSt
                 {n.body && <p className="text-xs text-ink-muted mt-0.5 line-clamp-2">{n.body}</p>}
                 <p className="text-[11px] text-ink-muted mt-1">{timeAgo(n.created_at)}</p>
               </div>
-              {!n.is_read && <span className="w-2 h-2 rounded-full bg-[#2563EB] shrink-0 mt-1.5" />}
+              {!n.is_read && <span className="w-2 h-2 rounded-full bg-[#4F46E5] shrink-0 mt-1.5" />}
             </button>
           ))
         )}
@@ -210,7 +210,7 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
   const entityLabel = (type: string) => schemas[type]?.label || type;
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 flex items-center gap-6 px-5 sm:px-6">
+    <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-xl border-b border-[#E8E8EE] flex items-center gap-6 px-5 sm:px-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm shrink-0 min-w-0" aria-label="Breadcrumb">
         <button onClick={() => onNavigate('dashboard')} className="text-slate-500 hover:text-slate-900 font-medium transition-colors">Home</button>
@@ -235,7 +235,7 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
             role="combobox"
             aria-expanded={open && !!query.trim()}
             placeholder="Search…"
-            className="w-full h-10 pl-9 pr-16 text-sm rounded-lg bg-slate-100/80 border border-transparent text-slate-800 placeholder:text-slate-400 outline-none transition-colors focus:bg-white focus:border-slate-300 focus-ring"
+            className="w-full h-10 pl-9 pr-16 text-sm rounded-lg bg-[#F3F3F7] border border-transparent text-slate-800 placeholder:text-[#9191A8] outline-none transition-colors focus:bg-white focus:border-[#DDDDE4] focus-ring"
           />
           {query ? (
             <button onClick={() => { setQuery(''); setResults([]); inputRef.current?.focus(); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -286,7 +286,7 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
         >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-[#2563EB] text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+            <span className="absolute top-1 right-1 w-4 h-4 bg-[#4F46E5] text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}

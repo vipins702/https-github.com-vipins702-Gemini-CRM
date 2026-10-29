@@ -36,4 +36,9 @@ export class SQLiteAdapter {
     transaction(fn) {
         return this.db.transaction(fn);
     }
+
+    // Helper for reporting
+    buildJsonPath(column, field) {
+        return `json_extract(${column}, '$.${field}')`;
+    }
 }
