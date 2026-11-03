@@ -32,7 +32,7 @@ const tipStyle = { backgroundColor: 'rgba(29, 29, 31, 0.92)', border: 'none', bo
 const WIDTH_CYCLE: Array<WidgetConfig['width']> = ['third', 'half', 'full'];
 const WIDTH_LABEL: Record<string, string> = { third: '1/3', half: '1/2', full: 'Full' };
 const colSpan = (w?: string) =>
-  w === 'full' ? 'col-span-full' : w === 'half' ? 'lg:col-span-2 md:col-span-1' : 'col-span-1';
+  w === 'full' ? 'col-span-full' : 'col-span-1';
 
 function fmtKpi(type: string, v: any): string {
   if (v === null || v === undefined) return '—';
@@ -474,7 +474,14 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 
-  const visible = widgets.filter(w => w.visible || isEditMode).sort((a, b) => a.order - b.order);
+  // A single-number card is redundant when a full KPI strip from the same dataset is already shown.
+  const stripShown = new Set(
+    widgets.filter(w => w.visible && w.type === 'pack' && !w.kpiColumn && w.datasetId).map(w => `${w.packId}:${w.datasetId}`)
+  );
+  const visible = widgets
+    .filter(w => w.visible || isEditMode)
+    .filter(w => isEditMode || !(w.type === 'pack' && w.kpiColumn && stripShown.has(`${w.packId}:${w.datasetId}`)))
+    .sort((a, b) => a.order - b.order);
 
   return (
     <div className="p-6 lg:p-8 font-sans animate-in fade-in duration-500">
@@ -512,7 +519,7 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* ── Grid ── (dense flow lets smaller widgets fill gaps beside wide ones) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 grid-flow-row-dense gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 grid-flow-row-dense gap-5">
         {visible.map((widget, i) => {
           const isDragging = draggedId  === widget.id;
           const isOver     = dragOverId === widget.id && draggedId !== widget.id;
