@@ -55,6 +55,19 @@ const App: React.FC = () => {
     typeof window !== 'undefined' && window.innerWidth < 1280
   );
 
+  // Width of the open sidebar; the user drags the edge to change it and we remember it.
+  const [sidebarWidth, setSidebarWidthState] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem('flowcrm_sidebar_width'));
+      return saved >= 200 && saved <= 420 ? saved : 256;
+    } catch { return 256; }
+  });
+  const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
+  const setSidebarWidth = (w: number) => {
+    setSidebarWidthState(w);
+    try { localStorage.setItem('flowcrm_sidebar_width', String(w)); } catch { /* private mode */ }
+  };
+
   // Responsive: auto-collapse the sidebar to icons below 1280px
   useEffect(() => {
     const onResize = () => setIsSidebarCollapsed(window.innerWidth < 1280);
@@ -238,12 +251,19 @@ const App: React.FC = () => {
           onChangeView={handleSidebarChange}
           isCollapsed={isSidebarCollapsed}
           onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          width={sidebarWidth}
+          onWidthChange={setSidebarWidth}
+          onCollapseChange={setIsSidebarCollapsed}
+          onDragState={setIsDraggingSidebar}
           onLogout={() => {
             api.logout();
             setSession(null);
           }}
         />
-        <main className={`${isSidebarCollapsed ? 'ml-[72px]' : 'ml-64'} w-full min-h-screen transition-[margin] duration-300 ease-in-out`}>
+        <main
+          style={{ marginLeft: isSidebarCollapsed ? 72 : sidebarWidth }}
+          className={`w-full min-h-screen ${isDraggingSidebar ? '' : 'transition-[margin] duration-300 ease-in-out'}`}
+        >
           <TopBar currentView={currentView} schemas={schemas} onNavigate={handleNavigate} />
           {renderContent()}
         </main>

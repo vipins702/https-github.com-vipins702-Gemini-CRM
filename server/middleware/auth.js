@@ -15,6 +15,14 @@ export const authenticateToken = async (req, res, next) => {
         req.user = user;
         req.tenantId = user.tenantId;
 
+        // A token must stop working the moment the person is deactivated or loses
+        // their role, not 24 hours later. Superadmins are checked the same way.
+        const live = await db.get('SELECT is_active, role FROM users WHERE id = ? AND tenant_id = ?', user.id, user.tenantId);
+        if (!live || !live.is_active) {
+            return res.status(403).json({ error: 'Account is inactive' });
+        }
+        req.user.role = live.role;
+
         // Fetch Role Permissions
         if (req.user.isSuperadmin) {
             req.user.permissions = { admin: true };

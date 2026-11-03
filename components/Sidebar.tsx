@@ -10,9 +10,47 @@ interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onLogout: () => void;
+  width: number;
+  onWidthChange: (w: number) => void;
+  onCollapseChange: (collapsed: boolean) => void;
+  onDragState: (dragging: boolean) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isCollapsed, onToggle, onLogout }) => {
+const MIN_W = 200;
+const MAX_W = 420;
+const COLLAPSE_BELOW = 150;
+
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isCollapsed, onToggle, onLogout, width, onWidthChange, onCollapseChange, onDragState }) => {
+  const [dragging, setDragging] = useState(false);
+
+  // Drag the right edge: pull wider (up to 420px), push narrower, and push past
+  // ~150px to squeeze it down to icons. Pull from icons to open it again.
+  const startDrag = (e: React.PointerEvent) => {
+    e.preventDefault();
+    setDragging(true);
+    onDragState(true);
+    const move = (ev: PointerEvent) => {
+      if (ev.clientX < COLLAPSE_BELOW) {
+        onCollapseChange(true);
+      } else {
+        onCollapseChange(false);
+        onWidthChange(Math.min(MAX_W, Math.max(MIN_W, ev.clientX)));
+      }
+    };
+    const stop = () => {
+      setDragging(false);
+      onDragState(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+  };
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -119,7 +157,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
   };
 
   return (
-    <aside className={`${isCollapsed ? 'w-[72px]' : 'w-64'} bg-surface/80 backdrop-blur-xl backdrop-saturate-150 text-gray-900 flex flex-col h-screen fixed left-0 top-0 border-r border-gray-200/80 z-50 transition-[width] duration-300 ease-in-out`}>
+    <aside
+      style={{ width: isCollapsed ? 72 : width }}
+      className={`bg-surface/80 backdrop-blur-xl backdrop-saturate-150 text-gray-900 flex flex-col h-screen fixed left-0 top-0 border-r border-gray-200/80 z-50 ${dragging ? '' : 'transition-[width] duration-300 ease-in-out'}`}
+    >
+      {/* Drag handle on the right edge */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        onPointerDown={startDrag}
+        onDoubleClick={() => { onCollapseChange(false); onWidthChange(256); }}
+        title="Drag to resize · double-click to reset"
+        className="group absolute top-0 -right-1.5 h-full w-3 cursor-col-resize z-[60] flex justify-center"
+      >
+        <span className={`h-full w-0.5 transition-colors ${dragging ? 'bg-accent' : 'bg-transparent group-hover:bg-accent/50'}`} />
+      </div>
       {/* Brand Header */}
       <div className={`h-16 px-4 flex items-center shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
         <div className="flex items-center gap-2.5 overflow-hidden">

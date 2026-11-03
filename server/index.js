@@ -403,7 +403,7 @@ app.get('/api/metadata/schemas', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/metadata/schemas', authenticateToken, async (req, res) => {
+app.post('/api/metadata/schemas', authenticateToken, requireAdmin, async (req, res) => {
     const { entityType, config } = req.body;
     try {
         const id = uuidv4();
@@ -440,7 +440,7 @@ app.get('/api/metadata/layouts/:entityType', authenticateToken, async (req, res)
     }
 });
 
-app.post('/api/metadata/layouts/:entityType', authenticateToken, async (req, res) => {
+app.post('/api/metadata/layouts/:entityType', authenticateToken, requireAdmin, async (req, res) => {
     const { entityType } = req.params;
     const layoutConfig = req.body;
     try {
@@ -475,7 +475,7 @@ app.get('/api/metadata/menu', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/metadata/menu', authenticateToken, async (req, res) => {
+app.post('/api/metadata/menu', authenticateToken, requireAdmin, async (req, res) => {
     const menuConfig = req.body;
     try {
         // Manual upsert (the menus table has no UNIQUE(tenant_id), so ON CONFLICT can't be used)
@@ -738,6 +738,12 @@ app.post('/api/saved-reports/run', authenticateToken, async (req, res) => {
 
 app.get('/api/data/:entityType', authenticateToken, async (req, res) => {
     const { entityType } = req.params;
+    if (req.user.role !== 'admin' && !req.user.permissions?.admin) {
+        const perms = req.user.permissions?.[entityType];
+        if (!perms || (!perms.read && !perms.manage && !perms.write && !perms.edit && !perms.create)) {
+            return res.status(403).json({ error: `Insufficient permissions to view ${entityType}` });
+        }
+    }
     try {
         const rows = await db.all('SELECT * FROM records WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
         const records = rows.map(row => {
@@ -1294,7 +1300,7 @@ app.get('/api/lookups/:lookupId', authenticateToken, async (req, res) => {
 });
 
 // Create or update a lookup value
-app.post('/api/lookups/:lookupId', authenticateToken, async (req, res) => {
+app.post('/api/lookups/:lookupId', authenticateToken, requireAdmin, async (req, res) => {
     const { lookupId } = req.params;
     const { valueId, value, sortOrder = 0 } = req.body;
 
@@ -1317,7 +1323,7 @@ app.post('/api/lookups/:lookupId', authenticateToken, async (req, res) => {
 });
 
 // Bulk import lookup values
-app.post('/api/lookups/:lookupId/import', authenticateToken, async (req, res) => {
+app.post('/api/lookups/:lookupId/import', authenticateToken, requireAdmin, async (req, res) => {
     const { lookupId } = req.params;
     const { values } = req.body; // Expecting array of { valueId, value, sortOrder }
 
@@ -1407,7 +1413,7 @@ app.delete('/api/lookups/:lookupId/live-source', authenticateToken, requireAdmin
 });
 
 // Delete a lookup value
-app.delete('/api/lookups/:lookupId/:valueId', authenticateToken, async (req, res) => {
+app.delete('/api/lookups/:lookupId/:valueId', authenticateToken, requireAdmin, async (req, res) => {
     const { lookupId, valueId } = req.params;
     try {
         await db.run(
@@ -1422,7 +1428,7 @@ app.delete('/api/lookups/:lookupId/:valueId', authenticateToken, async (req, res
 });
 
 // Import lookup values from a predefined source (users, records)
-app.post('/api/lookups/:lookupId/import-from-source', authenticateToken, async (req, res) => {
+app.post('/api/lookups/:lookupId/import-from-source', authenticateToken, requireAdmin, async (req, res) => {
     const { lookupId } = req.params;
     const { source, valueField = 'id', labelField = 'email' } = req.body;
 
@@ -1537,7 +1543,7 @@ app.get('/api/relationships/:id', authenticateToken, async (req, res) => {
 });
 
 // Create relationship with column mapping
-app.post('/api/relationships', authenticateToken, async (req, res) => {
+app.post('/api/relationships', authenticateToken, requireAdmin, async (req, res) => {
     const { name, sourceEntity, targetEntity, sourceField, targetField, relationshipType = 'lookup', cascadeDelete = false, displayField = 'id' } = req.body;
 
     if (!name || !sourceEntity || !targetEntity || !sourceField || !targetField) {
@@ -1583,7 +1589,7 @@ app.post('/api/relationships', authenticateToken, async (req, res) => {
 });
 
 // Delete relationship
-app.delete('/api/relationships/:id', authenticateToken, async (req, res) => {
+app.delete('/api/relationships/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         await db.run('DELETE FROM relationships WHERE id = ? AND tenant_id = ?', req.params.id, req.tenantId);
         res.json({ success: true });
@@ -1679,7 +1685,7 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
 });
 
 // Save settings
-app.post('/api/settings', authenticateToken, async (req, res) => {
+app.post('/api/settings', authenticateToken, requireAdmin, async (req, res) => {
     const config = req.body;
     try {
         const id = uuidv4();
@@ -1711,7 +1717,7 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 });
 
 // Create/Update User
-app.post('/api/users', authenticateToken, async (req, res) => {
+app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
     const { id, email, password, roleId, name, isActive = true } = req.body;
 
     // Split name into first and last
@@ -1772,16 +1778,21 @@ app.get('/api/roles', authenticateToken, async (req, res) => {
 });
 
 // Create/Update Role
-app.post('/api/roles', authenticateToken, async (req, res) => {
+app.post('/api/roles', authenticateToken, requireAdmin, async (req, res) => {
     const { id, name, description, permissions } = req.body;
     try {
         const roleId = id || uuidv4();
+        // An id that belongs to another workspace must never be overwritten from here.
+        const existing = await db.get('SELECT tenant_id FROM roles WHERE id = ?', roleId);
+        if (existing && existing.tenant_id !== req.tenantId) {
+            return res.status(404).json({ error: 'Role not found' });
+        }
         await db.run(`
             INSERT INTO roles (id, tenant_id, name, description, permissions)
             VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET 
-                name = excluded.name, 
-                description = excluded.description, 
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                description = excluded.description,
                 permissions = excluded.permissions
         `, roleId, req.tenantId, name, description, JSON.stringify(permissions));
         res.json({ success: true, id: roleId });
@@ -1792,7 +1803,7 @@ app.post('/api/roles', authenticateToken, async (req, res) => {
 });
 
 // Delete Role
-app.delete('/api/roles/:id', authenticateToken, async (req, res) => {
+app.delete('/api/roles/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         await db.run('DELETE FROM roles WHERE id = ? AND tenant_id = ?', req.params.id, req.tenantId);
         res.json({ success: true });
@@ -2701,7 +2712,7 @@ app.get('/api/workflows', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/workflows', authenticateToken, async (req, res) => {
+app.post('/api/workflows', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { nodes, edges } = req.body;
         
