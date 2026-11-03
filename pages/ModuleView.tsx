@@ -1025,7 +1025,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                      </h1>
                      <p className="text-ink-muted text-sm mt-1">Manage and track your {schema.pluralLabel.toLowerCase()}.</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                      <Button variant="secondary" icon={<Filter className="w-4 h-4" />}>Filter</Button>
                      <Button variant="secondary" icon={<Download className="w-4 h-4" />}>Export</Button>
                      <Button

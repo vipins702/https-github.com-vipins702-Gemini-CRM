@@ -262,7 +262,7 @@ const App: React.FC = () => {
         />
         <main
           style={{ marginLeft: isSidebarCollapsed ? 72 : sidebarWidth }}
-          className={`w-full min-h-screen ${isDraggingSidebar ? '' : 'transition-[margin] duration-300 ease-in-out'}`}
+          className={`flex-1 min-w-0 min-h-screen ${isDraggingSidebar ? '' : 'transition-[margin] duration-300 ease-in-out'}`}
         >
           <TopBar currentView={currentView} schemas={schemas} onNavigate={handleNavigate} />
           {renderContent()}
