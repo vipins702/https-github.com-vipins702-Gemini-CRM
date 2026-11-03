@@ -829,7 +829,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
       if (r.status) acc[r.status] = (acc[r.status] || 0) + 1;
       return acc;
    }, {});
-   const topStatus = Object.entries(statusCounts).sort((a, b) => b[1] - a[1])[0];
+   const topStatus = (Object.entries(statusCounts) as [string, number][]).sort((a, b) => b[1] - a[1])[0];
    const newThisWeek = data.filter(r => {
       if (!r.created_at) return false;
       const created = new Date(r.created_at);
