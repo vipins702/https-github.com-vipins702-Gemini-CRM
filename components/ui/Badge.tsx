@@ -38,7 +38,7 @@ export const Badge: React.FC<BadgeProps> = ({ status, variant = 'default', size 
 
   if (variant === 'dot') {
     return (
-      <span className="status-pill status-neutral !bg-transparent !border-transparent !text-ink-soft !px-0">
+      <span className="status-pill status-neutral !bg-transparent !border-transparent !text-ink-soft !px-0 before:hidden">
         <span className={`w-1.5 h-1.5 rounded-full ${dotColor[job]}`}></span>
         {status}
       </span>

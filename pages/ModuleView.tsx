@@ -815,11 +815,21 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
    const filteredData = data.filter(record =>
       JSON.stringify(record).toLowerCase().includes(searchTerm.toLowerCase())
    );
-   const columns = schema.fields.filter(f => !['image', 'iframe', 'attachment', 'textarea'].includes(f.type)).slice(0, 6);
+   const listable = schema.fields.filter(f => !['image', 'iframe', 'attachment', 'textarea'].includes(f.type));
+   let columns = listable.slice(0, 6);
+   // Stage is the first thing people scan for, so it always gets a column.
+   const statusField = listable.find(f => f.name === 'status' || f.type === 'status');
+   if (statusField && !columns.includes(statusField)) columns = [...columns.slice(0, 5), statusField];
 
    // Calculate stats
    const totalRecords = data.length;
-   const activeRecords = data.filter(r => r.status === 'Active' || r.status === 'Qualified' || r.status === 'Open').length;
+   const CLOSED = ['won', 'lost', 'closed', 'closed won', 'closed lost', 'converted', 'resolved', 'done', 'completed', 'inactive', 'paid', 'rejected', 'cancelled'];
+   const openRecords = data.filter(r => r.status && !CLOSED.includes(String(r.status).toLowerCase())).length;
+   const statusCounts = data.reduce<Record<string, number>>((acc, r) => {
+      if (r.status) acc[r.status] = (acc[r.status] || 0) + 1;
+      return acc;
+   }, {});
+   const topStatus = Object.entries(statusCounts).sort((a, b) => b[1] - a[1])[0];
    const newThisWeek = data.filter(r => {
       if (!r.created_at) return false;
       const created = new Date(r.created_at);
@@ -830,9 +840,9 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
    const listStats = [
       { icon: User, label: `Total ${schema.pluralLabel}`, value: totalRecords, tint: 'text-indigo-600 bg-indigo-50' },
-      { icon: Check, label: 'Active', value: activeRecords, tint: 'text-emerald-600 bg-emerald-50' },
-      { icon: Plus, label: 'New this week', value: newThisWeek, tint: 'text-blue-600 bg-blue-50' },
-      { icon: Briefcase, label: 'Showing', value: filteredData.length, tint: 'text-violet-600 bg-violet-50' },
+      { icon: Check, label: 'Still open', value: openRecords, tint: 'text-emerald-600 bg-emerald-50' },
+      { icon: Plus, label: 'Added this week', value: newThisWeek, tint: 'text-blue-600 bg-blue-50' },
+      { icon: Briefcase, label: topStatus ? `Most are "${topStatus[0]}"` : 'No stages yet', value: topStatus ? topStatus[1] : 0, tint: 'text-violet-600 bg-violet-50' },
    ];
 
    // --- DUPLICATE WARNING BANNER ---
