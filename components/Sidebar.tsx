@@ -159,7 +159,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
   return (
     <aside
       style={{ width: isCollapsed ? 72 : width }}
-      className={`bg-surface/80 backdrop-blur-xl backdrop-saturate-150 text-gray-900 flex flex-col h-screen fixed left-0 top-0 border-r border-gray-200/80 z-50 ${dragging ? '' : 'transition-[width] duration-300 ease-in-out'}`}
+      className={`theme-obsidian bg-surface/80 backdrop-blur-xl backdrop-saturate-150 text-gray-900 flex flex-col h-screen fixed left-0 top-0 border-r border-gray-200/80 z-50 ${dragging ? '' : 'transition-[width] duration-300 ease-in-out'}`}
     >
       {/* Drag handle on the right edge */}
       <div

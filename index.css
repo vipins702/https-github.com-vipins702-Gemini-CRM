@@ -464,3 +464,90 @@ h1, h2, h3, h4, .font-heading {
 ::-webkit-scrollbar-thumb { background: rgb(var(--neutral-300)); border-radius: 100vh; border: 3px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-thumb:hover { background: rgb(var(--neutral-400)); background-clip: content-box; border: 3px solid transparent; }
 * { scrollbar-width: thin; scrollbar-color: rgb(var(--neutral-300)) transparent; }
+
+
+/* ============================================================================
+   MAISON — luxury theme
+   Warm ivory + obsidian, champagne-gold brand, serif headings. Everything below
+   only re-points the tokens above, so every page picks it up. Brands: gold
+   (default), onyx, sapphire, burgundy, emerald, purple (amethyst).
+   ============================================================================ */
+:root {
+    /* Warm stone neutrals */
+    --neutral-50: 250 248 244; --neutral-100: 243 240 233; --neutral-200: 231 226 216; --neutral-300: 213 206 192; --neutral-400: 166 158 143; --neutral-500: 118 111 98; --neutral-600: 90 84 74; --neutral-700: 63 58 50; --neutral-800: 43 39 33; --neutral-900: 27 24 20; --neutral-950: 12 11 9;
+
+    --gold-50: 252 249 239; --gold-100: 248 241 219; --gold-200: 240 226 180; --gold-300: 228 204 128; --gold-400: 210 174 84; --gold-500: 184 143 48; --gold-600: 146 105 28; --gold-700: 118 84 22; --gold-800: 94 68 20; --gold-900: 74 54 20; --gold-950: 42 30 10;
+    --onyx-50: 247 246 243; --onyx-100: 237 235 230; --onyx-200: 214 210 202; --onyx-300: 168 162 152; --onyx-400: 112 106 98; --onyx-500: 64 60 54; --onyx-600: 30 28 25; --onyx-700: 14 13 11; --onyx-800: 8 8 7; --onyx-900: 4 4 4; --onyx-950: 0 0 0;
+    --sapphire-50: 238 243 252; --sapphire-100: 219 231 250; --sapphire-200: 184 206 243; --sapphire-300: 138 172 232; --sapphire-400: 88 130 214; --sapphire-500: 46 94 190; --sapphire-600: 28 70 156; --sapphire-700: 22 55 126; --sapphire-800: 18 44 100; --sapphire-900: 16 36 80; --sapphire-950: 10 22 50;
+    --burgundy-50: 253 241 243; --burgundy-100: 250 222 228; --burgundy-200: 242 188 200; --burgundy-300: 230 140 160; --burgundy-400: 208 88 117; --burgundy-500: 170 44 76; --burgundy-600: 138 28 58; --burgundy-700: 112 22 47; --burgundy-800: 90 20 40; --burgundy-900: 72 18 34; --burgundy-950: 42 8 18;
+    --emerald-50: 236 248 242; --emerald-100: 210 238 224; --emerald-200: 168 222 196; --emerald-300: 112 198 156; --emerald-400: 58 168 118; --emerald-500: 22 134 90; --emerald-600: 14 108 72; --emerald-700: 10 88 60; --emerald-800: 8 70 48; --emerald-900: 8 56 40; --emerald-950: 4 34 24;
+
+    --c-canvas: 247 244 238;
+    --c-surface: 255 254 251;
+    --c-surface-2: 250 248 243;
+    --on-accent: 255 255 255;
+
+    /* Warm, soft elevation with a gold-tinted hairline */
+    --elev-1: 0 0 0 1px rgba(110, 85, 30, 0.07), 0 1px 2px rgba(60, 45, 15, 0.05);
+    --elev-2: 0 0 0 1px rgba(110, 85, 30, 0.07), 0 2px 6px rgba(60, 45, 15, 0.04), 0 14px 32px -14px rgba(60, 45, 15, 0.14);
+    --elev-3: 0 0 0 1px rgba(110, 85, 30, 0.09), 0 18px 40px -14px rgba(60, 45, 15, 0.22);
+    --elev-pop: 0 0 0 1px rgba(110, 85, 30, 0.12), 0 28px 60px -16px rgba(40, 30, 10, 0.34);
+    --material: rgba(255, 254, 251, 0.8);
+    --material-border: rgba(110, 85, 30, 0.12);
+
+    --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-heading: "Playfair Display", "Cormorant Garamond", Georgia, "Times New Roman", serif;
+}
+.dark {
+    --neutral-50: 30 28 24; --neutral-100: 39 36 31; --neutral-200: 52 48 42; --neutral-300: 70 65 57; --neutral-400: 112 105 94; --neutral-500: 158 150 137; --neutral-600: 181 173 160; --neutral-700: 206 199 187; --neutral-800: 232 226 216; --neutral-900: 246 242 234; --neutral-950: 255 252 247;
+
+    --gold-50: 44 36 18; --gold-100: 58 46 20; --gold-200: 82 64 24; --gold-300: 112 88 30; --gold-400: 196 158 70; --gold-500: 212 175 84; --gold-600: 212 175 84; --gold-700: 228 197 118; --gold-800: 238 215 156; --gold-900: 246 232 192; --gold-950: 252 244 220;
+    --onyx-50: 40 38 34; --onyx-100: 52 49 44; --onyx-200: 70 66 60; --onyx-300: 96 91 83; --onyx-400: 190 184 172; --onyx-500: 226 221 211; --onyx-600: 238 234 225; --onyx-700: 248 245 238; --onyx-800: 252 250 246; --onyx-900: 255 255 255; --onyx-950: 255 255 255;
+    --sapphire-50: 22 32 52; --sapphire-100: 26 42 70; --sapphire-200: 32 56 98; --sapphire-300: 40 74 134; --sapphire-400: 96 144 235; --sapphire-500: 74 124 224; --sapphire-600: 62 112 214; --sapphire-700: 126 168 246; --sapphire-800: 164 196 250; --sapphire-900: 198 218 252; --sapphire-950: 226 236 254;
+    --burgundy-50: 52 22 30; --burgundy-100: 68 26 38; --burgundy-200: 92 32 50; --burgundy-300: 124 40 66; --burgundy-400: 224 100 132; --burgundy-500: 212 78 112; --burgundy-600: 196 62 98; --burgundy-700: 234 130 158; --burgundy-800: 242 164 186; --burgundy-900: 248 198 212; --burgundy-950: 252 226 234;
+    --emerald-50: 18 44 34; --emerald-100: 20 58 44; --emerald-200: 24 80 60; --emerald-300: 28 108 80; --emerald-400: 64 190 140; --emerald-500: 40 160 112; --emerald-600: 30 150 104; --emerald-700: 110 218 170; --emerald-800: 150 230 192; --emerald-900: 186 238 214; --emerald-950: 216 246 232;
+
+    --c-canvas: 12 11 9;
+    --c-surface: 24 22 19;
+    --c-surface-2: 36 33 29;
+    --elev-1: 0 0 0 1px rgba(232, 200, 120, 0.08);
+    --elev-2: 0 0 0 1px rgba(232, 200, 120, 0.09), 0 10px 28px -10px rgba(0, 0, 0, 0.7);
+    --elev-3: 0 0 0 1px rgba(232, 200, 120, 0.11), 0 18px 44px -12px rgba(0, 0, 0, 0.8);
+    --elev-pop: 0 0 0 1px rgba(232, 200, 120, 0.14), 0 28px 60px -14px rgba(0, 0, 0, 0.9);
+    --material: rgba(24, 22, 19, 0.8);
+    --material-border: rgba(232, 200, 120, 0.12);
+}
+
+/* Brand → accent palette. Gold is the default when nothing is chosen. */
+:root:not([data-brand]), [data-brand="gold"], [data-brand="blue"] { --accent-50: var(--gold-50); --accent-100: var(--gold-100); --accent-200: var(--gold-200); --accent-300: var(--gold-300); --accent-400: var(--gold-400); --accent-500: var(--gold-500); --accent-600: var(--gold-600); --accent-700: var(--gold-700); --accent-800: var(--gold-800); --accent-900: var(--gold-900); --accent-950: var(--gold-950); }
+[data-brand="onyx"] { --accent-50: var(--onyx-50); --accent-100: var(--onyx-100); --accent-200: var(--onyx-200); --accent-300: var(--onyx-300); --accent-400: var(--onyx-400); --accent-500: var(--onyx-500); --accent-600: var(--onyx-600); --accent-700: var(--onyx-700); --accent-800: var(--onyx-800); --accent-900: var(--onyx-900); --accent-950: var(--onyx-950); }
+[data-brand="sapphire"] { --accent-50: var(--sapphire-50); --accent-100: var(--sapphire-100); --accent-200: var(--sapphire-200); --accent-300: var(--sapphire-300); --accent-400: var(--sapphire-400); --accent-500: var(--sapphire-500); --accent-600: var(--sapphire-600); --accent-700: var(--sapphire-700); --accent-800: var(--sapphire-800); --accent-900: var(--sapphire-900); --accent-950: var(--sapphire-950); }
+[data-brand="burgundy"] { --accent-50: var(--burgundy-50); --accent-100: var(--burgundy-100); --accent-200: var(--burgundy-200); --accent-300: var(--burgundy-300); --accent-400: var(--burgundy-400); --accent-500: var(--burgundy-500); --accent-600: var(--burgundy-600); --accent-700: var(--burgundy-700); --accent-800: var(--burgundy-800); --accent-900: var(--burgundy-900); --accent-950: var(--burgundy-950); }
+[data-brand="emerald"] { --accent-50: var(--emerald-50); --accent-100: var(--emerald-100); --accent-200: var(--emerald-200); --accent-300: var(--emerald-300); --accent-400: var(--emerald-400); --accent-500: var(--emerald-500); --accent-600: var(--emerald-600); --accent-700: var(--emerald-700); --accent-800: var(--emerald-800); --accent-900: var(--emerald-900); --accent-950: var(--emerald-950); }
+
+/* Bright gold / ivory fills in dark mode need dark text on top. */
+.dark:not([data-brand]), .dark[data-brand="gold"], .dark[data-brand="blue"] { --on-accent: 30 22 6; }
+.dark[data-brand="onyx"] { --on-accent: 20 18 14; }
+.btn-primary-brand, .btn-tri-primary, .btn-gradient { color: rgb(var(--on-accent)); background: linear-gradient(180deg, rgb(var(--accent-500)) 0%, rgb(var(--accent-600)) 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 2px rgba(40, 30, 10, 0.25); }
+.btn-primary-brand:hover, .btn-tri-primary:hover, .btn-gradient:hover { background: linear-gradient(180deg, rgb(var(--accent-600)) 0%, rgb(var(--accent-700)) 100%); }
+.dark :is(.bg-blue-500, .bg-blue-600, .bg-blue-700, .bg-indigo-500, .bg-indigo-600, .bg-indigo-700, .bg-accent).text-white { color: rgb(var(--on-accent)); }
+
+/* Serif headings with lining figures so numbers stay legible. */
+h1, h2, h3, h4, .font-heading { font-variant-numeric: lining-nums; font-feature-settings: "lnum"; letter-spacing: -0.012em; }
+h1, h2, h3, .font-heading { font-weight: 600 !important; }
+
+/* Cards: ivory paper with a warm hairline. */
+.glass-showcase, .surface-card, .card-modern, .stat-card { border-color: rgb(var(--neutral-200) / 0.55); }
+
+/* Obsidian sidebar: scopes the dark tokens + bright champagne accent to the <aside>. */
+.theme-obsidian {
+    --neutral-50: 30 28 24; --neutral-100: 40 37 32; --neutral-200: 58 53 46; --neutral-300: 80 74 65; --neutral-400: 122 115 103; --neutral-500: 162 154 140; --neutral-600: 186 178 164; --neutral-700: 210 203 190; --neutral-800: 234 228 218; --neutral-900: 248 244 236; --neutral-950: 255 252 247;
+    --c-canvas: 12 11 9; --c-surface: 18 17 14; --c-surface-2: 28 26 22;
+    --accent-50: 44 36 18; --accent-100: 58 46 20; --accent-200: 82 64 24; --accent-300: 112 88 30; --accent-400: 196 158 70; --accent-500: 212 175 84; --accent-600: 212 175 84; --accent-700: 232 202 124; --accent-800: 238 215 156; --accent-900: 246 232 192; --accent-950: 252 244 220;
+    --on-accent: 30 22 6;
+    background-image: linear-gradient(180deg, rgba(232, 200, 120, 0.05), transparent 220px);
+    border-right-color: rgba(232, 200, 120, 0.14) !important;
+}
+.theme-obsidian .nav-pill-active { background: rgb(var(--accent-500) / 0.14); color: rgb(var(--accent-700)); }
+.nav-pill-active::before { content: ""; position: absolute; left: -10px; top: 50%; width: 3px; height: 18px; border-radius: 0 3px 3px 0; transform: translateY(-50%); background: rgb(var(--accent-500)); }
+.theme-obsidian .tri-ring-sq { background: linear-gradient(140deg, rgb(232 200 120), rgb(146 105 28)); }

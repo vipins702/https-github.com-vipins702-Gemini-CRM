@@ -76,13 +76,16 @@ export const Settings: React.FC = () => {
 
    // Swatches use the fixed palette tokens (bg-blue-* / bg-indigo-* follow the current brand).
    const colors = [
-      { id: 'blue', label: 'Blue', swatch: 'rgb(var(--blue-600))' },
-      { id: 'indigo', label: 'Indigo', swatch: 'rgb(var(--indigo-600))' },
-      { id: 'purple', label: 'Purple', swatch: 'rgb(var(--purple-600))' },
-      { id: 'emerald', label: 'Green', swatch: 'rgb(var(--green-600))' },
-      { id: 'rose', label: 'Pink', swatch: 'rgb(var(--pink-600))' },
-      { id: 'orange', label: 'Orange', swatch: 'rgb(var(--orange-600))' },
+      { id: 'gold', label: 'Champagne Gold', swatch: 'linear-gradient(140deg, rgb(212 175 84), rgb(146 105 28))' },
+      { id: 'onyx', label: 'Onyx', swatch: 'linear-gradient(140deg, rgb(64 60 54), rgb(14 13 11))' },
+      { id: 'sapphire', label: 'Sapphire', swatch: 'linear-gradient(140deg, rgb(46 94 190), rgb(22 55 126))' },
+      { id: 'burgundy', label: 'Burgundy', swatch: 'linear-gradient(140deg, rgb(170 44 76), rgb(112 22 47))' },
+      { id: 'emerald', label: 'Emerald', swatch: 'linear-gradient(140deg, rgb(22 134 90), rgb(10 88 60))' },
+      { id: 'purple', label: 'Amethyst', swatch: 'linear-gradient(140deg, rgb(175 82 222), rgb(123 47 163))' },
    ];
+
+   // Workspaces saved on the old default (blue) or on nothing show as Champagne Gold, which is what they render.
+   const currentBrand = colors.some(c => c.id === settings?.primaryColor) ? settings?.primaryColor : 'gold';
 
    if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>;
    if (!settings) return <div>Error loading settings</div>;
@@ -354,11 +357,12 @@ export const Settings: React.FC = () => {
                                  key={color.id}
                                  onClick={() => updateSetting('primaryColor', color.id)}
                                  aria-label={`${color.label} brand colour`}
-                                 aria-pressed={settings.primaryColor === color.id}
-                                 style={{ backgroundColor: color.swatch }}
-                                 className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform ${settings.primaryColor === color.id ? 'ring-4 ring-offset-2 ring-offset-surface ring-gray-200 scale-110' : 'hover:scale-105'}`}
+                                 aria-pressed={currentBrand === color.id}
+                                 title={color.label}
+                                 style={{ background: color.swatch }}
+                                 className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] ${currentBrand === color.id ? 'ring-4 ring-offset-2 ring-offset-surface ring-gray-300 scale-110' : 'hover:scale-105'}`}
                               >
-                                 {settings.primaryColor === color.id && <Check className="w-6 h-6 text-white" />}
+                                 {currentBrand === color.id && <Check className="w-6 h-6 text-white" />}
                               </button>
                            ))}
                         </div>

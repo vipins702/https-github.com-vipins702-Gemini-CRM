@@ -9,7 +9,7 @@ const v = (token) => `rgb(var(--${token}) / <alpha-value>)`;
 
 const neutral = scale('neutral');
 const accent = scale('accent');
-const systemFont = ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', 'Inter', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'];
+const systemFont = ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'];
 
 module.exports = {
     darkMode: 'class',
@@ -24,7 +24,7 @@ module.exports = {
         extend: {
             fontFamily: {
                 sans: systemFont,
-                heading: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'Inter', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+                heading: ['"Playfair Display"', '"Cormorant Garamond"', 'Georgia', '"Times New Roman"', 'serif'],
                 mono: ['ui-monospace', '"SF Mono"', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
             },
             colors: {

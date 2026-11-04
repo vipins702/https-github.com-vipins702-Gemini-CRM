@@ -19,11 +19,11 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 const THEME_KEY = 'flowcrm_theme';
 const THEME_EVENT = 'flowcrm-theme-change';
 
-const BRANDS = new Set(['blue', 'indigo', 'purple', 'emerald', 'rose', 'orange']);
+const BRANDS = new Set(['gold', 'onyx', 'sapphire', 'burgundy', 'emerald', 'purple', 'indigo', 'rose', 'orange']);
 
 const FONT_FAMILIES: Record<string, string> = {
-  sans: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  serif: "'Merriweather', Georgia, 'Times New Roman', serif",
+  sans: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  serif: "'Playfair Display', Georgia, 'Times New Roman', serif",
   mono: 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace',
 };
 
@@ -96,7 +96,8 @@ export function applySettings(settings: Partial<SystemSettings> | null | undefin
   applyThemeMode(getThemeMode());
 
   // Brand colour -> accent palette (index.css [data-brand])
-  const brand = settings?.primaryColor && BRANDS.has(settings.primaryColor) ? settings.primaryColor : 'blue';
+  // "blue" was the old default, so saved workspaces on it move to the new gold default.
+  const brand = settings?.primaryColor && BRANDS.has(settings.primaryColor) ? settings.primaryColor : 'gold';
   root.setAttribute('data-brand', brand);
 
   // Font size -> root font-size (rem-based text scales)
