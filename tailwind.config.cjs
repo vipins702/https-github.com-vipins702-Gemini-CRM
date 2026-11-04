@@ -9,7 +9,8 @@ const v = (token) => `rgb(var(--${token}) / <alpha-value>)`;
 
 const neutral = scale('neutral');
 const accent = scale('accent');
-const systemFont = ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'];
+// Body font follows the workspace's font setting (services/theme.ts sets --font-family).
+const systemFont = ['var(--font-family)'];
 
 module.exports = {
     darkMode: 'class',
@@ -24,7 +25,7 @@ module.exports = {
         extend: {
             fontFamily: {
                 sans: systemFont,
-                heading: ['"Playfair Display"', '"Cormorant Garamond"', 'Georgia', '"Times New Roman"', 'serif'],
+                heading: ['var(--font-heading)'],
                 mono: ['ui-monospace', '"SF Mono"', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
             },
             colors: {
@@ -49,7 +50,8 @@ module.exports = {
                 ink: { DEFAULT: v('neutral-900'), soft: v('neutral-700'), muted: v('neutral-500') },
                 brand: { blue: v('accent-600'), bluedeep: v('accent-700'), green: v('green-600'), greendeep: v('green-700'), orange: v('orange-600'), orangedeep: v('orange-700') },
             },
-            borderRadius: { xl: '0.875rem', '2xl': '1.125rem', '3xl': '1.5rem' },
+            // Corner shape is a workspace setting (sharp / soft / round) via --r-* in index.css.
+            borderRadius: { md: 'var(--r-md)', lg: 'var(--r-lg)', xl: 'var(--r-xl)', '2xl': 'var(--r-2xl)', '3xl': 'var(--r-3xl)' },
         },
     },
     plugins: [],

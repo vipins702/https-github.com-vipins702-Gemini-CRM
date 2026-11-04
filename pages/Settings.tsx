@@ -4,6 +4,7 @@ import { Button } from '../components/ui/Button';
 import { api } from '../services/api';
 import { applySettings, setPersonalTheme, getThemeMode, onThemeChange, ThemeMode } from '../services/theme';
 import { SystemSettings } from '../types';
+import { AppearanceEditor } from '../components/AppearanceEditor';
 import { CURRENCIES, formatCurrency } from '../services/currency';
 import {
    Settings as SettingsIcon, Palette, Building, Bell, Moon, Sun,
@@ -66,6 +67,15 @@ export const Settings: React.FC = () => {
       setSaving(false);
    };
 
+   // Change several settings at once (presets, colour pickers); applied live.
+   const patchSettings = (changes: Partial<SystemSettings>) => {
+      if (!settings) return;
+      const next = { ...settings, ...changes };
+      setSettings(next);
+      if (changes.theme) setPersonalTheme(changes.theme);
+      applySettings(next);
+   };
+
    const updateSetting = (key: keyof SystemSettings, value: any) => {
       if (!settings) return;
       const next = { ...settings, [key]: value };
@@ -73,19 +83,6 @@ export const Settings: React.FC = () => {
       if (key === 'theme') setPersonalTheme(value); // your own choice wins over any earlier top-bar toggle
       applySettings(next); // live preview — apply instantly as the user changes options
    };
-
-   // Swatches use the fixed palette tokens (bg-blue-* / bg-indigo-* follow the current brand).
-   const colors = [
-      { id: 'gold', label: 'Champagne Gold', swatch: 'linear-gradient(140deg, rgb(212 175 84), rgb(146 105 28))' },
-      { id: 'onyx', label: 'Onyx', swatch: 'linear-gradient(140deg, rgb(64 60 54), rgb(14 13 11))' },
-      { id: 'sapphire', label: 'Sapphire', swatch: 'linear-gradient(140deg, rgb(46 94 190), rgb(22 55 126))' },
-      { id: 'burgundy', label: 'Burgundy', swatch: 'linear-gradient(140deg, rgb(170 44 76), rgb(112 22 47))' },
-      { id: 'emerald', label: 'Emerald', swatch: 'linear-gradient(140deg, rgb(22 134 90), rgb(10 88 60))' },
-      { id: 'purple', label: 'Amethyst', swatch: 'linear-gradient(140deg, rgb(175 82 222), rgb(123 47 163))' },
-   ];
-
-   // Workspaces saved on the old default (blue) or on nothing show as Champagne Gold, which is what they render.
-   const currentBrand = colors.some(c => c.id === settings?.primaryColor) ? settings?.primaryColor : 'gold';
 
    if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>;
    if (!settings) return <div>Error loading settings</div>;
@@ -330,115 +327,7 @@ export const Settings: React.FC = () => {
                {activeTab === 'appearance' && (
                   <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
 
-                     {/* Theme Mode */}
-                     <Card title="Interface Theme">
-                        <div className="grid grid-cols-3 gap-4">
-                           {['light', 'dark', 'system'].map((mode) => (
-                              <button
-                                 key={mode}
-                                 onClick={() => updateSetting('theme', mode)}
-                                 className={`p-4 rounded-xl border-2 flex flex-col items-center gap-3 transition-all ${activeTheme === mode ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-gray-300 text-gray-500'}`}
-                                 aria-pressed={activeTheme === mode}
-                              >
-                                 {mode === 'light' && <Sun className="w-6 h-6" />}
-                                 {mode === 'dark' && <Moon className="w-6 h-6" />}
-                                 {mode === 'system' && <Monitor className="w-6 h-6" />}
-                                 <span className="capitalize font-medium text-sm">{mode} Mode</span>
-                              </button>
-                           ))}
-                        </div>
-                     </Card>
-
-                     {/* Accent Color */}
-                     <Card title="Brand Color">
-                        <div className="flex gap-4">
-                           {colors.map((color) => (
-                              <button
-                                 key={color.id}
-                                 onClick={() => updateSetting('primaryColor', color.id)}
-                                 aria-label={`${color.label} brand colour`}
-                                 aria-pressed={currentBrand === color.id}
-                                 title={color.label}
-                                 style={{ background: color.swatch }}
-                                 className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] ${currentBrand === color.id ? 'ring-4 ring-offset-2 ring-offset-surface ring-gray-300 scale-110' : 'hover:scale-105'}`}
-                              >
-                                 {currentBrand === color.id && <Check className="w-6 h-6 text-white" />}
-                              </button>
-                           ))}
-                        </div>
-                        <p className="text-xs text-gray-500 mt-4">This color will be used for buttons, links, and active states.</p>
-                     </Card>
-
-                     {/* Density & Typography */}
-                     <Card title="Layout & Typography">
-                        <div className="space-y-6">
-                           <div>
-                              <label className="text-sm font-medium text-gray-700 mb-3 block flex items-center gap-2">
-                                 <Layout className="w-4 h-4" /> Density
-                              </label>
-                              <div className="flex gap-4">
-                                 <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                       type="radio"
-                                       name="density"
-                                       checked={settings.density === 'comfortable'}
-                                       onChange={() => updateSetting('density', 'comfortable')}
-                                       className="text-indigo-600 focus:ring-indigo-500"
-                                    />
-                                    <span className="text-sm">Comfortable</span>
-                                 </label>
-                                 <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                       type="radio"
-                                       name="density"
-                                       checked={settings.density === 'compact'}
-                                       onChange={() => updateSetting('density', 'compact')}
-                                       className="text-indigo-600 focus:ring-indigo-500"
-                                    />
-                                    <span className="text-sm">Compact</span>
-                                 </label>
-                              </div>
-                           </div>
-
-                           <div>
-                              <label className="text-sm font-medium text-gray-700 mb-3 block flex items-center gap-2">
-                                 <Type className="w-4 h-4" /> Font Family
-                              </label>
-                              <select
-                                 className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                 value={settings.fontFamily}
-                                 onChange={(e) => updateSetting('fontFamily', e.target.value)}
-                              >
-                                 <option value="sans">Sans Serif (Inter/Helvetica)</option>
-                                 <option value="serif">Serif (Merriweather)</option>
-                                 <option value="mono">Monospace (JetBrains Mono)</option>
-                              </select>
-                           </div>
-
-                           <div>
-                              <label className="text-sm font-medium text-gray-700 mb-3 block flex items-center gap-2">
-                                 <Type className="w-4 h-4" /> Font Size
-                              </label>
-                              <div className="grid grid-cols-3 gap-3 max-w-md">
-                                 {([
-                                    { id: 'sm', label: 'Compact', sample: 'text-xs' },
-                                    { id: 'md', label: 'Default', sample: 'text-sm' },
-                                    { id: 'lg', label: 'Large', sample: 'text-base' },
-                                 ] as const).map((opt) => (
-                                    <button
-                                       key={opt.id}
-                                       onClick={() => updateSetting('fontSize', opt.id)}
-                                       className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-1 ${(settings.fontSize || 'md') === opt.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
-                                    >
-                                       <span className={`font-bold ${opt.sample}`}>Aa</span>
-                                       <span className="text-xs font-medium">{opt.label}</span>
-                                    </button>
-                                 ))}
-                              </div>
-                              <p className="text-xs text-gray-500 mt-2">Scales text across the entire application.</p>
-                           </div>
-                        </div>
-                     </Card>
+                     <AppearanceEditor settings={settings} activeTheme={activeTheme} patch={patchSettings} />
 
                      {/* 2025 Effects */}
                      <Card title="2025 Effects">

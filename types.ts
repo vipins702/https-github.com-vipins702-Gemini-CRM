@@ -554,9 +554,16 @@ export interface ObjectManagerProps {
 // --- SYSTEM SETTINGS ---
 export interface SystemSettings {
   theme: 'light' | 'dark' | 'system';
-  primaryColor: 'indigo' | 'blue' | 'purple' | 'emerald' | 'rose' | 'orange';
+  primaryColor: string; // brand preset id (gold, sapphire, …) or 'custom' with customColor
+  customColor?: string; // #RRGGBB, used when primaryColor is 'custom'
+  neutralTone?: 'warm' | 'cool' | 'neutral';
+  sidebarStyle?: 'dark' | 'light';
+  radius?: 'sharp' | 'soft' | 'round';
+  fontBody?: string;
+  fontHeading?: string; // 'same' follows fontBody
+  themePreset?: string;
   density: 'comfortable' | 'compact';
-  fontFamily: 'sans' | 'serif' | 'mono';
+  fontFamily?: 'sans' | 'serif' | 'mono'; // legacy; superseded by fontBody
   fontSize?: 'sm' | 'md' | 'lg';
   organizationName: string;
   logoUrl?: string;

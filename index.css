@@ -160,17 +160,17 @@ h1, h2, h3, h4, .font-heading {
     border: 1px solid var(--material-border);
     box-shadow: var(--elev-2);
 }
-.glass-card { border-radius: 18px; transition: box-shadow var(--transition-normal), transform var(--transition-normal); }
+.glass-card { border-radius: var(--r-2xl); transition: box-shadow var(--transition-normal), transform var(--transition-normal); }
 .glass-card:hover { box-shadow: var(--elev-3); }
 .glass-strong { background: rgb(var(--c-surface)); border: 1px solid var(--material-border); box-shadow: var(--elev-3); }
 
 .glass-showcase, .surface-card, .card-modern, .stat-card {
     background: rgb(var(--c-surface));
     border: 1px solid transparent;
-    border-radius: 18px;
+    border-radius: var(--r-2xl);
     box-shadow: var(--elev-2);
 }
-.glass-work { background: rgb(var(--c-surface)); border-radius: 14px; box-shadow: var(--elev-1); }
+.glass-work { background: rgb(var(--c-surface)); border-radius: var(--r-xl); box-shadow: var(--elev-1); }
 .stat-card { padding: 1.25rem; transition: box-shadow var(--transition-normal); }
 .card-modern { transition: box-shadow var(--transition-normal); }
 .card-modern:hover, .stat-card:hover { box-shadow: var(--elev-3); }
@@ -279,7 +279,7 @@ h1, h2, h3, h4, .font-heading {
    ============================================================================ */
 .tri-ring { position: relative; border-radius: 50%; padding: 2px; background: linear-gradient(140deg, rgb(var(--accent-400)), rgb(var(--accent-600))); }
 .tri-ring > * { border-radius: 50%; background: rgb(var(--c-surface)); width: 100%; height: 100%; }
-.tri-ring-sq { border-radius: 14px; padding: 2px; background: linear-gradient(140deg, rgb(var(--accent-400)), rgb(var(--accent-600))); }
+.tri-ring-sq { border-radius: var(--r-xl); padding: 2px; background: linear-gradient(140deg, rgb(var(--accent-400)), rgb(var(--accent-600))); }
 .tri-ring-sq > * { border-radius: 12px; }
 /* App-icon style tiles: white glyph on the accent tile, whatever colour class the icon carries. */
 .tri-ring-sq svg { color: #fff !important; }
@@ -287,7 +287,7 @@ h1, h2, h3, h4, .font-heading {
 /* ============================================================================
    Navigation (sidebar)
    ============================================================================ */
-.nav-item, .nav-pill { position: relative; border-radius: 10px; transition: background-color var(--transition-fast), color var(--transition-fast); }
+.nav-item, .nav-pill { position: relative; border-radius: var(--r-lg); transition: background-color var(--transition-fast), color var(--transition-fast); }
 .nav-item-active, .nav-pill-active {
     background: rgb(var(--accent-500) / 0.12);
     color: rgb(var(--accent-700));
@@ -307,7 +307,7 @@ h1, h2, h3, h4, .font-heading {
         width: 100%;
         background-color: rgb(var(--c-surface));
         border: 1px solid rgb(var(--neutral-200));
-        border-radius: 10px;
+        border-radius: var(--r-lg);
         padding: 0.625rem 0.875rem;
         font-size: 0.9375rem;
         line-height: 1.45;
@@ -358,7 +358,7 @@ h1, h2, h3, h4, .font-heading {
 .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
 .toast {
     pointer-events: auto; display: flex; align-items: center; gap: 0.75rem;
-    padding: 0.875rem 1.125rem; border-radius: 14px;
+    padding: 0.875rem 1.125rem; border-radius: var(--r-xl);
     font-size: 0.875rem; font-weight: 500;
     background: var(--material);
     backdrop-filter: saturate(180%) blur(20px);
@@ -384,7 +384,7 @@ h1, h2, h3, h4, .font-heading {
 .skeleton-text { height: 0.875rem; border-radius: 4px; }
 .skeleton-heading { height: 1.5rem; width: 60%; border-radius: 6px; }
 .skeleton-circle { border-radius: 50%; }
-.skeleton-card { border-radius: 18px; height: 120px; }
+.skeleton-card { border-radius: var(--r-2xl); height: 120px; }
 
 .tooltip-wrapper { position: relative; }
 .tooltip-content {
@@ -495,8 +495,6 @@ h1, h2, h3, h4, .font-heading {
     --material: rgba(255, 254, 251, 0.8);
     --material-border: rgba(110, 85, 30, 0.12);
 
-    --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --font-heading: "Playfair Display", "Cormorant Garamond", Georgia, "Times New Roman", serif;
 }
 .dark {
     --neutral-50: 30 28 24; --neutral-100: 39 36 31; --neutral-200: 52 48 42; --neutral-300: 70 65 57; --neutral-400: 112 105 94; --neutral-500: 158 150 137; --neutral-600: 181 173 160; --neutral-700: 206 199 187; --neutral-800: 232 226 216; --neutral-900: 246 242 234; --neutral-950: 255 252 247;
@@ -519,35 +517,95 @@ h1, h2, h3, h4, .font-heading {
 }
 
 /* Brand → accent palette. Gold is the default when nothing is chosen. */
-:root:not([data-brand]), [data-brand="gold"], [data-brand="blue"] { --accent-50: var(--gold-50); --accent-100: var(--gold-100); --accent-200: var(--gold-200); --accent-300: var(--gold-300); --accent-400: var(--gold-400); --accent-500: var(--gold-500); --accent-600: var(--gold-600); --accent-700: var(--gold-700); --accent-800: var(--gold-800); --accent-900: var(--gold-900); --accent-950: var(--gold-950); }
+:root:not([data-brand]), [data-brand="gold"] { --accent-50: var(--gold-50); --accent-100: var(--gold-100); --accent-200: var(--gold-200); --accent-300: var(--gold-300); --accent-400: var(--gold-400); --accent-500: var(--gold-500); --accent-600: var(--gold-600); --accent-700: var(--gold-700); --accent-800: var(--gold-800); --accent-900: var(--gold-900); --accent-950: var(--gold-950); }
 [data-brand="onyx"] { --accent-50: var(--onyx-50); --accent-100: var(--onyx-100); --accent-200: var(--onyx-200); --accent-300: var(--onyx-300); --accent-400: var(--onyx-400); --accent-500: var(--onyx-500); --accent-600: var(--onyx-600); --accent-700: var(--onyx-700); --accent-800: var(--onyx-800); --accent-900: var(--onyx-900); --accent-950: var(--onyx-950); }
 [data-brand="sapphire"] { --accent-50: var(--sapphire-50); --accent-100: var(--sapphire-100); --accent-200: var(--sapphire-200); --accent-300: var(--sapphire-300); --accent-400: var(--sapphire-400); --accent-500: var(--sapphire-500); --accent-600: var(--sapphire-600); --accent-700: var(--sapphire-700); --accent-800: var(--sapphire-800); --accent-900: var(--sapphire-900); --accent-950: var(--sapphire-950); }
 [data-brand="burgundy"] { --accent-50: var(--burgundy-50); --accent-100: var(--burgundy-100); --accent-200: var(--burgundy-200); --accent-300: var(--burgundy-300); --accent-400: var(--burgundy-400); --accent-500: var(--burgundy-500); --accent-600: var(--burgundy-600); --accent-700: var(--burgundy-700); --accent-800: var(--burgundy-800); --accent-900: var(--burgundy-900); --accent-950: var(--burgundy-950); }
 [data-brand="emerald"] { --accent-50: var(--emerald-50); --accent-100: var(--emerald-100); --accent-200: var(--emerald-200); --accent-300: var(--emerald-300); --accent-400: var(--emerald-400); --accent-500: var(--emerald-500); --accent-600: var(--emerald-600); --accent-700: var(--emerald-700); --accent-800: var(--emerald-800); --accent-900: var(--emerald-900); --accent-950: var(--emerald-950); }
 
 /* Bright gold / ivory fills in dark mode need dark text on top. */
-.dark:not([data-brand]), .dark[data-brand="gold"], .dark[data-brand="blue"] { --on-accent: 30 22 6; }
+.dark:not([data-brand]), .dark[data-brand="gold"] { --on-accent: 30 22 6; }
 .dark[data-brand="onyx"] { --on-accent: 20 18 14; }
 .btn-primary-brand, .btn-tri-primary, .btn-gradient { color: rgb(var(--on-accent)); background: linear-gradient(180deg, rgb(var(--accent-500)) 0%, rgb(var(--accent-600)) 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 2px rgba(40, 30, 10, 0.25); }
 .btn-primary-brand:hover, .btn-tri-primary:hover, .btn-gradient:hover { background: linear-gradient(180deg, rgb(var(--accent-600)) 0%, rgb(var(--accent-700)) 100%); }
 .dark :is(.bg-blue-500, .bg-blue-600, .bg-blue-700, .bg-indigo-500, .bg-indigo-600, .bg-indigo-700, .bg-accent).text-white { color: rgb(var(--on-accent)); }
 
-/* Serif headings with lining figures so numbers stay legible. */
-h1, h2, h3, h4, .font-heading { font-variant-numeric: lining-nums; font-feature-settings: "lnum"; letter-spacing: -0.012em; }
-h1, h2, h3, .font-heading { font-weight: 600 !important; }
-
 /* Cards: ivory paper with a warm hairline. */
 .glass-showcase, .surface-card, .card-modern, .stat-card { border-color: rgb(var(--neutral-200) / 0.55); }
 
 /* Obsidian sidebar: scopes the dark tokens + bright champagne accent to the <aside>. */
-.theme-obsidian {
+/* Sidebar style: dark (default) scopes dark tokens to the sidebar; "light" leaves it on the page tokens. */
+:root:not([data-sidebar="light"]) .app-sidebar {
     --neutral-50: 30 28 24; --neutral-100: 40 37 32; --neutral-200: 58 53 46; --neutral-300: 80 74 65; --neutral-400: 122 115 103; --neutral-500: 162 154 140; --neutral-600: 186 178 164; --neutral-700: 210 203 190; --neutral-800: 234 228 218; --neutral-900: 248 244 236; --neutral-950: 255 252 247;
     --c-canvas: 12 11 9; --c-surface: 18 17 14; --c-surface-2: 28 26 22;
-    --accent-50: 44 36 18; --accent-100: 58 46 20; --accent-200: 82 64 24; --accent-300: 112 88 30; --accent-400: 196 158 70; --accent-500: 212 175 84; --accent-600: 212 175 84; --accent-700: 232 202 124; --accent-800: 238 215 156; --accent-900: 246 232 192; --accent-950: 252 244 220;
-    --on-accent: 30 22 6;
+    --accent-400: var(--sb-500); --accent-500: var(--sb-500); --accent-600: var(--sb-500); --accent-700: var(--sb-700); --accent-800: var(--sb-700);
+    --on-accent: 20 18 14;
+    background-color: rgb(var(--c-surface)); /* solid, so it never washes out over the page colour */
     background-image: linear-gradient(180deg, rgba(232, 200, 120, 0.05), transparent 220px);
     border-right-color: rgba(232, 200, 120, 0.14) !important;
 }
-.theme-obsidian .nav-pill-active { background: rgb(var(--accent-500) / 0.14); color: rgb(var(--accent-700)); }
+.app-sidebar .nav-pill-active { background: rgb(var(--accent-500) / 0.14); color: rgb(var(--accent-700)); }
 .nav-pill-active::before { content: ""; position: absolute; left: -10px; top: 50%; width: 3px; height: 18px; border-radius: 0 3px 3px 0; transform: translateY(-50%); background: rgb(var(--accent-500)); }
-.theme-obsidian .tri-ring-sq { background: linear-gradient(140deg, rgb(232 200 120), rgb(146 105 28)); }
+.app-sidebar .tri-ring-sq { background: linear-gradient(140deg, rgb(var(--sb-700)), rgb(var(--accent-600))); }
+
+/* ============================================================================
+   Workspace appearance engine (services/theme.ts sets these attributes/vars)
+   data-brand · data-tone · data-sidebar · data-radius · data-density
+   ============================================================================ */
+:root {
+    --r-md: 0.375rem; --r-lg: 0.625rem; --r-xl: 0.875rem; --r-2xl: 1.125rem; --r-3xl: 1.5rem;
+    /* Bright accent used on the dark sidebar (per brand) */
+    --sb-500: 212 175 84; --sb-700: 232 202 124;
+}
+[data-brand="blue"]     { --sb-500: 10 132 255;  --sb-700: 71 163 255; }
+[data-brand="indigo"]   { --sb-500: 107 105 232; --sb-700: 134 133 236; }
+[data-brand="purple"]   { --sb-500: 191 90 242;  --sb-700: 207 131 245; }
+[data-brand="rose"]     { --sb-500: 255 71 108;  --sb-700: 255 105 135; }
+[data-brand="orange"]   { --sb-500: 255 167 30;  --sb-700: 255 183 71; }
+[data-brand="onyx"]     { --sb-500: 226 221 211; --sb-700: 248 245 238; }
+[data-brand="sapphire"] { --sb-500: 96 144 235;  --sb-700: 126 168 246; }
+[data-brand="burgundy"] { --sb-500: 224 100 132; --sb-700: 234 130 158; }
+[data-brand="emerald"]  { --sb-500: 64 190 140;  --sb-700: 110 218 170; }
+
+/* Surface tone: warm (default, ivory) · cool (slate) · neutral (pure grey) */
+:root[data-tone="cool"] {
+    --neutral-50: 248 250 252; --neutral-100: 241 245 249; --neutral-200: 226 232 240; --neutral-300: 203 213 225; --neutral-400: 148 163 184; --neutral-500: 100 116 139; --neutral-600: 71 85 105; --neutral-700: 51 65 85; --neutral-800: 30 41 59; --neutral-900: 15 23 42; --neutral-950: 2 6 23;
+    --c-canvas: 244 246 250; --c-surface: 255 255 255; --c-surface-2: 249 250 252;
+    --elev-1: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.05);
+    --elev-2: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04), 0 14px 32px -14px rgba(15, 23, 42, 0.14);
+    --elev-3: 0 0 0 1px rgba(15, 23, 42, 0.08), 0 18px 40px -14px rgba(15, 23, 42, 0.22);
+    --material-border: rgba(15, 23, 42, 0.08);
+}
+:root[data-tone="neutral"] {
+    --neutral-50: 245 245 247; --neutral-100: 237 237 240; --neutral-200: 226 226 231; --neutral-300: 210 210 215; --neutral-400: 161 161 166; --neutral-500: 110 110 115; --neutral-600: 81 81 84; --neutral-700: 58 58 60; --neutral-800: 44 44 46; --neutral-900: 29 29 31; --neutral-950: 10 10 11;
+    --c-canvas: 245 245 247; --c-surface: 255 255 255; --c-surface-2: 250 250 252;
+    --elev-1: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --elev-2: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.03), 0 8px 24px -8px rgba(0, 0, 0, 0.08);
+    --elev-3: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 12px 32px -8px rgba(0, 0, 0, 0.14);
+    --material-border: rgba(0, 0, 0, 0.06);
+}
+.dark[data-tone="cool"] {
+    --neutral-50: 24 28 36; --neutral-100: 32 37 47; --neutral-200: 44 51 64; --neutral-300: 60 69 84; --neutral-400: 100 112 132; --neutral-500: 148 160 180; --neutral-600: 172 182 198; --neutral-700: 200 208 220; --neutral-800: 226 232 240; --neutral-900: 241 245 249; --neutral-950: 255 255 255;
+    --c-canvas: 8 10 15; --c-surface: 18 21 28; --c-surface-2: 28 32 42;
+    --elev-1: 0 0 0 1px rgba(148, 163, 184, 0.10);
+    --elev-2: 0 0 0 1px rgba(148, 163, 184, 0.11), 0 10px 28px -10px rgba(0, 0, 0, 0.7);
+    --elev-3: 0 0 0 1px rgba(148, 163, 184, 0.13), 0 18px 44px -12px rgba(0, 0, 0, 0.8);
+    --material: rgba(18, 21, 28, 0.8); --material-border: rgba(148, 163, 184, 0.14);
+}
+.dark[data-tone="neutral"] {
+    --neutral-50: 35 35 37; --neutral-100: 44 44 46; --neutral-200: 56 56 58; --neutral-300: 72 72 74; --neutral-400: 110 110 115; --neutral-500: 152 152 157; --neutral-600: 174 174 178; --neutral-700: 199 199 204; --neutral-800: 229 229 234; --neutral-900: 245 245 247; --neutral-950: 255 255 255;
+    --c-canvas: 0 0 0; --c-surface: 28 28 30; --c-surface-2: 44 44 46;
+    --elev-1: 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --elev-2: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+    --elev-3: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 40px -10px rgba(0, 0, 0, 0.7);
+    --material: rgba(28, 28, 30, 0.8); --material-border: rgba(255, 255, 255, 0.08);
+}
+
+/* Corner shape */
+:root[data-radius="sharp"] { --r-md: 0.125rem; --r-lg: 0.25rem; --r-xl: 0.375rem; --r-2xl: 0.5rem; --r-3xl: 0.75rem; }
+:root[data-radius="round"] { --r-md: 0.625rem; --r-lg: 0.875rem; --r-xl: 1.25rem; --r-2xl: 1.625rem; --r-3xl: 2rem; }
+
+/* Density: compact tightens table rows, nav items and cards. */
+[data-density="compact"] table td, [data-density="compact"] table th { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; }
+[data-density="compact"] .nav-pill { height: 2rem; }
+[data-density="compact"] .stat-card { padding: 0.875rem; }

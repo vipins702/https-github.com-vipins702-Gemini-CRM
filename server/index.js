@@ -1670,7 +1670,13 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
             // Return default settings
             res.json({
                 theme: 'light',
-                primaryColor: 'indigo',
+                primaryColor: 'gold',
+                neutralTone: 'warm',
+                sidebarStyle: 'dark',
+                radius: 'soft',
+                fontBody: 'system',
+                fontHeading: 'same',
+                themePreset: 'maison',
                 density: 'comfortable',
                 fontFamily: 'sans',
                 organizationName: 'FlowCRM Inc.',
