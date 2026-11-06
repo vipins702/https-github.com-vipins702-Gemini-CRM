@@ -1,8 +1,7 @@
 
-import db, { initDB } from './database.js';
+import db from './database.js';
 import { v4 as uuidv4 } from 'uuid';
 
-initDB();
 
 const TENANT_ID = 'default';
 
@@ -271,108 +270,107 @@ const LAYOUTS = {
     }
 };
 
-console.log("Seeding Database...");
-
-// Seed Menu
-const menuCount = db.prepare('SELECT COUNT(*) as count FROM menus WHERE tenant_id = ?').get(TENANT_ID).count;
-if (menuCount === 0) {
-    db.prepare('INSERT INTO menus (id, tenant_id, config) VALUES (?, ?, ?)').run(uuidv4(), TENANT_ID, JSON.stringify(INITIAL_MENU));
-    console.log("Seeded Menu");
+/** Entity definitions, layouts and (if missing) the menu. Safe to run repeatedly: never overwrites what a tenant has customised. */
+export async function seedCoreMetadata() {
+    const menu = await db.get('SELECT COUNT(*) as count FROM menus WHERE tenant_id = ?', TENANT_ID);
+    if (!menu.count) {
+        await db.run('INSERT INTO menus (id, tenant_id, config) VALUES (?, ?, ?)', uuidv4(), TENANT_ID, JSON.stringify(INITIAL_MENU));
+    }
+    for (const [key, value] of Object.entries(SCHEMAS)) {
+        const has = await db.get('SELECT id FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', TENANT_ID, key);
+        if (!has) await db.run('INSERT INTO entity_definitions (id, tenant_id, entity_type, config) VALUES (?, ?, ?, ?)', uuidv4(), TENANT_ID, key, JSON.stringify(value));
+    }
+    for (const [key, value] of Object.entries(LAYOUTS)) {
+        const has = await db.get('SELECT id FROM layouts WHERE tenant_id = ? AND entity_type = ?', TENANT_ID, key);
+        if (!has) await db.run('INSERT INTO layouts (id, tenant_id, entity_type, config) VALUES (?, ?, ?, ?)', uuidv4(), TENANT_ID, key, JSON.stringify(value));
+    }
 }
 
-// Seed Schemas
-for (const [key, value] of Object.entries(SCHEMAS)) {
-    db.prepare(`
-       INSERT OR REPLACE INTO entity_definitions (id, tenant_id, entity_type, config) 
-       VALUES (?, ?, ?, ?)
-    `).run(uuidv4(), TENANT_ID, key, JSON.stringify(value));
-}
-console.log("Seeded Schemas");
+/** Demo records (Acme Corp etc.). Only when the workspace has no records at all. */
+export async function seedDemoRecords() {
+    const recordCount = (await db.get("SELECT COUNT(*) as count FROM records WHERE tenant_id = ?", TENANT_ID)).count;
+    if (recordCount === 0) {
+        console.log("Seeding Records...");
 
-// Seed Layouts
-for (const [key, value] of Object.entries(LAYOUTS)) {
-    db.prepare(`
-       INSERT OR REPLACE INTO layouts (id, tenant_id, entity_type, config) 
-       VALUES (?, ?, ?, ?)
-    `).run(uuidv4(), TENANT_ID, key, JSON.stringify(value));
-}
-console.log("Seeded Layouts");
+        // 1. Create a Customer
+        const customerId = 'c1234567-89ab-cdef-0123-456789abcdef';
+        const customer = {
+            id: customerId,
+            name: 'Acme Corp',
+            email: 'contact@acme.com',
+            phone: '555-0100',
+            rating: 'Hot',
+            status: 'Active',
+            industry: 'Tech',
+            annualRevenue: 1000000,
+            employeeCount: 50
+        };
+        await db.run(`INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)`, customerId, TENANT_ID, 'customer', customer.name, customer.status, JSON.stringify(customer));
 
-// Seed Records (Mock Leads)
-// Seed Records (Mock Data with Relationships)
-const recordCount = db.prepare("SELECT COUNT(*) as count FROM records WHERE tenant_id = ?").get(TENANT_ID).count;
-if (recordCount === 0) {
-    console.log("Seeding Records...");
+        // 2. Create Related Lead
+        const leadId = uuidv4();
+        const lead = {
+            id: leadId,
+            firstName: 'John',
+            lastName: 'Doe',
+            email: 'john@acme.com',
+            company: 'Acme Corp',
+            title: 'CTO',
+            customerId: customerId, // LINKED
+            status: 'New',
+            score: 85
+        };
+        await db.run(`INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)`, leadId, TENANT_ID, 'lead', `${lead.firstName} ${lead.lastName}`, lead.status, JSON.stringify(lead));
 
-    // 1. Create a Customer
-    const customerId = 'c1234567-89ab-cdef-0123-456789abcdef';
-    const customer = {
-        id: customerId,
-        name: 'Acme Corp',
-        email: 'contact@acme.com',
-        phone: '555-0100',
-        rating: 'Hot',
-        status: 'Active',
-        industry: 'Tech',
-        annualRevenue: 1000000,
-        employeeCount: 50
-    };
-    db.prepare(`INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)`).run(customerId, TENANT_ID, 'customer', customer.name, customer.status, JSON.stringify(customer));
+        // 3. Create Related Case
+        const caseId = uuidv4();
+        const caseRec = {
+            id: caseId,
+            subject: 'Product Installation Issue',
+            customerId: customerId, // LINKED
+            description: 'Customer is having trouble installing v2.0',
+            status: 'In Progress',
+            priority: 'High',
+            category: 'Technical'
+        };
+        await db.run(`INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)`, caseId, TENANT_ID, 'case', caseRec.subject, caseRec.status, JSON.stringify(caseRec));
 
-    // 2. Create Related Lead
-    const leadId = uuidv4();
-    const lead = {
-        id: leadId,
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john@acme.com',
-        company: 'Acme Corp',
-        title: 'CTO',
-        customerId: customerId, // LINKED
-        status: 'New',
-        score: 85
-    };
-    db.prepare(`INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)`).run(leadId, TENANT_ID, 'lead', `${lead.firstName} ${lead.lastName}`, lead.status, JSON.stringify(lead));
+        // 4. Create Related Task
+        const taskId = uuidv4();
+        const task = {
+            id: taskId,
+            subject: 'Follow up on Case #123',
+            customerId: customerId, // LINKED
+            status: 'Not Started',
+            priority: 'Medium',
+            dueDate: new Date().toISOString().split('T')[0]
+        };
+        await db.run(`INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)`, taskId, TENANT_ID, 'task', task.subject, task.status, JSON.stringify(task));
 
-    // 3. Create Related Case
-    const caseId = uuidv4();
-    const caseRec = {
-        id: caseId,
-        subject: 'Product Installation Issue',
-        customerId: customerId, // LINKED
-        description: 'Customer is having trouble installing v2.0',
-        status: 'In Progress',
-        priority: 'High',
-        category: 'Technical'
-    };
-    db.prepare(`INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)`).run(caseId, TENANT_ID, 'case', caseRec.subject, caseRec.status, JSON.stringify(caseRec));
+        // 5. Create Related Product
+        const productId = uuidv4();
+        const product = {
+            id: productId,
+            name: 'Enterprise License',
+            sku: 'ENT-2024',
+            customerId: customerId, // LINKED
+            price: 5000,
+            status: 'Active',
+            category: 'Software'
+        };
+        await db.run(`INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)`, productId, TENANT_ID, 'product', product.name, product.status, JSON.stringify(product));
 
-    // 4. Create Related Task
-    const taskId = uuidv4();
-    const task = {
-        id: taskId,
-        subject: 'Follow up on Case #123',
-        customerId: customerId, // LINKED
-        status: 'Not Started',
-        priority: 'Medium',
-        dueDate: new Date().toISOString().split('T')[0]
-    };
-    db.prepare(`INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)`).run(taskId, TENANT_ID, 'task', task.subject, task.status, JSON.stringify(task));
+        console.log("Seeded Related Records");
+    }
 
-    // 5. Create Related Product
-    const productId = uuidv4();
-    const product = {
-        id: productId,
-        name: 'Enterprise License',
-        sku: 'ENT-2024',
-        customerId: customerId, // LINKED
-        price: 5000,
-        status: 'Active',
-        category: 'Software'
-    };
-    db.prepare(`INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)`).run(productId, TENANT_ID, 'product', product.name, product.status, JSON.stringify(product));
-
-    console.log("Seeded Related Records");
 }
 
-console.log("Seeding Complete!");
+// Run directly (node seed.js / npm run seed): seed everything, including demo records.
+if (process.argv[1] && process.argv[1].replace(/[\\/]+/g, '/').endsWith('/seed.js')) {
+    const { initDB } = await import('./database.js');
+    await initDB();
+    await seedCoreMetadata();
+    await seedDemoRecords();
+    console.log('Seeding Complete!');
+    process.exit(0);
+}

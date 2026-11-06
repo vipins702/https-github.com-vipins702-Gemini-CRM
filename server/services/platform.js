@@ -1,6 +1,7 @@
 import db from '../database.js';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { logAudit } from './audit.js';
 
 /**
@@ -99,12 +100,17 @@ export async function ensureSuperadmin() {
     if (existing) return;
     const dt = await db.get("SELECT id FROM tenants WHERE id = 'default'");
     if (!dt) await db.run("INSERT INTO tenants (id, name, status) VALUES ('default', 'Default', 'active')");
+    // No built-in password: use OWNER_PASSWORD, or generate one and show it once.
+    const generated = !process.env.OWNER_PASSWORD;
+    const password = process.env.OWNER_PASSWORD || crypto.randomBytes(9).toString('base64url') + 'A1!';
     await db.run(
         `INSERT INTO users (id, tenant_id, email, password_hash, role, first_name, last_name, is_active, must_change_password, is_superadmin)
-         VALUES (?, 'default', ?, ?, 'superadmin', 'Platform', 'Owner', 1, 0, 1)`,
-        uuidv4(), 'owner@flowcrm.com', bcrypt.hashSync('Owner@123', 10)
+         VALUES (?, 'default', ?, ?, 'superadmin', 'Platform', 'Owner', 1, ?, 1)`,
+        uuidv4(), 'owner@flowcrm.com', bcrypt.hashSync(password, 10), generated ? 1 : 0
     );
-    console.log('[platform] Seeded superadmin → owner@flowcrm.com / Owner@123');
+    console.log(generated
+        ? `[platform] Seeded superadmin owner@flowcrm.com with password ${password}   <-- SAVE THIS (shown once; set OWNER_PASSWORD to choose your own)`
+        : '[platform] Seeded superadmin owner@flowcrm.com (password from OWNER_PASSWORD)');
 }
 
 /** Whether a tenant is suspended (used to block login). */

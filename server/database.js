@@ -746,6 +746,47 @@ export async function initDB() {
             console.log('Seeded default workflow');
         }
 
+        // Migration: fields the lead -> customer journey needs, added to every workspace that lacks them.
+        try {
+            const defs = await dbInstance.all('SELECT id, tenant_id, entity_type, config FROM entity_definitions WHERE entity_type IN (?, ?)', 'lead', 'customer');
+            const byTenant = {};
+            for (const d of defs) (byTenant[d.tenant_id] ||= {})[d.entity_type] = d;
+            for (const defsOfTenant of Object.values(byTenant)) {
+                const leadDef = defsOfTenant.lead, custDef = defsOfTenant.customer;
+                const leadCfg = leadDef ? JSON.parse(leadDef.config) : null;
+                const custCfg = custDef ? JSON.parse(custDef.config) : null;
+                const addTo = (cfg, field) => {
+                    if (!cfg || cfg.fields.some(f => f.name === field.name)) return false;
+                    cfg.fields.push(field);
+                    return true;
+                };
+                const product = { name: 'interestedProduct', label: 'Product of interest', type: 'lookup', lookupTarget: 'product' };
+                const category = leadCfg?.fields.find(f => f.name === 'category');
+                let leadChanged = addTo(leadCfg, product);
+                let custChanged = false;
+                custChanged = addTo(custCfg, { name: 'source', label: 'Lead source', type: 'text' }) || custChanged;
+                custChanged = addTo(custCfg, product) || custChanged;
+                custChanged = addTo(custCfg, { name: 'instagram', label: 'Instagram', type: 'text' }) || custChanged;
+                if (category) custChanged = addTo(custCfg, category) || custChanged;
+                if (leadChanged) await dbInstance.run('UPDATE entity_definitions SET config = ? WHERE id = ?', JSON.stringify(leadCfg), leadDef.id);
+                if (custChanged) await dbInstance.run('UPDATE entity_definitions SET config = ? WHERE id = ?', JSON.stringify(custCfg), custDef.id);
+            }
+        } catch (e) {
+            console.warn('Core-field migration skipped:', e.message);
+        }
+
+        // Migration: leads saved as "Untitled" (first/last name only) get a real display name.
+        try {
+            const rows = await dbInstance.all(`SELECT id, data FROM records WHERE entity_type = 'lead' AND (primary_display IS NULL OR primary_display IN ('', 'Untitled'))`);
+            for (const r of rows) {
+                const d = JSON.parse(r.data || '{}');
+                const name = d.name || [d.firstName, d.lastName].filter(Boolean).join(' ').trim() || d.company || d.email;
+                if (name) await dbInstance.run('UPDATE records SET primary_display = ? WHERE id = ?', name, r.id);
+            }
+        } catch (e) {
+            console.warn('Display-name migration skipped:', e.message);
+        }
+
         // Seed initial admin user if no users exist
         const adminUser = await dbInstance.get('SELECT * FROM users WHERE email = ?', 'admin@flowcrm.com');
         if (!adminUser) {

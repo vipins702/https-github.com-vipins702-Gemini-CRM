@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.js",
+    "seed": "node server/seed.js",
     "db:copy-to-postgres": "node server/copy-sqlite-to-postgres.js",
     "admin:reset-password": "node server/reset-admin-password.js",
     "dev:all": "npx concurrently \"npm run server\" \"npm run dev\" --names \"BACKEND,FRONTEND\" --prefix-colors \"blue,green\""

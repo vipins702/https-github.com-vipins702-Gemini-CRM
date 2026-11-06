@@ -3,6 +3,24 @@ import { v4 as uuidv4 } from 'uuid';
 import { logAudit } from './audit.js';
 import { generateUpsellSuggestion, classifyCallIntent } from './ai.js';
 import { normalizePhoneE164 } from '../utils/phone.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const UPLOAD_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'uploads');
+
+/** Copy a record's profile photo to another record; returns the new URL (or null if the file is missing). */
+function copyProfileImage(tenantId, toEntity, toId, url) {
+    try {
+        const rel = String(url || '').replace(/^\/uploads\//, '');
+        const src = path.join(UPLOAD_ROOT, rel);
+        if (!src.startsWith(UPLOAD_ROOT) || !fs.existsSync(src)) return null;
+        const dir = path.join(UPLOAD_ROOT, tenantId, toEntity, toId);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.copyFileSync(src, path.join(dir, path.basename(src)));
+        return `/uploads/${tenantId}/${toEntity}/${toId}/${path.basename(src)}`;
+    } catch { return null; }
+}
 
 /**
  * CTI (Computer Telephony Integration) + Lead→Customer conversion service.
@@ -84,6 +102,11 @@ export async function convertLeadToCustomer(tenantId, leadId, actorId = 'system'
     if (lead._converted_to_customer) {
         return { alreadyConverted: true, customerId: lead._converted_to_customer };
     }
+    if (String(lead.status || leadRow.status).toLowerCase() === 'lost') {
+        const err = new Error('This lead is marked Lost. Reopen it (move it to another stage) before converting.');
+        err.statusCode = 400;
+        throw err;
+    }
 
     const rawPhone = phoneOf(lead);
     const normalized = normalizePhoneE164(rawPhone, 'US'); // Using US as default, adjust as needed
@@ -150,8 +173,26 @@ export async function convertLeadToCustomer(tenantId, leadId, actorId = 'system'
         }
     }
 
-    // Mark the lead converted/won
-    const updatedLead = { ...lead, status: 'Won', _converted_to_customer: customerId };
+    // Carry the lead's story onto the customer: where they came from, what they wanted, their photo.
+    try {
+        const custRow = await db.get('SELECT data FROM records WHERE id = ? AND tenant_id = ?', customerId, tenantId);
+        const custData = custRow ? JSON.parse(custRow.data || '{}') : {};
+        const carried = {};
+        for (const k of ['source', 'category', 'interestedProduct', 'instagram']) {
+            if (lead[k] && !custData[k]) carried[k] = lead[k];
+        }
+        if (lead.profileImage && !custData.profileImage) {
+            const copied = copyProfileImage(tenantId, 'customer', customerId, lead.profileImage);
+            if (copied) carried.profileImage = copied;
+        }
+        if (custRow && Object.keys(carried).length) {
+            await db.run('UPDATE records SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?',
+                JSON.stringify({ ...custData, ...carried }), customerId, tenantId);
+        }
+    } catch (e) { console.warn('[cti] carry-over to customer failed:', e.message); }
+
+    // Mark the lead converted/won. customerId is the lookup the relationship builder follows.
+    const updatedLead = { ...lead, status: 'Won', _converted_to_customer: customerId, customerId };
     await db.run(
         'UPDATE records SET status = ?, data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?',
         'Won', JSON.stringify(updatedLead), leadId, tenantId

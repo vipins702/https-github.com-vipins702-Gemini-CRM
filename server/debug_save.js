@@ -7,7 +7,7 @@ async function run() {
     const loginRes = await fetch(`${API_Base}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@flowcrm.com', password: 'Admin@123' })
+        body: JSON.stringify({ email: 'admin@flowcrm.com', password: process.env.ADMIN_PASSWORD })
     });
 
     if (!loginRes.ok) {

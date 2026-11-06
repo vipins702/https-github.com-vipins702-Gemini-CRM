@@ -66,6 +66,14 @@ const requireAdmin = (req, res, next) => {
     res.status(403).json({ error: 'Admin access required' });
 };
 
+// Role scope "own": the user only sees and changes records they own (records.owner_id).
+const ownOnly = (req, entityType) =>
+    req.user?.role !== 'admin' && !req.user?.permissions?.admin && req.user?.permissions?.[entityType]?.scope === 'own';
+
+// What to call a record in lists, search and duplicate warnings.
+const displayNameOf = (d) =>
+    d.name || d.title || d.subject || [d.firstName, d.lastName].filter(Boolean).join(' ').trim() || d.company || d.email || 'Untitled';
+
 // --- Uploads (attachments) ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
@@ -83,6 +91,12 @@ const upload = multer({
 // Initialize Database
 // Initialize Database
 await initDB();
+// A brand-new database has no entity definitions (lead, customer, case, task...); install the defaults once.
+if (!(await db.get('SELECT id FROM entity_definitions LIMIT 1'))) {
+    const { seedCoreMetadata } = await import('./seed.js');
+    await seedCoreMetadata();
+    console.log('[seed] Installed default entity definitions and layouts');
+}
 await encryptStoredSecrets();
 
 // Idempotent menu patch: ensure existing tenant menus expose the Reports view.
@@ -293,26 +307,33 @@ app.get('/', (req, res) => {
     res.send('FlowCRM Backend v1.0 is running. API is at /api');
 });
 
-const loginAttempts = new Map();
+// Failed-login limiter, per IP (in memory, per process). Only failures count: a successful login
+// clears the record, and requests refused while blocked do not extend the block.
+const loginFailures = new Map();
+const LOGIN_WINDOW_MS = 60 * 1000;
+const LOGIN_MAX_FAILURES = 5;
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, list] of loginFailures) {
+        const recent = list.filter(t => now - t < LOGIN_WINDOW_MS);
+        if (recent.length) loginFailures.set(ip, recent); else loginFailures.delete(ip);
+    }
+}, LOGIN_WINDOW_MS).unref();
 
 function loginRateLimiter(req, res, next) {
-    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const now = Date.now();
-    const windowMs = 60 * 1000; // 1 minute
-    const maxAttempts = 5;
-    
-    if (!loginAttempts.has(ip)) {
-        loginAttempts.set(ip, []);
+    const recent = (loginFailures.get(ip) || []).filter(t => now - t < LOGIN_WINDOW_MS);
+    if (recent.length >= LOGIN_MAX_FAILURES) {
+        const wait = Math.max(1, Math.ceil((recent[0] + LOGIN_WINDOW_MS - now) / 1000));
+        res.set('Retry-After', String(wait));
+        return res.status(429).json({ error: `Too many failed login attempts. Try again in ${wait}s.` });
     }
-    
-    const attempts = loginAttempts.get(ip).filter(timestamp => now - timestamp < windowMs);
-    attempts.push(now);
-    loginAttempts.set(ip, attempts);
-    
-    if (attempts.length > maxAttempts) {
-        return res.status(429).json({ error: 'Too many login attempts. Please try again in 1 minute.' });
-    }
-    
+    loginFailures.set(ip, recent);
+    res.on('finish', () => {
+        if (res.statusCode === 200) loginFailures.delete(ip);
+        else if (res.statusCode === 401 || res.statusCode === 403) loginFailures.set(ip, [...(loginFailures.get(ip) || []), Date.now()]);
+    });
     next();
 }
 
@@ -745,7 +766,9 @@ app.get('/api/data/:entityType', authenticateToken, async (req, res) => {
         }
     }
     try {
-        const rows = await db.all('SELECT * FROM records WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
+        const rows = ownOnly(req, entityType)
+            ? await db.all('SELECT * FROM records WHERE tenant_id = ? AND entity_type = ? AND owner_id = ?', req.tenantId, entityType, req.user.id)
+            : await db.all('SELECT * FROM records WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
         const records = rows.map(row => {
             const data = JSON.parse(row.data);
             return { ...data, id: row.id, created_at: row.created_at, status: row.status };
@@ -852,10 +875,19 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             });
         }
 
+        // A lookup must point at a record that exists in this workspace.
+        for (const f of definition.fields) {
+            const ref = recordData[f.name];
+            if (f.type === 'lookup' && f.lookupTarget && typeof ref === 'string' && ref) {
+                const hit = await db.get('SELECT id FROM records WHERE id = ? AND tenant_id = ?', ref, req.tenantId);
+                if (!hit) return res.status(400).json({ error: 'Validation Failed', details: [`${f.label || f.name}: that record no longer exists`] });
+            }
+        }
+
         // Use validated data (sanitized)
         const validData = validationResult.data;
         const id = recordData.id || uuidv4();
-        const primaryDisplay = recordData.name || recordData.title || recordData.subject || 'Untitled';
+        const primaryDisplay = displayNameOf(recordData);
         const status = recordData.status || 'New';
 
         // Clean data for JSON column (remove ID if present)
@@ -864,6 +896,10 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
 
         if (recordData.id) {
             // Update
+            if (ownOnly(req, entityType)) {
+                const mine = await db.get('SELECT owner_id FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
+                if (!mine || mine.owner_id !== req.user.id) return res.status(403).json({ error: 'You can only change records you own' });
+            }
             // Fetch old record for audit diff (optional, or just log 'update')
             const oldRecord = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
 
@@ -907,9 +943,9 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             }
 
             await db.run(`
-            INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `, id, req.tenantId, entityType, primaryDisplay, status, JSON.stringify(finalData));
+            INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data, owner_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, id, req.tenantId, entityType, primaryDisplay, status, JSON.stringify(finalData), actorId);
 
             // Log Audit
             await logAudit({
@@ -988,6 +1024,7 @@ app.delete('/api/data/:entityType/:id', authenticateToken, async (req, res) => {
 
         const record = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
         if (!record) return res.status(404).json({ error: 'Record not found' });
+        if (ownOnly(req, entityType) && record.owner_id !== req.user.id) return res.status(403).json({ error: 'You can only delete records you own' });
 
         await db.run('DELETE FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
 
@@ -1027,12 +1064,17 @@ app.post('/api/data/:entityType/:id/status', authenticateToken, async (req, res)
     try {
         const row = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ? AND entity_type = ?', id, req.tenantId, entityType);
         if (!row) return res.status(404).json({ error: 'Record not found' });
+        if (ownOnly(req, entityType) && row.owner_id !== req.user.id) return res.status(403).json({ error: 'You can only change records you own' });
         let data = {};
         try { data = JSON.parse(row.data); } catch { data = {}; }
         const prevStatus = data.status || row.status;
 
         // Configurable process: enforce the target stage's entry requirements.
         const targetStage = await findStage(req.tenantId, entityType, status);
+        if (!targetStage) {
+            const proc = await getProcess(req.tenantId, entityType).catch(() => null);
+            if (proc?.stages?.length) return res.status(400).json({ error: `"${status}" is not a stage of the ${entityType} pipeline` });
+        }
         if (targetStage) {
             const missing = missingForStage(targetStage, data);
             if (missing.length) {
@@ -1086,23 +1128,29 @@ app.get('/api/records/:entityType/:id/related-activity', authenticateToken, asyn
     const t = req.tenantId;
     const J = (f) => db.json('data', f);
     try {
-        const [taskRows, quoteRows, emails, whatsapp, calls, histRows] = await Promise.all([
-            db.all(`SELECT id, primary_display, status, data FROM records WHERE tenant_id = ? AND entity_type = 'task' AND (${J('relatedId')} = ? OR ${J('customerId')} = ?) ORDER BY created_at DESC LIMIT 50`, t, id, id),
-            db.all(`SELECT id, status, data FROM records WHERE tenant_id = ? AND entity_type = 'quote' AND ${J('customerId')} = ? ORDER BY created_at DESC LIMIT 50`, t, id),
-            db.all(`SELECT id, direction, subject, status, created_at FROM email_messages WHERE tenant_id = ? AND matched_id = ? ORDER BY created_at DESC LIMIT 50`, t, id),
-            db.all(`SELECT id, direction, body, status, created_at FROM wa_messages WHERE tenant_id = ? AND matched_id = ? ORDER BY created_at DESC LIMIT 50`, t, id),
-            db.all(`SELECT id, direction, from_number, to_number, outcome, status, created_at FROM call_logs WHERE tenant_id = ? AND matched_id = ? ORDER BY created_at DESC LIMIT 50`, t, id),
+        // A customer also owns the history of the lead(s) it was converted from.
+        const srcLeads = await db.all(`SELECT id FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND ${J('_converted_to_customer')} = ?`, t, id);
+        const ids = [id, ...srcLeads.map(r => r.id)];
+        const ph = ids.map(() => '?').join(',');
+        const [taskRows, quoteRows, caseRows, emails, whatsapp, calls, histRows] = await Promise.all([
+            db.all(`SELECT id, primary_display, status, data FROM records WHERE tenant_id = ? AND entity_type = 'task' AND (${J('relatedId')} IN (${ph}) OR ${J('customerId')} IN (${ph})) ORDER BY created_at DESC LIMIT 50`, t, ...ids, ...ids),
+            db.all(`SELECT id, status, data FROM records WHERE tenant_id = ? AND entity_type = 'quote' AND ${J('customerId')} IN (${ph}) ORDER BY created_at DESC LIMIT 50`, t, ...ids),
+            db.all(`SELECT id, primary_display, status, data FROM records WHERE tenant_id = ? AND entity_type = 'case' AND ${J('customerId')} IN (${ph}) ORDER BY created_at DESC LIMIT 50`, t, ...ids),
+            db.all(`SELECT id, direction, subject, status, created_at FROM email_messages WHERE tenant_id = ? AND matched_id IN (${ph}) ORDER BY created_at DESC LIMIT 50`, t, ...ids),
+            db.all(`SELECT id, direction, body, status, created_at FROM wa_messages WHERE tenant_id = ? AND matched_id IN (${ph}) ORDER BY created_at DESC LIMIT 50`, t, ...ids),
+            db.all(`SELECT id, direction, from_number, to_number, outcome, status, created_at FROM call_logs WHERE tenant_id = ? AND matched_id IN (${ph}) ORDER BY created_at DESC LIMIT 50`, t, ...ids),
             db.all(`SELECT a.id, a.details, a.created_at, COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email, 'system') AS actor
                     FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_id
-                    WHERE a.tenant_id = ? AND a.record_id = ? AND a.action = 'status' ORDER BY a.created_at DESC LIMIT 50`, t, id),
+                    WHERE a.tenant_id = ? AND a.record_id IN (${ph}) AND a.action = 'status' ORDER BY a.created_at DESC LIMIT 50`, t, ...ids),
         ]);
 
         const parse = (r) => { try { return JSON.parse(r.data); } catch { return {}; } };
         const tasks = taskRows.map(r => { const d = parse(r); return { id: r.id, subject: d.subject || r.primary_display, status: d.status || r.status, priority: d.priority || 'Medium', dueDate: d.dueDate || '', assignee: d.assignee || '' }; });
         const quotes = quoteRows.map(r => { const d = parse(r); return { id: r.id, quoteNumber: d.quoteNumber || '', total: Number(d.total) || 0, currency: d.currency || 'USD', status: d.status || r.status }; });
+        const cases = caseRows.map(r => { const d = parse(r); return { id: r.id, subject: d.subject || r.primary_display, status: d.status || r.status, priority: d.priority || 'Medium' }; });
         const stageHistory = histRows.map(r => { let d = {}; try { d = JSON.parse(r.details); } catch { d = {}; } return { id: r.id, from: d.from || '', to: d.to || '', note: d.note || '', actor: r.actor, created_at: r.created_at }; });
 
-        res.json({ tasks, quotes, emails, whatsapp, calls, stageHistory });
+        res.json({ tasks, quotes, cases, emails, whatsapp, calls, stageHistory });
     } catch (e) {
         console.error('Related activity error:', e);
         res.status(500).json({ error: 'Failed to fetch related activity' });
@@ -1770,7 +1818,7 @@ app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
 // --- Role Routes ---
 
 // Get Roles
-app.get('/api/roles', authenticateToken, async (req, res) => {
+app.get('/api/roles', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const roles = await db.all('SELECT * FROM roles WHERE tenant_id = ?', req.tenantId);
         const parsedRoles = roles.map(r => ({
@@ -2417,11 +2465,23 @@ app.delete('/api/reports/cache', authenticateToken, (req, res) => {
 // Convert a lead to a customer (+ AI upsell task)
 app.post('/api/leads/:id/convert', authenticateToken, async (req, res) => {
     try {
+        // Converting edits the lead and creates a customer, so the role needs both.
+        if (req.user.role !== 'admin' && !req.user.permissions?.admin) {
+            const p = req.user.permissions || {};
+            const can = (e, a) => p[e] && (p[e][a] || p[e].manage);
+            if (!can('lead', 'edit') || !can('customer', 'create')) {
+                return res.status(403).json({ error: 'Converting a lead needs permission to edit leads and create customers' });
+            }
+            if (ownOnly(req, 'lead')) {
+                const mine = await db.get('SELECT owner_id FROM records WHERE id = ? AND tenant_id = ?', req.params.id, req.tenantId);
+                if (!mine || mine.owner_id !== req.user.id) return res.status(403).json({ error: 'You can only convert leads you own' });
+            }
+        }
         const result = await convertLeadToCustomer(req.tenantId, req.params.id, req.user.id);
         res.json(result);
     } catch (error) {
         console.error('Lead convert error:', error);
-        res.status(500).json({ error: error.message || 'Conversion failed' });
+        res.status(error.statusCode || 500).json({ error: error.message || 'Conversion failed' });
     }
 });
 
@@ -2450,13 +2510,26 @@ app.get('/api/search', authenticateToken, async (req, res) => {
     if (q.length < 1) return res.json([]);
     try {
         const like = `%${q}%`;
+        // Only search what this user may read; "own" scope narrows a type to their own records.
+        const isAdmin = req.user.role === 'admin' || req.user.permissions?.admin;
+        const scopeSql = [];
+        const scopeArgs = [];
+        if (!isAdmin) {
+            const perms = req.user.permissions || {};
+            const types = Object.keys(perms).filter(t => perms[t] && typeof perms[t] === 'object' && (perms[t].read || perms[t].manage || perms[t].write || perms[t].edit || perms[t].create));
+            if (!types.length) return res.json([]);
+            for (const t of types) {
+                if (ownOnly(req, t)) { scopeSql.push('(entity_type = ? AND owner_id = ?)'); scopeArgs.push(t, req.user.id); }
+                else { scopeSql.push('entity_type = ?'); scopeArgs.push(t); }
+            }
+        }
         const rows = await db.all(
             `SELECT id, entity_type, primary_display, status
              FROM records
-             WHERE tenant_id = ? AND (primary_display ${db.like} ? OR CAST(data AS TEXT) ${db.like} ?)
+             WHERE tenant_id = ? AND (primary_display ${db.like} ? OR CAST(data AS TEXT) ${db.like} ?)${scopeSql.length ? ` AND (${scopeSql.join(' OR ')})` : ''}
              ORDER BY updated_at DESC
              LIMIT ?`,
-            req.tenantId, like, like, limit
+            req.tenantId, like, like, ...scopeArgs, limit
         );
         res.json(rows.map(r => ({
             id: r.id,
@@ -2792,9 +2865,15 @@ app.post('/api/workflows', authenticateToken, requireAdmin, async (req, res) => 
 
 app.get('/api/notes/:entityType/:recordId', authenticateToken, async (req, res) => {
     try {
+        // A customer also shows the notes written while it was still a lead.
+        let ids = [req.params.recordId];
+        if (req.params.entityType === 'customer') {
+            const src = await db.all(`SELECT id FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND ${db.json('data', '_converted_to_customer')} = ?`, req.tenantId, req.params.recordId);
+            ids = ids.concat(src.map(r => r.id));
+        }
         const rows = await db.all(
-            `SELECT * FROM record_notes WHERE tenant_id=? AND entity_type=? AND record_id=? ORDER BY created_at ASC`,
-            req.tenantId, req.params.entityType, req.params.recordId
+            `SELECT * FROM record_notes WHERE tenant_id=? AND record_id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at ASC`,
+            req.tenantId, ...ids
         );
         res.json(rows);
     } catch (e) { res.status(500).json({ error: e.message }); }

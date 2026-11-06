@@ -162,7 +162,7 @@ Core types:
 
 - **Login flow**: POST to `/api/auth/login` with email/password
 - **Token storage**: JWT stored in `localStorage` under key `flowcrm_session`
-- **Auto-seed**: If email is `admin@flowcrm.com` and no user exists, admin account is auto-created with password `Admin@123` (dev/demo only)
+- **Auto-seed**: on first start, `admin@flowcrm.com` is created with `ADMIN_PASSWORD` (or a random password printed once), and the platform superadmin `owner@flowcrm.com` with `OWNER_PASSWORD` (or a random one printed once). Reset with `npm run admin:reset-password`. No password is built in.
 - **Session check**: App checks `api.getSession()` on mount; if invalid/expired, user redirected to login
 - **Logout**: Removes session from localStorage
 
