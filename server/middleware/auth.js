@@ -3,6 +3,7 @@ import { JWT_SECRET } from '../config.js';
 import db from '../database.js';
 
 export const authenticateToken = async (req, res, next) => {
+    if (req._authDone) return next(); // already signed in by the policy gate
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -45,6 +46,7 @@ export const authenticateToken = async (req, res, next) => {
                 req.user.roleName = 'Unknown';
             }
         }
+        req._authDone = true;
         next();
     } catch (err) {
         console.error('Auth Error:', err.message);

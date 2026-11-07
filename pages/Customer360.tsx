@@ -14,6 +14,7 @@ import {
 } from '../components/Record360';
 import { api } from '../services/api';
 import { formatCurrency } from '../services/currency';
+import { can } from '../services/permissions';
 import { RelatedActivity, Activity, ViewState, ProcessStage } from '../types';
 
 interface Props {
@@ -223,8 +224,8 @@ export const Customer360: React.FC<Props> = ({ customerId, onBack, onNavigate })
               email: customer.email,
               onWhatsApp: onNavigate && (() => onNavigate('whatsapp', { phone })),
               onEmail: onNavigate && (() => onNavigate('email-inbox', { email: customer.email })),
-              onNote: () => noteRef.current?.focus(),
-              onEdit: onNavigate && (() => onNavigate('customer', { editId: customerId })),
+              onNote: can('customer', 'edit') ? (() => noteRef.current?.focus()) : undefined,
+              onEdit: onNavigate && can('customer', 'edit') ? (() => onNavigate('customer', { editId: customerId })) : undefined,
             })} />
           </div>
         </div>
@@ -289,6 +290,7 @@ export const Customer360: React.FC<Props> = ({ customerId, onBack, onNavigate })
             onNoteChange={setNote}
             onAddNote={addNote}
             savingNote={savingNote}
+            canAddNote={can('customer', 'edit')}
             noteInputRef={noteRef}
           />
 

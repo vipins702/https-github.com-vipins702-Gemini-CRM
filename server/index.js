@@ -10,6 +10,7 @@ import db from './database.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { authenticateToken, requirePermission, requireSuperadmin } from './middleware/auth.js';
+import { policyGate, can, isAdminUser, isRestrictedScope, hasAnyAccess, hiddenFields, filterFields, protectFields } from './middleware/access.js';
 import { listTenants, createTenant, updateTenant, ensureSuperadmin } from './services/platform.js';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -46,6 +47,9 @@ app.use(express.json({
     verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/webhooks/')) req.rawBody = buf; },
 }));
 
+// Central permission checks for routes that carry none of their own (see middleware/access.js).
+app.use('/api', policyGate);
+
 // Tenant for public inbound endpoints (lead ingest, telephony). A logged-in caller
 // uses their own tenant; an external system must present the tenant's ingest key
 // (?key= or X-Ingest-Key). The tenant is never taken from the request itself.
@@ -67,8 +71,7 @@ const requireAdmin = (req, res, next) => {
 };
 
 // Role scope "own": the user only sees and changes records they own (records.owner_id).
-const ownOnly = (req, entityType) =>
-    req.user?.role !== 'admin' && !req.user?.permissions?.admin && req.user?.permissions?.[entityType]?.scope === 'own';
+const ownOnly = (req, entityType) => isRestrictedScope(req, entityType);
 
 // What to call a record in lists, search and duplicate warnings.
 const displayNameOf = (d) =>
@@ -338,6 +341,12 @@ function loginRateLimiter(req, res, next) {
 }
 
 // --- Auth Routes ---
+
+// Who am I, with the role's permissions as they are right now (the UI refreshes from this).
+app.get('/api/auth/me', authenticateToken, (req, res) => {
+    const u = req.user;
+    res.json({ id: u.id, email: u.email, name: u.name, role: u.role, isSuperadmin: !!u.isSuperadmin, permissions: u.permissions || {} });
+});
 
 app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
     const { email, password } = req.body;
@@ -759,11 +768,8 @@ app.post('/api/saved-reports/run', authenticateToken, async (req, res) => {
 
 app.get('/api/data/:entityType', authenticateToken, async (req, res) => {
     const { entityType } = req.params;
-    if (req.user.role !== 'admin' && !req.user.permissions?.admin) {
-        const perms = req.user.permissions?.[entityType];
-        if (!perms || (!perms.read && !perms.manage && !perms.write && !perms.edit && !perms.create)) {
-            return res.status(403).json({ error: `Insufficient permissions to view ${entityType}` });
-        }
+    if (!can(req, entityType, 'read')) {
+        return res.status(403).json({ error: `Insufficient permissions to view ${entityType}` });
     }
     try {
         const rows = ownOnly(req, entityType)
@@ -771,7 +777,7 @@ app.get('/api/data/:entityType', authenticateToken, async (req, res) => {
             : await db.all('SELECT * FROM records WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
         const records = rows.map(row => {
             const data = JSON.parse(row.data);
-            return { ...data, id: row.id, created_at: row.created_at, status: row.status };
+            return { ...filterFields(req, entityType, data), id: row.id, created_at: row.created_at, status: row.status };
         });
         res.json(records);
     } catch (error) {
@@ -823,24 +829,9 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
 
     // Check Permissions (create or update)
     const action = recordData.id ? 'edit' : 'create';
-    if (req.user.role !== 'admin' && !req.user.permissions?.admin) {
-        const perms = req.user.permissions?.[entityType];
-
-        if (!perms || !perms[action]) {
-            // Fallback checks ('manage' covers everything, 'write' might cover create/edit)
-            const hasManage = perms?.manage;
-            const hasWrite = perms?.write; // legacy/simpler model
-
-            if (!hasManage && !hasWrite) {
-                if (action === 'edit') {
-                    console.warn(`Access denied: ${req.user.email} tried to edit ${entityType}`);
-                    return res.status(403).json({ error: `Insufficient permissions to edit ${entityType}` });
-                }
-                if (action === 'create' && !perms?.create) {
-                    return res.status(403).json({ error: `Insufficient permissions to create ${entityType}` });
-                }
-            }
-        }
+    if (!can(req, entityType, action)) {
+        console.warn(`Access denied: ${req.user.email} tried to ${action} ${entityType}`);
+        return res.status(403).json({ error: `Insufficient permissions to ${action} ${entityType}` });
     }
 
     try {
@@ -900,14 +891,18 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
                 const mine = await db.get('SELECT owner_id FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
                 if (!mine || mine.owner_id !== req.user.id) return res.status(403).json({ error: 'You can only change records you own' });
             }
-            // Fetch old record for audit diff (optional, or just log 'update')
+            // The id must be a record of THIS type: an edit right on leads is no right to overwrite a case.
             const oldRecord = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
+            if (!oldRecord || oldRecord.entity_type !== entityType) return res.status(404).json({ error: 'Record not found' });
+            // Fields this role cannot see or edit keep their stored value.
+            let oldData = {}; try { oldData = JSON.parse(oldRecord.data); } catch { oldData = {}; }
+            protectFields(req, entityType, jsonData, oldData);
 
             await db.run(`
             UPDATE records 
             SET primary_display = ?, status = ?, data = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND tenant_id = ?
-        `, primaryDisplay, status, JSON.stringify(jsonData), id, req.tenantId);
+        `, displayNameOf(jsonData), status, JSON.stringify(jsonData), id, req.tenantId);
 
             // Log Audit
             await logAudit({
@@ -934,7 +929,7 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
         } else {
             // Create
             // Auto-score leads before insert
-            let finalData = { ...jsonData };
+            let finalData = protectFields(req, entityType, { ...jsonData });
             if (entityType === 'lead') {
                 try {
                     const computedScore = await calculateLeadScore(finalData, req.tenantId);
@@ -958,7 +953,7 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             });
 
             // Auto-assign leads
-            if (entityType === 'lead') {
+            if (entityType === 'lead' && !ownOnly(req, 'lead')) {
                 try { await assignLead(req.tenantId, id, finalData); } catch (_) { /* non-fatal */ }
             }
 
@@ -1015,11 +1010,8 @@ app.delete('/api/data/:entityType/:id', authenticateToken, async (req, res) => {
     const { entityType, id } = req.params;
     try {
         // Check Permissions for Delete
-        if (req.user.role !== 'admin' && !req.user.permissions?.admin) {
-            const perms = req.user.permissions?.[entityType];
-            if (!perms || (!perms.delete && !perms.manage)) {
-                return res.status(403).json({ error: `Insufficient permissions to delete ${entityType}` });
-            }
+        if (!can(req, entityType, 'delete')) {
+            return res.status(403).json({ error: `Insufficient permissions to delete ${entityType}` });
         }
 
         const record = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
@@ -1859,6 +1851,8 @@ app.post('/api/roles', authenticateToken, requireAdmin, async (req, res) => {
 // Delete Role
 app.delete('/api/roles/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
+        const inUse = await db.get('SELECT COUNT(*) AS c FROM users WHERE role = ? AND tenant_id = ?', req.params.id, req.tenantId);
+        if (inUse?.c) return res.status(409).json({ error: `${inUse.c} user(s) still have this role. Move them to another role first.` });
         await db.run('DELETE FROM roles WHERE id = ? AND tenant_id = ?', req.params.id, req.tenantId);
         res.json({ success: true });
     } catch (error) {
@@ -2510,17 +2504,18 @@ app.get('/api/search', authenticateToken, async (req, res) => {
     if (q.length < 1) return res.json([]);
     try {
         const like = `%${q}%`;
-        // Only search what this user may read; "own" scope narrows a type to their own records.
-        const isAdmin = req.user.role === 'admin' || req.user.permissions?.admin;
+        // Only search what this user may read; restricted scope narrows a type to their own records.
+        // A role that hides fields must not be able to probe them, so for those types only the title is matched.
         const scopeSql = [];
         const scopeArgs = [];
-        if (!isAdmin) {
-            const perms = req.user.permissions || {};
-            const types = Object.keys(perms).filter(t => perms[t] && typeof perms[t] === 'object' && (perms[t].read || perms[t].manage || perms[t].write || perms[t].edit || perms[t].create));
+        if (!isAdminUser(req)) {
+            const types = Object.keys(req.user.permissions || {}).filter(t => can(req, t, 'read'));
             if (!types.length) return res.json([]);
             for (const t of types) {
-                if (ownOnly(req, t)) { scopeSql.push('(entity_type = ? AND owner_id = ?)'); scopeArgs.push(t, req.user.id); }
-                else { scopeSql.push('entity_type = ?'); scopeArgs.push(t); }
+                const hidden = hiddenFields(req, t).length > 0;
+                const own = ownOnly(req, t);
+                scopeSql.push(`(entity_type = ?${own ? ' AND owner_id = ?' : ''}${hidden ? ' AND primary_display ' + db.like + ' ?' : ''})`);
+                scopeArgs.push(t); if (own) scopeArgs.push(req.user.id); if (hidden) scopeArgs.push(like);
             }
         }
         const rows = await db.all(
@@ -3336,7 +3331,7 @@ app.post('/api/data/:entityType/import', authenticateToken, csvUpload.single('fi
                 await logAudit({ tenantId: req.tenantId, entityType, recordId, action: 'create', actorId: req.user.id, details: { ...mapped, _via: 'csv_import' } });
 
                 // Auto-assign leads
-                if (entityType === 'lead') {
+                if (entityType === 'lead' && !ownOnly(req, 'lead')) {
                     try { await assignLead(req.tenantId, recordId, mapped); } catch (_) {}
                 }
 

@@ -22,7 +22,15 @@ const handleResponse = async (res: Response) => {
     throw new Error('Unauthorized');
   }
   if (res.status === 403) {
-    throw new Error('Forbidden: Access is denied');
+    const error = await res.json().catch(() => ({ error: '' }));
+    const why = String(error.error || '');
+    // A dead session is a sign-out; anything else is a missing permission, and the reason is worth showing.
+    if (/token|inactive/i.test(why)) {
+      localStorage.removeItem('flowcrm_session');
+      window.location.href = '/login';
+      throw new Error(why);
+    }
+    throw new Error(why || 'You do not have permission to do that');
   }
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: 'Unknown error' }));
@@ -72,6 +80,17 @@ export const api = {
     const session: AuthSession = { ...data, user: data.user };
     localStorage.setItem('flowcrm_session', JSON.stringify(session));
     return session;
+  },
+
+  /** Re-reads the role permissions from the server so a role change shows without signing out. */
+  async refreshSession(): Promise<AuthSession | null> {
+    const s = localStorage.getItem('flowcrm_session');
+    if (!s) return null;
+    const current: AuthSession = JSON.parse(s);
+    const me = await fetchWithAuth(`${API_BASE}/auth/me`);
+    const next: AuthSession = { ...current, user: { ...current.user, ...me } };
+    localStorage.setItem('flowcrm_session', JSON.stringify(next));
+    return next;
   },
 
   async logout() {

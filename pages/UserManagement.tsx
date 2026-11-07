@@ -101,18 +101,8 @@ export const UserManagement: React.FC = () => {
     setUsers(u);
     setRoles(r);
 
-    // Inject System Modules for Permission Management
-    const systemSchemas: Record<string, EntityDefinition> = {
-      'users':         { id: 'users',         label: 'Users & Roles',  pluralLabel: 'Users & Roles',  fields: [] },
-      'object-manager':{ id: 'object-manager', label: 'Object Manager', pluralLabel: 'Object Manager', fields: [] },
-      'menu-manager':  { id: 'menu-manager',   label: 'Menu Builder',   pluralLabel: 'Menu Builder',   fields: [] },
-      'lookups':       { id: 'lookups',        label: 'Lookup Manager', pluralLabel: 'Lookup Manager', fields: [] },
-      'autoflow':      { id: 'autoflow',       label: 'Workflows',      pluralLabel: 'Workflows',      fields: [] },
-      'layout':        { id: 'layout',         label: 'Form Designer',  pluralLabel: 'Form Designer',  fields: [] },
-      'web-presenter': { id: 'web-presenter',  label: 'Web Presenter',  pluralLabel: 'Web Presenter',  fields: [] },
-    };
-
-    setSchemas({ ...systemSchemas, ...s });
+    // Only record types get permissions. Administration screens (users, menus, objects...) are admin-only.
+    setSchemas(s);
     if (r.length > 0 && !selectedRole) setSelectedRole(r[0]);
     setLoading(false);
   };
@@ -131,14 +121,40 @@ export const UserManagement: React.FC = () => {
 
     // If ID is temporary client-side ID, remove it so backend generates a real one
     const roleToSave = { ...selectedRole };
-    if (roleToSave.id.startsWith('new_')) {
+    if (!roleToSave.name?.trim()) {
+      setIsSavingRole(false);
+      addToast('Give the role a name first', 'error');
+      return;
+    }
+    const wasNew = roleToSave.id.startsWith('new_');
+    if (wasNew) {
       roleToSave.id = '';
     }
 
-    await api.saveRole(roleToSave);
-    setIsSavingRole(false);
-    addToast('Role permissions saved!', 'success');
-    loadData();
+    try {
+      const saved: any = await api.saveRole(roleToSave);
+      // A new role now has its real id; keep it so the next save updates it instead of adding another.
+      if (wasNew && saved?.id) setSelectedRole({ ...selectedRole, id: saved.id });
+      addToast('Role permissions saved!', 'success');
+      await loadData();
+    } catch (e: any) {
+      addToast(e?.message || 'Could not save the role', 'error');
+    } finally {
+      setIsSavingRole(false);
+    }
+  };
+
+  const handleDeleteRole = async () => {
+    if (!selectedRole || selectedRole.id.startsWith('new_')) return;
+    if (!window.confirm(`Delete the role "${selectedRole.name}"?`)) return;
+    try {
+      await api.deleteRole(selectedRole.id);
+      addToast('Role deleted', 'success');
+      setSelectedRole(null);
+      await loadData();
+    } catch (e: any) {
+      addToast(e?.message || 'Could not delete the role', 'error');
+    }
   };
 
   // Helper to toggle permission
@@ -150,8 +166,12 @@ export const UserManagement: React.FC = () => {
 
     const updatedEntityPerms = { ...currentEntityPerms, [type]: !currentEntityPerms[type] };
 
-    // Auto-enable read if others are enabled
-    if (updatedEntityPerms.create || updatedEntityPerms.edit || updatedEntityPerms.delete) {
+    // The other rights need read: switching one on turns read on, and switching read off clears them.
+    if (type === 'read' && !updatedEntityPerms.read) {
+      updatedEntityPerms.create = false;
+      updatedEntityPerms.edit = false;
+      updatedEntityPerms.delete = false;
+    } else if (updatedEntityPerms.create || updatedEntityPerms.edit || updatedEntityPerms.delete) {
       updatedEntityPerms.read = true;
     }
 
@@ -494,6 +514,9 @@ export const UserManagement: React.FC = () => {
                           }}
                         />
                       </div>
+                      {!selectedRole.id.startsWith('new_') && (
+                        <Button variant="ghost" onClick={handleDeleteRole}>Delete role</Button>
+                      )}
                       <Button
                         onClick={handleSaveRole}
                         disabled={isSavingRole}
@@ -503,6 +526,9 @@ export const UserManagement: React.FC = () => {
                       </Button>
                     </div>
 
+                    <p className="px-5 py-2 text-xs text-ink-muted border-b border-[var(--border)]">
+                      Quotes follow Customer rights, Campaigns, Pipeline and Sequences follow Lead, Calendar follows Task, and WhatsApp / Email follow Lead or Customer. Administration screens are for administrators only.
+                    </p>
                     {/* Permission table */}
                     <div className="flex-1 overflow-y-auto">
                       <table className="min-w-full">
@@ -574,6 +600,7 @@ export const UserManagement: React.FC = () => {
                                     {(['all', 'team', 'own'] as const).map(scope => (
                                       <button
                                         key={scope}
+                                        title={scope === 'team' ? 'There are no teams yet, so Team works like Own' : scope === 'own' ? 'Only records this person owns' : 'Every record'}
                                         onClick={() => updateScope(schema.id, scope)}
                                         className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-all ${
                                           currentScope === scope

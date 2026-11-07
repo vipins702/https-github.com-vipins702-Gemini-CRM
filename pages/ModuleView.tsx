@@ -10,6 +10,7 @@ import { Attachments } from '../components/Attachments';
 import { Plus, Filter, Download, Search, MoreHorizontal, ArrowLeft, Save, Upload, ExternalLink, Paperclip, Loader2, Phone, Mail, MapPin, Calendar, Clock, MessageSquare, Briefcase, User, Link, Image as ImageIcon, X, CloudUpload, Check, Eye, AlertCircle, FileText, Activity as ActivityIcon } from 'lucide-react';
 import { api } from '../services/api';
 import { useToast } from '../components/ui/Toast';
+import { can, fieldAccess } from '../services/permissions';
 
 interface ModuleViewProps {
    entityType: EntityType;
@@ -37,6 +38,9 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
    const [isSaving, setIsSaving] = useState(false);
    const [errors, setErrors] = useState<Record<string, string>>({});
    const { addToast } = useToast();
+   const canCreate = can(entityType, 'create');
+   const canEdit = can(entityType, 'edit');
+   const canDelete = can(entityType, 'delete');
 
    // Import state
    const [showImportModal, setShowImportModal] = useState(false);
@@ -218,9 +222,23 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
          addToast('Record saved successfully!', 'success');
       } catch (error) {
          console.error(error);
-         addToast('Failed to save record.', 'error');
+         addToast(error instanceof Error && error.message ? error.message : 'Failed to save record.', 'error');
       } finally {
          setIsSaving(false);
+      }
+   };
+
+   const handleDelete = async () => {
+      if (!selectedRecord?.id || !schema) return;
+      if (!window.confirm(`Delete this ${schema.label.toLowerCase()}? This cannot be undone.`)) return;
+      try {
+         await api.deleteRecord(entityType, selectedRecord.id);
+         setData(prev => prev.filter(r => r.id !== selectedRecord.id));
+         setSelectedRecord(null);
+         setView('list');
+         addToast(`${schema.label} deleted`, 'success');
+      } catch (error) {
+         addToast(error instanceof Error && error.message ? error.message : 'Failed to delete record.', 'error');
       }
    };
 
@@ -536,14 +554,21 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                               360° view
                            </Button>
                         )}
-                        <Button variant="ghost" onClick={() => setView('list')}>Cancel</Button>
-                        <Button
-                           icon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                           onClick={handleSave}
-                           disabled={isSaving}
-                        >
-                           Save
-                        </Button>
+                        <Button variant="ghost" onClick={() => setView('list')}>{(selectedRecord.id ? canEdit : canCreate) ? 'Cancel' : 'Back'}</Button>
+                        {selectedRecord.id && canDelete && (
+                           <Button variant="ghost" onClick={handleDelete}>Delete</Button>
+                        )}
+                        {(selectedRecord.id ? canEdit : canCreate) ? (
+                           <Button
+                              icon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                              onClick={handleSave}
+                              disabled={isSaving}
+                           >
+                              Save
+                           </Button>
+                        ) : (
+                           <span className="text-xs font-medium text-gray-500 px-3 py-2 rounded-lg bg-gray-100">View only</span>
+                        )}
                      </div>
                   </div>
                </div>
@@ -630,6 +655,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                                           if (!fieldDef) return null;
                                           const fieldConfig = layout.fieldConfigs?.[fieldName];
                                           if (!checkVisibility(fieldConfig?.visibilityRule, selectedRecord)) return null;
+                                          const access = fieldAccess(entityType, fieldName);
+                                          if (!access.read) return null;
 
                                           return (
                                              <div key={fieldName}>
@@ -637,7 +664,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                                                    {fieldConfig?.labelOverride || fieldDef.label} {(fieldDef.required || fieldConfig?.validation?.required) && <span className="text-rose-500">*</span>}
                                                    {fieldDef.type === 'image' && <ImageIcon className="w-3 h-3 text-indigo-400" />}
                                                 </label>
-                                                {renderFieldInput(fieldDef, selectedRecord[fieldName], false, fieldConfig, selectedRecord)}
+                                                {renderFieldInput(fieldDef, selectedRecord[fieldName], !access.edit || !(selectedRecord.id ? canEdit : canCreate), fieldConfig, selectedRecord)}
                                                 {errors[fieldName] && (
                                                    <p className="text-xs text-rose-600 mt-1 flex items-center gap-1">
                                                       <AlertCircle className="w-3 h-3 shrink-0" /> {errors[fieldName]}
@@ -1028,16 +1055,16 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                   <div className="flex flex-wrap gap-2">
                      <Button variant="secondary" icon={<Filter className="w-4 h-4" />}>Filter</Button>
                      <Button variant="secondary" icon={<Download className="w-4 h-4" />}>Export</Button>
-                     <Button
+                     {canCreate && <Button
                         variant="secondary"
                         icon={<Upload className="w-4 h-4" />}
                         onClick={() => { setShowImportModal(true); setImportStep('upload'); setImportFile(null); setImportPreview([]); setImportResult(null); }}
                      >
                         Import
-                     </Button>
-                     <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={() => { setSelectedRecord({ id: '' } as CRMRecord); setRelatedRecords({}); setActivity(null); setActivities([]); setView('detail'); }}>
+                     </Button>}
+                     {canCreate && <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={() => { setSelectedRecord({ id: '' } as CRMRecord); setRelatedRecords({}); setActivity(null); setActivities([]); setView('detail'); }}>
                         New {schema.label}
-                     </Button>
+                     </Button>}
                   </div>
                </div>
             </div>

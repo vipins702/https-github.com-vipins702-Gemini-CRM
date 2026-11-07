@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Paperclip, Upload, Trash2, Loader2, FileText, ImageIcon } from 'lucide-react';
 import { api } from '../services/api';
+import { can } from '../services/permissions';
 import { Attachment } from '../types';
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
 const fmtSize = (n: number) => n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
 export const Attachments: React.FC<Props> = ({ entityType, recordId, compact }) => {
+  // Adding or removing files changes the record, so it needs "edit"; viewing needs only "read".
+  const canChange = can(entityType, 'edit');
   const [items, setItems] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -46,22 +49,23 @@ export const Attachments: React.FC<Props> = ({ entityType, recordId, compact }) 
     <div>
       <div className="flex items-center justify-between mb-3">
         <p className="mono-label flex items-center gap-1.5"><Paperclip className="w-3.5 h-3.5" /> Files ({items.length})</p>
-        <button
+        {canChange && <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
           className="flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-accent-deep disabled:opacity-50"
         >
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload
-        </button>
+        </button>}
         <input ref={inputRef} type="file" multiple className="hidden" onChange={e => onPick(e.target.files)} />
       </div>
 
       {loading ? (
         <p className="text-xs text-ink-muted py-3 text-center">Loading…</p>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 ? (canChange ?
         <button onClick={() => inputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-xl text-xs text-ink-muted hover:border-accent/40 hover:text-accent transition-colors">
           Drop files or click to upload
         </button>
+        : <p className="text-xs text-ink-muted py-3 text-center">No files</p>
       ) : (
         <div className={compact ? 'flex flex-wrap gap-2' : 'grid grid-cols-2 sm:grid-cols-3 gap-2'}>
           {items.map(a => (
@@ -78,9 +82,9 @@ export const Attachments: React.FC<Props> = ({ entityType, recordId, compact }) 
               )}
               <div className="px-2 py-1.5 flex items-center justify-between gap-1 border-t border-slate-100">
                 <span className="text-xs text-ink-muted truncate">{a.kind === 'image' ? a.filename : fmtSize(a.size)}</span>
-                <button onClick={() => remove(a.id)} className="text-slate-300 hover:text-red-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                {canChange && <button onClick={() => remove(a.id)} className="text-slate-300 hover:text-red-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                </button>}
               </div>
             </div>
           ))}

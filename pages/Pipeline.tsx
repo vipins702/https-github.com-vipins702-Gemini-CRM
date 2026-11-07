@@ -8,6 +8,7 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../services/api';
+import { can } from '../services/permissions';
 import { ProcessStage, ViewState, RecordNote } from '../types';
 import { formatCurrency } from '../services/currency';
 
@@ -326,10 +327,10 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
                   {items.map(card => (
                     <div
                       key={card.id}
-                      draggable
-                      onDragStart={() => setDraggedId(card.id)}
+                      draggable={can('lead', 'edit')}
+                      onDragStart={() => { if (can('lead', 'edit')) setDraggedId(card.id); }}
                       onDragEnd={() => { setDraggedId(null); setOverStage(null); }}
-                      className={`bg-surface border border-slate-200 rounded-xl p-3 cursor-grab active:cursor-grabbing transition-all hover:border-slate-300 hover:shadow-sm group ${draggedId === card.id ? 'opacity-40' : ''}`}
+                      className={`bg-surface border border-slate-200 rounded-xl p-3 ${can('lead', 'edit') ? 'cursor-grab active:cursor-grabbing' : ''} transition-all hover:border-slate-300 hover:shadow-sm group ${draggedId === card.id ? 'opacity-40' : ''}`}
                       style={{ borderLeft: `3px solid ${accent}` }}
                     >
                       <div className="flex items-start justify-between gap-1">

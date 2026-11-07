@@ -64,10 +64,19 @@ async function roundRobinPick(tenantId, users) {
  * 2. True round-robin fallback across all active users
  */
 export async function assignLead(tenantId, leadId, leadData) {
-    const users = await db.all(
-        'SELECT id, email, first_name FROM users WHERE tenant_id = ? AND is_active = 1 ORDER BY created_at ASC',
+    const everyone = await db.all(
+        'SELECT id, email, first_name, role FROM users WHERE tenant_id = ? AND is_active = 1 AND COALESCE(is_superadmin, 0) = 0 ORDER BY created_at ASC',
         tenantId
     );
+    // Only people who can actually open leads receive them by round-robin.
+    const roleRows = await db.all('SELECT id, permissions FROM roles WHERE tenant_id = ?', tenantId);
+    const rolePerms = new Map(roleRows.map(r => { try { return [r.id, JSON.parse(r.permissions)]; } catch { return [r.id, {}]; } }));
+    const canOpenLeads = (u) => {
+        if (u.role === 'admin') return true;
+        const p = rolePerms.get(u.role) || {};
+        return !!(p.admin || (p.lead && (p.lead.read || p.lead.manage || p.lead.write)));
+    };
+    const users = everyone.filter(canOpenLeads);
     if (users.length === 0) return null;
 
     let assignedUser = null;
@@ -89,7 +98,7 @@ export async function assignLead(tenantId, leadId, leadData) {
             assignedUser = await roundRobinPick(tenantId, users);
         } else if (rule.assign_to) {
             // Assign to a specific user
-            assignedUser = users.find(u => u.id === rule.assign_to) || null;
+            assignedUser = everyone.find(u => u.id === rule.assign_to) || null;
         }
 
         if (assignedUser) {

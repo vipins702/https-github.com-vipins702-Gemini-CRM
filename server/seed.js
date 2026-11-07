@@ -272,9 +272,12 @@ const LAYOUTS = {
 
 /** Entity definitions, layouts and (if missing) the menu. Safe to run repeatedly: never overwrites what a tenant has customised. */
 export async function seedCoreMetadata() {
-    const menu = await db.get('SELECT COUNT(*) as count FROM menus WHERE tenant_id = ?', TENANT_ID);
-    if (!menu.count) {
+    const menu = await db.get('SELECT id, config FROM menus WHERE tenant_id = ?', TENANT_ID);
+    if (!menu) {
         await db.run('INSERT INTO menus (id, tenant_id, config) VALUES (?, ?, ?)', uuidv4(), TENANT_ID, JSON.stringify(INITIAL_MENU));
+    } else if (/"view":"(leads|contacts|deals)"/.test(String(menu.config).replace(/\s/g, ''))) {
+        // The built-in placeholder menu points at screens (leads / contacts / deals) that have no definition.
+        await db.run('UPDATE menus SET config = ? WHERE id = ?', JSON.stringify(INITIAL_MENU), menu.id);
     }
     for (const [key, value] of Object.entries(SCHEMAS)) {
         const has = await db.get('SELECT id FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', TENANT_ID, key);

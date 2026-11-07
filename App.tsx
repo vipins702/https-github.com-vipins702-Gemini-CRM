@@ -95,7 +95,9 @@ const App: React.FC = () => {
             await refreshSchemas();
             // Apply per-tenant theme/appearance settings
             try { applySettings(await api.getSettings()); } catch (e) { /* keep defaults */ }
-            setSession(existingSession); // Session is valid
+            // Pick up role changes made since the last login; fall back to the saved copy offline.
+            const live = await api.refreshSession().catch(() => null);
+            setSession(live || existingSession); // Session is valid
           } catch (error: any) {
             // Session token is invalid/expired, clear it
             console.warn('Session expired, clearing...');

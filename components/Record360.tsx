@@ -88,7 +88,7 @@ export const contactActions = (o: {
   { key: 'call', label: 'Call', icon: Phone, href: o.phone ? `tel:${o.phone}` : undefined, disabled: !o.phone, hint: 'No phone number' },
   { key: 'wa', label: 'WhatsApp', icon: MessageCircle, onClick: o.onWhatsApp, disabled: !o.phone || !o.onWhatsApp, hint: 'No phone number' },
   { key: 'mail', label: 'Email', icon: Mail, onClick: o.onEmail, disabled: !o.email || !o.onEmail, hint: 'No email address' },
-  { key: 'note', label: 'Note', icon: StickyNote, onClick: o.onNote },
+  { key: 'note', label: 'Note', icon: StickyNote, onClick: o.onNote, disabled: !o.onNote },
   { key: 'edit', label: 'Edit', icon: Pencil, onClick: o.onEdit, disabled: !o.onEdit },
 ];
 
@@ -211,7 +211,9 @@ export const ActivityTimeline: React.FC<{
   timeline: Activity[]; activity: RelatedActivity | null;
   note: string; onNoteChange: (v: string) => void; onAddNote: () => void; savingNote: boolean;
   noteInputRef?: React.Ref<HTMLTextAreaElement>;
-}> = ({ timeline, activity, note, onNoteChange, onAddNote, savingNote, noteInputRef }) => {
+  /** false for roles that may view but not edit: the note box is left out. */
+  canAddNote?: boolean;
+}> = ({ timeline, activity, note, onNoteChange, onAddNote, savingNote, noteInputRef, canAddNote = true }) => {
   const [filter, setFilter] = useState<Kind | 'all'>('all');
   const items = useMemo(() => buildItems(timeline, activity), [timeline, activity]);
   const counts = useMemo(() => items.reduce((m, i) => ({ ...m, [i.kind]: (m[i.kind] || 0) + 1 }), {} as Record<string, number>), [items]);
@@ -223,7 +225,7 @@ export const ActivityTimeline: React.FC<{
       <div className="px-5 pt-4 pb-3 border-b border-gray-100">
         <h3 className="font-heading text-[17px] font-semibold text-gray-900">Activity</h3>
         {/* Composer */}
-        <div className="mt-3 flex items-end gap-2">
+        {canAddNote && <div className="mt-3 flex items-end gap-2">
           <textarea
             ref={noteInputRef}
             value={note}
@@ -242,8 +244,8 @@ export const ActivityTimeline: React.FC<{
           >
             {savingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Save
           </button>
-        </div>
-        <p className="mt-2 text-xs text-gray-500 flex items-center gap-1"><Sparkles className="w-3.5 h-3.5 text-purple-500" aria-hidden="true" />Notes can create follow-up tasks automatically.</p>
+        </div>}
+        {canAddNote && <p className="mt-2 text-xs text-gray-500 flex items-center gap-1"><Sparkles className="w-3.5 h-3.5 text-purple-500" aria-hidden="true" />Notes can create follow-up tasks automatically.</p>}
         {/* Filters */}
         {kinds.length > 1 && (
           <div className="mt-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Filter activity">

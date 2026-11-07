@@ -15,6 +15,7 @@ import {
 } from '../components/Record360';
 import { api } from '../services/api';
 import { formatCurrency } from '../services/currency';
+import { can } from '../services/permissions';
 import { RelatedActivity, Activity, ViewState, ProcessStage, User } from '../types';
 
 interface Props {
@@ -155,10 +156,10 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
               email: lead.email,
               onWhatsApp: onNavigate && (() => onNavigate('whatsapp', { phone: lead.phone || lead.mobile })),
               onEmail: onNavigate && (() => onNavigate('email-inbox', { email: lead.email })),
-              onNote: () => noteRef.current?.focus(),
-              onEdit: onNavigate && (() => onNavigate('lead', { editId: leadId })),
+              onNote: can('lead', 'edit') ? (() => noteRef.current?.focus()) : undefined,
+              onEdit: onNavigate && can('lead', 'edit') ? (() => onNavigate('lead', { editId: leadId })) : undefined,
             })} />
-            {!isConverted && (
+            {!isConverted && can('lead', 'edit') && can('customer', 'create') && (
               <Button icon={converting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} onClick={() => setShowConvertConfirm(true)} disabled={converting}>
                 Convert to customer
               </Button>
@@ -245,6 +246,7 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
             onAddNote={addNote}
             savingNote={savingNote}
             noteInputRef={noteRef}
+            canAddNote={can('lead', 'edit')}
           />
         </div>
       </div>

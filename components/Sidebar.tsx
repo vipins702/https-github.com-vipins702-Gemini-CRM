@@ -1,3 +1,4 @@
+import { canOpenView, isAdminUser } from '../services/permissions';
 import React, { useEffect, useState } from 'react';
 import * as Icons from 'lucide-react';
 import { ViewState, MenuItem, User } from '../types';
@@ -74,6 +75,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
 
     // 2. Groups - Allow by default (logic delegates to children filtering)
     if (item.type === 'group') return true;
+
+    // 2b. Screens tied to data follow the role's permissions (a role with no access never sees them)
+    if (canOpenView(item.view) === false) return false;
 
     // 3. Permission Check (Metadata Driven)
     // If a view is associated, check if user has 'read' permission for that module/entity
@@ -220,8 +224,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
           );
           return isCollapsed ? <Tooltip text="Platform Console">{btn}</Tooltip> : btn;
         })()}
-        {(() => {
-          // Allow all tenant users to access Integrations for easy webhooks
+        {isAdminUser() && (() => {
+          // Integrations holds tenant credentials; the API is admin-only, so only admins see it
           const isActive = currentView === 'integrations';
           const btn = (
             <button
