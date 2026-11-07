@@ -1,4 +1,5 @@
 
+import { getViewAs, isRealAdmin, currentUser } from './permissions';
 import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult, ReportDefinition, RunReportOptions, ReportResult, PackDefinition, PackResult, WaConversation, WaMessage, EmailConversation, EmailMessage, TaskItem, Quote, RelatedActivity, ProcessDefinition, Attachment, CategoryNode, BulkCampaign, IntegrationConfig, Tenant } from '../types';
 
 const API_BASE = '/api';
@@ -7,9 +8,11 @@ const getAuthHeaders = () => {
   const sessionStr = localStorage.getItem('flowcrm_session');
   if (sessionStr) {
     const session = JSON.parse(sessionStr);
+    const viewAs = isRealAdmin() ? getViewAs() : null;
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.token}`
+      'Authorization': `Bearer ${session.token}`,
+      ...(viewAs ? { 'X-View-As-Role': viewAs.roleId } : {})
     };
   }
   return { 'Content-Type': 'application/json' };
@@ -87,7 +90,7 @@ export const api = {
     const s = localStorage.getItem('flowcrm_session');
     if (!s) return null;
     const current: AuthSession = JSON.parse(s);
-    const me = await fetchWithAuth(`${API_BASE}/auth/me`);
+    const me = await fetchWithAuth(`${API_BASE}/auth/me`, { headers: { 'X-View-As-Role': '' } });
     const next: AuthSession = { ...current, user: { ...current.user, ...me } };
     localStorage.setItem('flowcrm_session', JSON.stringify(next));
     return next;
@@ -99,7 +102,10 @@ export const api = {
 
   async getSession(): Promise<AuthSession | null> {
     const s = localStorage.getItem('flowcrm_session');
-    return s ? JSON.parse(s) : null;
+    if (!s) return null;
+    const session: AuthSession = JSON.parse(s);
+    const effective = currentUser();
+    return effective ? { ...session, user: { ...session.user, ...effective } } : session;
   },
 
   // --- SETTINGS ---
@@ -318,7 +324,7 @@ export const api = {
     });
   },
   async getRoles(): Promise<Role[]> {
-    return fetchWithAuth(`${API_BASE}/roles`);
+    return fetchWithAuth(`${API_BASE}/roles`, { headers: { 'X-View-As-Role': '' } });
   },
   async saveRole(role: Role) {
     return fetchWithAuth(`${API_BASE}/roles`, {

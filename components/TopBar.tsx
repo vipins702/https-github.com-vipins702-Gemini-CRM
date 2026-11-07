@@ -3,6 +3,7 @@ import { Search, ChevronRight, X, Loader2, CornerDownLeft, Bell, CheckCheck, Clo
 import { ViewState, EntityDefinition, AppNotification } from '../types';
 import { api } from '../services/api';
 import { isDarkActive, onThemeChange, setPersonalTheme } from '../services/theme';
+import { ViewAsSelect } from './ViewAsRole';
 
 interface TopBarProps {
   currentView: ViewState;
@@ -282,6 +283,9 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
           </div>
         )}
       </div>
+
+      {/* Admins: preview the app as any role */}
+      <ViewAsSelect />
 
       {/* Light / dark toggle (your own preference, remembered on this device) */}
       <button

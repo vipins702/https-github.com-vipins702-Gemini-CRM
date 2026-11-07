@@ -3,9 +3,33 @@
 // Keep in step with server/middleware/access.js.
 export type PermAction = 'read' | 'create' | 'edit' | 'delete';
 
-const sessionUser = (): any => {
+// Admin preview ("view as role"): kept per browser tab, so closing the tab ends it.
+export interface ViewAs { roleId: string; name: string; permissions: Record<string, any>; }
+const VIEW_AS_KEY = 'flowcrm_view_as';
+
+export const getViewAs = (): ViewAs | null => {
+  try { return JSON.parse(sessionStorage.getItem(VIEW_AS_KEY) || 'null'); } catch { return null; }
+};
+export const setViewAs = (v: ViewAs | null) => {
+  try { v ? sessionStorage.setItem(VIEW_AS_KEY, JSON.stringify(v)) : sessionStorage.removeItem(VIEW_AS_KEY); } catch { /* private mode */ }
+};
+
+/** The signed-in user as saved at login, whatever any preview says. */
+export const realSessionUser = (): any => {
   try { return JSON.parse(localStorage.getItem('flowcrm_session') || 'null')?.user || null; } catch { return null; }
 };
+export const isRealAdmin = (): boolean => {
+  const u = realSessionUser();
+  return !!(u && (u.isSuperadmin || u.role === 'admin' || u.permissions?.admin));
+};
+
+/** The user as the app should treat them: during a preview, a person holding the previewed role. */
+const sessionUser = (): any => {
+  const u = realSessionUser();
+  const v = u && isRealAdmin() ? getViewAs() : null;
+  return v ? { ...u, role: v.roleId, isSuperadmin: false, permissions: v.permissions } : u;
+};
+export const currentUser = sessionUser;
 
 export const isAdminUser = (): boolean => {
   const u = sessionUser();

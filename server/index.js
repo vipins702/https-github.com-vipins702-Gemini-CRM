@@ -345,7 +345,7 @@ function loginRateLimiter(req, res, next) {
 // Who am I, with the role's permissions as they are right now (the UI refreshes from this).
 app.get('/api/auth/me', authenticateToken, (req, res) => {
     const u = req.user;
-    res.json({ id: u.id, email: u.email, name: u.name, role: u.role, isSuperadmin: !!u.isSuperadmin, permissions: u.permissions || {} });
+    res.json({ id: u.id, email: u.email, name: u.name, role: u.role, isSuperadmin: !!u.isSuperadmin, permissions: u.permissions || {}, viewAs: u.viewAs || null });
 });
 
 app.post('/api/auth/login', loginRateLimiter, async (req, res) => {

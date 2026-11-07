@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
+import { ViewAsBanner } from './components/ViewAsRole';
 import { Dashboard } from './pages/Dashboard';
 import { ModuleView } from './pages/ModuleView';
 import { WorkflowBuilder } from './pages/WorkflowBuilder';
@@ -266,6 +267,7 @@ const App: React.FC = () => {
           style={{ marginLeft: isSidebarCollapsed ? 72 : sidebarWidth }}
           className={`flex-1 min-w-0 min-h-screen ${isDraggingSidebar ? '' : 'transition-[margin] duration-300 ease-in-out'}`}
         >
+          <ViewAsBanner />
           <TopBar currentView={currentView} schemas={schemas} onNavigate={handleNavigate} />
           {renderContent()}
         </main>

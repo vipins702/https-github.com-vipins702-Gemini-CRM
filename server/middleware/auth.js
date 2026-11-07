@@ -46,6 +46,22 @@ export const authenticateToken = async (req, res, next) => {
                 req.user.roleName = 'Unknown';
             }
         }
+        // Admins can preview the app as any role: that role's permissions, scope and field rules
+        // apply to everything they read, and nothing can be changed while previewing.
+        const viewAs = req.headers['x-view-as-role'];
+        if (viewAs && (req.user.role === 'admin' || req.user.isSuperadmin)) {
+            const target = await db.get('SELECT id, name, permissions FROM roles WHERE id = ? AND tenant_id = ?', String(viewAs), user.tenantId);
+            if (target) {
+                if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+                    return res.status(409).json({ error: `Preview only: you are viewing as "${target.name}". Exit the preview to make changes.` });
+                }
+                try { req.user.permissions = JSON.parse(target.permissions); } catch { req.user.permissions = {}; }
+                req.user.role = target.id;
+                req.user.isSuperadmin = false;
+                req.user.roleName = target.name;
+                req.user.viewAs = target.name;
+            }
+        }
         req._authDone = true;
         next();
     } catch (err) {

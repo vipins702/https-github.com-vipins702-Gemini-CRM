@@ -208,5 +208,33 @@ sec('7. Live permissions, cross-type writes, who receives auto-assigned leads');
     check('[assignment] no lead goes to a user who cannot open leads', !owners.includes(noLeadId), 'a cases-only user received a lead');
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+sec('8. Admin "view as role" preview');
+{
+    const as = (roleId, method, path, token = A, body) => fetch(BASE + path, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, 'X-View-As-Role': roleId }, body: body ? JSON.stringify(body) : undefined }).then(async r => ({ s: r.status, j: await r.json().catch(() => null) }));
+    const leadOnly = await mkUser('preview lead read', { lead: { read: true, create: false, edit: false, delete: false, scope: 'all', fields: { email: { read: false, edit: false } } } });
+    const strong = await mkUser('preview strong', { lead: { manage: true }, case: { manage: true } });
+    const caseId = (await call('POST', '/data/case', A, { subject: 'PreviewSecret ' + tag, description: 'd', priority: 'Low', status: 'New' })).j?.id;
+    await mkLead(A, { company: 'PreviewCo' });
+
+    check('[preview] admin still sees cases without the header', gate(await call('GET', '/data/case', A)));
+    check('[preview] case list blocked while previewing a lead-only role', (await as(leadOnly.roleId, 'GET', '/data/case')).s === 403);
+    const leads = await as(leadOnly.roleId, 'GET', '/data/lead');
+    check('[preview] lead list allowed', leads.s === 200 && Array.isArray(leads.j) && leads.j.length > 0, String(leads.s));
+    check('[preview] hidden field (email) not shown in the preview', (leads.j || []).every(r => r.email === undefined), 'email leaked');
+    const sr = await as(leadOnly.roleId, 'GET', '/search?q=PreviewSecret');
+    check('[preview] search hides what the role cannot read', !(sr.j || []).some(x => x.entityType === 'case'), JSON.stringify(sr.j));
+    const w = await as(leadOnly.roleId, 'POST', '/data/lead', A, { firstName: 'No', lastName: 'Write', email: 'nw@example.com', status: 'New' });
+    check('[preview] changes are refused while previewing', w.s === 409, String(w.s));
+    check('[preview] delete refused while previewing', (await as(leadOnly.roleId, 'DELETE', '/data/case/' + caseId)).s === 409);
+    check('[preview] admin-only API closed (roles)', (await as(leadOnly.roleId, 'GET', '/roles')).s === 403);
+    check('[preview] unknown role id is ignored (admin keeps access)', gate(await as('no-such-role', 'GET', '/data/case')));
+
+    // the header must never lift a normal user
+    const esc = await as(strong.roleId, 'GET', '/data/case', leadOnly.token);
+    check('[preview] a non-admin cannot borrow another role', esc.s === 403, String(esc.s));
+    check('[preview] auth/me tells the truth when asked as yourself', (await call('GET', '/auth/me', A)).j?.viewAs == null);
+}
+
 console.log(`\n=========== ${pass} passed, ${fails.length} failed ===========`);
 process.exit(fails.length ? 1 : 0);
