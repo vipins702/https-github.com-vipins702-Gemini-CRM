@@ -21,6 +21,11 @@ const MIN_W = 200;
 const MAX_W = 420;
 const COLLAPSE_BELOW = 150;
 
+// Record types seeded with the generic folder icon get one that says what they are (matters most when the sidebar is collapsed to icons).
+const MODULE_ICONS: Record<string, string> = { lead: 'Users', customer: 'Building2', case: 'LifeBuoy', task: 'CheckSquare', product: 'Package' };
+const iconFor = (item: MenuItem): string | undefined =>
+  (!item.icon || item.icon === 'FolderOpen') && item.view && MODULE_ICONS[item.view] ? MODULE_ICONS[item.view] : item.icon;
+
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isCollapsed, onToggle, onLogout, width, onWidthChange, onCollapseChange, onDragState }) => {
   const [dragging, setDragging] = useState(false);
 
@@ -144,7 +149,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
           : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
           }`}
       >
-        {renderIcon(item.icon, isActive)}
+        {renderIcon(iconFor(item), isActive)}
         {!isCollapsed && <span className="truncate">{item.label}</span>}
       </button>
     );

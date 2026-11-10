@@ -55,6 +55,16 @@ Uses concurrently to run both frontend and backend in parallel.
 npm run build
 ```
 
+## Public website, sign-in and password reset
+
+- `index.html` is the **marketing home page** and `public/<industry>.html` are the industry pages (agencies, real estate, education, clinics, insurance, recruitment, travel, B2B). They are generated, plain static HTML (readable without JavaScript) by `node scripts/build-site.mjs`; `npm run build` runs it first. Edit the copy in that script, not in the HTML.
+- `app.html` is the CRM itself (React). Paths `/login`, `/app`, `/reset-password` and `/form/:id` serve it (`vercel.json` in production, the `flowcrm-dev-routes` plugin in `vite.config.ts` for `npm run dev`).
+- Rename the product: set `BRAND_NAME` for the site build and the server, and change `BRAND_NAME` in `components/AuthLayout.tsx`. Set `SITE_URL=https://your-domain` when building to add canonical tags and `sitemap.xml`.
+- **Forgot password**: `POST /api/auth/forgot-password` e-mails a one-time link (30 minutes, stored hashed, asking again cancels the older link, using it ends every session of that user). It needs SMTP (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`) and `APP_URL` (the public address of the web app, used in the link). Without SMTP the link is printed to the server log in development only.
+- **Demo requests**: the form on the public pages posts to `POST /api/public/demo-request` and creates a lead in the workspace named by `DEMO_TENANT_ID` (default `default`).
+- Other server settings: `CORS_ORIGINS` (comma-separated web app origins; empty allows any), `NODE_ENV=production`.
+- Tests: `server/test/*.mjs` (see each file's header). `reset-and-site.mjs` also checks every marketing page (title, description, one h1, links, structured data).
+
 ## Architecture
 
 ### Frontend Structure

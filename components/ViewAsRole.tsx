@@ -23,7 +23,7 @@ export const ViewAsSelect: React.FC = () => {
   };
 
   return (
-    <label className="shrink-0 flex items-center gap-1.5 text-xs font-medium text-gray-500" title="Preview the app as one of your roles">
+    <label className="shrink-0 hidden sm:flex items-center gap-1.5 text-xs font-medium text-gray-500" title="Preview the app as one of your roles">
       <Eye className="w-4 h-4" aria-hidden="true" />
       <span className="sr-only">View as</span>
       <select

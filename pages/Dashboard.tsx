@@ -479,6 +479,7 @@ export const Dashboard: React.FC = () => {
     widgets.filter(w => w.visible && w.type === 'pack' && !w.kpiColumn && w.datasetId).map(w => `${w.packId}:${w.datasetId}`)
   );
   const visible = widgets
+    .filter(w => w.type === 'pack') // older tile types draw nothing, so they must not hide the empty state
     .filter(w => w.visible || isEditMode)
     .filter(w => isEditMode || !(w.type === 'pack' && w.kpiColumn && stripShown.has(`${w.packId}:${w.datasetId}`)))
     .sort((a, b) => a.order - b.order);
@@ -551,13 +552,13 @@ export const Dashboard: React.FC = () => {
           );
         })}
 
-        {isEditMode && visible.length === 0 && (
+        {visible.length === 0 && (
           <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
               <BarChart3 className="w-8 h-8 text-slate-300" />
             </div>
-            <p className="font-heading font-bold text-lg text-ink">Dashboard is empty</p>
-            <p className="text-sm text-ink-muted mt-1 mb-5">Add widgets from the report packs</p>
+            <p className="font-heading font-bold text-lg text-ink">No widgets on your dashboard yet</p>
+            <p className="text-sm text-ink-muted mt-1 mb-5 max-w-sm">Add a KPI strip, a trend or a pipeline funnel from the report packs.</p>
             <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowPanel(true)}>Add Widget</Button>
           </div>
         )}

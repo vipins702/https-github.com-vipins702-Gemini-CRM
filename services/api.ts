@@ -51,6 +51,14 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
 };
 
 
+/** POST to a public endpoint; errors carry the server's own message. */
+const publicPost = async (path: string, body: unknown) => {
+  const res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json.details && json.details[0]) || json.error || `Request failed (${res.status})`);
+  return json;
+};
+
 export const api = {
   // --- BOOTSTRAP ---
   async initialize() {
@@ -101,6 +109,17 @@ export const api = {
     try { await fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: getAuthHeaders() }); } catch { /* offline */ }
     setViewAs(null);
     localStorage.removeItem('flowcrm_session');
+  },
+
+  // ── Password reset (no session needed) ──
+  async forgotPassword(email: string): Promise<void> {
+    await publicPost('/auth/forgot-password', { email });
+  },
+  async checkResetToken(token: string): Promise<boolean> {
+    return !!(await publicPost('/auth/reset-password/check', { token }))?.valid;
+  },
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await publicPost('/auth/reset-password', { token, newPassword });
   },
 
   /** Changes your own password; the server returns a fresh token because it ends your other sessions. */
@@ -373,7 +392,8 @@ export const api = {
 
   // --- MENU ---
   async getMenu(): Promise<MenuItem[]> {
-    return fetchWithAuth(`${API_BASE}/metadata/menu`);
+    const menu = await fetchWithAuth(`${API_BASE}/metadata/menu`);
+    return Array.isArray(menu) ? menu : []; // never hand a screen anything but a list
   },
   async saveMenu(menu: MenuItem[]) {
     return fetchWithAuth(`${API_BASE}/metadata/menu`, {

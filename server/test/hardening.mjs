@@ -166,5 +166,27 @@ check('password change is logged', await has('entityType=auth', 'password_change
 const entries = JSON.stringify(await logsOf('entityType=user'));
 check('no password appears in the audit trail', !/Brand!New|Admin!Reset|Start!Pass/.test(entries));
 
+sec('10. Menu, settings and audit entries keep their shape');
+const menu0 = (await call('GET', '/metadata/menu', A)).j;
+check('the menu is always a list', Array.isArray(menu0));
+check('saving the menu back unchanged works', (await call('POST', '/metadata/menu', A, menu0)).s === 200);
+check('an empty menu is refused (400): it would leave nothing to click', (await call('POST', '/metadata/menu', A, [])).s === 400);
+check('a menu that is not a list is refused (400)', (await call('POST', '/metadata/menu', A, { name: 5, email: 'a@b.io' })).s === 400);
+check('a menu item without an id is refused (400)', (await call('POST', '/metadata/menu', A, [{ label: 'No id' }])).s === 400);
+check('a menu item with a non-text label is refused (400)', (await call('POST', '/metadata/menu', A, [{ id: 'x', label: { a: 1 } }])).s === 400);
+check('nested menu groups are checked too', (await call('POST', '/metadata/menu', A, [{ id: 'g', label: 'Group', type: 'group', children: [{ id: 'c' }] }])).s === 400);
+check('a valid nested menu is accepted', (await call('POST', '/metadata/menu', A, [{ id: 'g', label: 'Group', type: 'group', children: [{ id: 'c', label: 'Child', view: 'lead', icon: 'Users' }] }])).s === 200);
+check('the failed saves left the previous menu in place', ((await call('GET', '/metadata/menu', A)).j || [])[0]?.id === 'g');
+await call('POST', '/metadata/menu', A, menu0); // put the original back
+const set0 = (await call('GET', '/settings', A)).j;
+check('saving the settings back unchanged works', (await call('POST', '/settings', A, set0)).s === 200, JSON.stringify(set0).slice(0, 80));
+check('settings that are not settings are refused (400)', (await call('POST', '/settings', A, { name: 5, email: 'a@b.io' })).s === 400);
+check('an unknown theme is refused (400)', (await call('POST', '/settings', A, { ...set0, theme: 'neon' })).s === 400);
+check('a colour that is not #RRGGBB is refused (400)', (await call('POST', '/settings', A, { ...set0, customColor: 'red' })).s === 400);
+check('a javascript: logo address is refused (400)', (await call('POST', '/settings', A, { ...set0, logoUrl: 'javascript:alert(1)' })).s === 400);
+check('oversized settings are refused (400)', (await call('POST', '/settings', A, { ...set0, address: 'x'.repeat(30000) })).s === 400);
+check('an audit entry without a record id is refused (400)', (await call('POST', '/audit', A, { entityType: 'lead', action: 'note' })).s === 400);
+check('an audit entry with a record id is accepted', (await call('POST', '/audit', A, { entityType: 'lead', recordId: lead.id, action: 'note', details: { text: 'ok' } })).s === 200);
+
 console.log(`\n=========== ${pass} passed, ${fails.length} failed ===========`);
 process.exit(fails.length ? 1 : 0);

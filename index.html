@@ -1,43 +1,201 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="FlowCRM — Enterprise metadata-driven CRM platform. Manage leads, customers, deals, and automate workflows from a single platform." />
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://ui-avatars.com data:; connect-src 'self' http://localhost:* ws://localhost:* https://generativelanguage.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;">
-  <title>FlowCRM — Enterprise CRM Platform</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'">
+<title>CRM for Agencies with WhatsApp and Instagram Leads | FlowCRM</title>
+<meta name="description" content="FlowCRM is a CRM for agencies and service businesses. Capture WhatsApp, Instagram and web leads, run a pipeline per client, and control who sees what.">
+<meta name="theme-color" content="#0d2b3e">
 
-  <meta name="color-scheme" content="light dark">
-
-  <!-- Apple's system font where available; Inter elsewhere (Windows, Android).
-       Other fonts a workspace picks in Settings are loaded on demand by services/theme.ts. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-  <script>
-    // Apply the saved light/dark choice before first paint (no white flash). services/theme.ts owns it after load.
-    (function () {
-      try {
-        var m = localStorage.getItem('flowcrm_theme');
-        var dark = m === 'dark' || (m === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        if (dark) document.documentElement.classList.add('dark');
-      } catch (e) {}
-    })();
-  </script>
-  <style>
-    /* React Flow Customization */
-    .react-flow__node {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
-    }
-  </style>
-  <script type="module" src="/index.tsx"></script>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FlowCRM">
+<meta property="og:title" content="CRM for Agencies with WhatsApp and Instagram Leads | FlowCRM">
+<meta property="og:description" content="FlowCRM is a CRM for agencies and service businesses. Capture WhatsApp, Instagram and web leads, run a pipeline per client, and control who sees what.">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="/site/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,500..800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site/site.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"FlowCRM","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"FlowCRM is a CRM for agencies and service businesses. Capture WhatsApp, Instagram and web leads, run a pipeline per client, and control who sees what."}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does it work with WhatsApp?","acceptedAnswer":{"@type":"Answer","text":"Yes. Connect the WhatsApp Business Cloud API and incoming messages create or update leads. Your team replies from a shared inbox and every message stays on the lead’s record."}},{"@type":"Question","name":"Can I run a separate pipeline for each client?","acceptedAnswer":{"@type":"Answer","text":"Yes. Each workspace has its own stages, fields, layouts and branding, so every client can follow their own process."}},{"@type":"Question","name":"Can I control what each person sees?","acceptedAnswer":{"@type":"Answer","text":"Roles set read, create, edit and delete rights per record type, can limit a person to their own records, and can hide or lock single fields. Admins can preview the app as any role before giving it out."}},{"@type":"Question","name":"Can I bring in my existing leads?","acceptedAnswer":{"@type":"Answer","text":"Yes. Import a CSV and map its columns to your fields, or send leads from other tools to the ingest endpoint."}},{"@type":"Question","name":"Is there an audit trail?","acceptedAnswer":{"@type":"Answer","text":"Every record change, sign-in, failed sign-in and permission change is logged with who did it and when."}}]}</script>
 </head>
+<body>
 
-<body class="text-gray-900 font-sans antialiased">
-  <div id="root"></div>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/" aria-label="FlowCRM home"><img src="/site/mark.svg" alt="" width="28" height="28"><span>FlowCRM</span></a>
+    <nav aria-label="Main">
+      <a href="/#industries">Industries</a>
+      <a href="/#features">Features</a>
+      <a href="/#faq">Questions</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="link-quiet" href="/login" data-app-link>Sign in</a>
+      <a class="btn btn-accent" href="/#demo">Book a demo</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+<section class="hero" aria-labelledby="hero-h">
+  <div class="wrap hero-inner">
+    <div class="hero-copy">
+      <h1 id="hero-h">The CRM for agencies. Every lead from every client in one pipeline.</h1>
+      <p class="lede">WhatsApp chats, Instagram and Facebook leads and website forms arrive as leads, go to the right person, and move through stages you define for each client.</p>
+      <div class="hero-cta">
+        <a class="btn btn-accent btn-lg" href="#demo">Book a demo</a>
+        <a class="btn btn-ghost btn-lg" href="/login" data-app-link>Sign in</a>
+      </div>
+    </div>
+    <div class="board" aria-label="Example pipeline: three new leads arriving from WhatsApp, Instagram and a web form" role="img">
+  <div class="col">
+    <div class="col-head"><span>New</span><span class="count">3</span></div>
+    <div class="card arrive" style="--d:0.35s"><span class="src src-whatsapp">WhatsApp</span><b>Meera Kapoor</b><span>“Need a quote for reels”</span></div><div class="card arrive" style="--d:0.9s"><span class="src src-instagram">Instagram</span><b>Urban Brew Café</b><span>Launch campaign</span></div><div class="card arrive" style="--d:1.4500000000000002s"><span class="src src-webform">Web form</span><b>Alpine Realty</b><span>Lead-gen for 2 projects</span></div>
+  </div>
+  <div class="col">
+    <div class="col-head"><span>Contacted</span><span class="count">1</span></div>
+    <div class="card"><b>Kite &amp; Co.</b><span>Instagram ads</span><span class="val">₹1.8L</span></div>
+  </div>
+  <div class="col">
+    <div class="col-head"><span>Proposal</span><span class="count">2</span></div>
+    <div class="card"><b>Nova Dental</b><span>SEO retainer</span><span class="val">₹60k/mo</span></div><div class="card"><b>Sharma Interiors</b><span>Website rebuild</span><span class="val">₹3.2L</span></div>
+  </div>
+  <div class="col">
+    <div class="col-head"><span>Won</span><span class="count">1</span></div>
+    <div class="card"><b>Brightline Tutors</b><span>Lead-gen campaign</span><span class="val">₹90k</span></div>
+  </div>
+</div>
+  </div>
+</section>
+
+<section class="channels" aria-label="Where leads come from">
+  <div class="wrap channels-inner">
+    <p>Leads arrive from</p>
+    <ul>
+      <li><span class="dot" style="--c:#25d366"></span>WhatsApp</li>
+      <li><span class="dot" style="--c:#d6249f"></span>Instagram</li>
+      <li><span class="dot" style="--c:#1877f2"></span>Facebook</li>
+      <li><span class="dot" style="--c:#f4a621"></span>Website forms</li>
+      <li><span class="dot" style="--c:#6a7886"></span>Calls</li>
+      <li><span class="dot" style="--c:#0d2b3e"></span>E-mail</li>
+    </ul>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="why-h">
+  <div class="wrap">
+    <h2 id="why-h" class="h-wide">Built for teams that sell for other people</h2>
+    <div class="rows">
+      <div class="row">
+        <h3>Keep every client apart</h3>
+        <p>Give each client a workspace with its own pipeline, fields, forms and colours. Your team switches between them; clients never see each other.</p>
+      </div>
+      <div class="row">
+        <h3>Decide who sees what</h3>
+        <p>Limit account managers to their own leads, hide fields such as budgets from juniors, and preview the app as any role before you hand out a login.</p>
+      </div>
+      <div class="row">
+        <h3>Stop chasing follow-ups</h3>
+        <p>Stage rules ask for the right details before a deal moves on, create the next task automatically, and send e-mail sequences while your team sleeps.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tint" id="industries" aria-labelledby="ind-h">
+  <div class="wrap">
+    <h2 id="ind-h">Made for how your business sells</h2>
+    <ul class="index">
+      <li><a href="/crm-for-agencies"><span class="index-name">Agencies</span><span class="index-stages">Enquiry, Discovery call, Proposal sent, Negotiation…</span></a></li>
+      <li><a href="/real-estate-crm"><span class="index-name">Real estate</span><span class="index-stages">New enquiry, Contacted, Site visit booked, Site visit done…</span></a></li>
+      <li><a href="/crm-for-education"><span class="index-name">Education &amp; admissions</span><span class="index-stages">Enquiry, Counselling call, Demo class, Application…</span></a></li>
+      <li><a href="/clinic-crm"><span class="index-name">Clinics</span><span class="index-stages">Enquiry, Called back, Appointment booked, Visited…</span></a></li>
+      <li><a href="/insurance-crm"><span class="index-name">Insurance &amp; finance</span><span class="index-stages">Prospect, Needs analysis, Quote sent, Documents pending…</span></a></li>
+      <li><a href="/recruitment-crm"><span class="index-name">Recruitment</span><span class="index-stages">Sourced, Screened, Submitted to client, Interview…</span></a></li>
+      <li><a href="/travel-agency-crm"><span class="index-name">Travel</span><span class="index-stages">Enquiry, Itinerary shared, Quote sent, Advance paid…</span></a></li>
+      <li><a href="/b2b-sales-crm"><span class="index-name">B2B services</span><span class="index-stages">Lead, Qualified, Demo, Proposal…</span></a></li>
+    </ul>
+  </div>
+</section>
+
+<section class="section" id="features" aria-labelledby="feat-h">
+  <div class="wrap">
+    <h2 id="feat-h">What is included</h2>
+    <dl class="features">
+      <div><dt>Shared WhatsApp inbox</dt><dd>Reply from one place and keep every chat on the right lead.</dd></div>
+      <div><dt>Instagram, Facebook and form capture</dt><dd>Leads arrive with their source, matched to existing records.</dd></div>
+      <div><dt>Pipelines with stage rules</dt><dd>Required fields, required notes and automatic tasks, e-mails or webhooks per stage.</dd></div>
+      <div><dt>Assignment and scoring</dt><dd>Round-robin or rule-based routing, and automatic lead scores.</dd></div>
+      <div><dt>Customer 360</dt><dd>Calls, e-mails, chats, notes, tasks, quotes and stage history on one page.</dd></div>
+      <div><dt>Quotes</dt><dd>Line items, tax and currency, e-mailed and converted into won deals.</dd></div>
+      <div><dt>Roles and field permissions</dt><dd>Own-records scope, hidden or read-only fields, and preview-as-role.</dd></div>
+      <div><dt>Custom objects and layouts</dt><dd>Add record types, fields and forms without writing code.</dd></div>
+      <div><dt>Reports and dashboards</dt><dd>Ready-made packs for sales and service, plus your own saved reports.</dd></div>
+      <div><dt>Workspaces and branding</dt><dd>A workspace per client or business unit, each with its own look.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="section" id="faq" aria-labelledby="faq-h">
+  <div class="wrap narrow">
+    <h2 id="faq-h">Questions people ask</h2>
+    <div class="faq">
+      <details><summary>Does it work with WhatsApp?</summary><p>Yes. Connect the WhatsApp Business Cloud API and incoming messages create or update leads. Your team replies from a shared inbox and every message stays on the lead’s record.</p></details>
+      <details><summary>Can I run a separate pipeline for each client?</summary><p>Yes. Each workspace has its own stages, fields, layouts and branding, so every client can follow their own process.</p></details>
+      <details><summary>Can I control what each person sees?</summary><p>Roles set read, create, edit and delete rights per record type, can limit a person to their own records, and can hide or lock single fields. Admins can preview the app as any role before giving it out.</p></details>
+      <details><summary>Can I bring in my existing leads?</summary><p>Yes. Import a CSV and map its columns to your fields, or send leads from other tools to the ingest endpoint.</p></details>
+      <details><summary>Is there an audit trail?</summary><p>Every record change, sign-in, failed sign-in and permission change is logged with who did it and when.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="section demo" id="demo" aria-labelledby="demo-h">
+  <div class="wrap demo-inner">
+    <div class="demo-copy">
+      <h2 id="demo-h">See it with your own pipeline</h2>
+      <p>Tell us how you sell today. We will set up a workspace with your stages and fields and walk you through it in thirty minutes.</p>
+    </div>
+    <form class="demo-form" data-demo-form novalidate>
+      <div class="field"><label for="d-name">Your name</label><input id="d-name" name="name" autocomplete="name" required maxlength="120"></div>
+      <div class="field"><label for="d-email">Work e-mail</label><input id="d-email" name="email" type="email" autocomplete="email" required maxlength="320"></div>
+      <div class="field"><label for="d-company">Company</label><input id="d-company" name="company" autocomplete="organization" maxlength="160"></div>
+      <div class="field"><label for="d-phone">Phone or WhatsApp</label><input id="d-phone" name="phone" type="tel" autocomplete="tel" maxlength="40"></div>
+      <div class="field field-wide"><label for="d-industry">What kind of business?</label><select id="d-industry" name="industry"><option>Agencies</option><option>Real estate</option><option>Education &amp; admissions</option><option>Clinics</option><option>Insurance &amp; finance</option><option>Recruitment</option><option>Travel</option><option>B2B services</option><option>Something else</option></select></div>
+      <div class="field field-wide"><label for="d-message">How do leads reach you today? <span class="opt">(optional)</span></label><textarea id="d-message" name="message" rows="3" maxlength="2000"></textarea></div>
+      <div class="hp" aria-hidden="true"><label for="d-website">Website</label><input id="d-website" name="website" tabindex="-1" autocomplete="off"></div>
+      <div class="field-wide form-foot">
+        <button class="btn btn-accent btn-lg" type="submit">Request a demo</button>
+        <p class="form-status" role="status" aria-live="polite"></p>
+      </div>
+    </form>
+  </div>
+</section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <div>
+      <a class="brand brand-light" href="/"><img src="/site/mark.svg" alt="" width="24" height="24"><span>FlowCRM</span></a>
+      <p class="footer-note">The CRM for agencies and service businesses that sell on WhatsApp, Instagram and the web.</p>
+    </div>
+    <nav aria-label="Industries" class="footer-links">
+      <a href="/crm-for-agencies">CRM for agencies</a>
+      <a href="/real-estate-crm">Real estate CRM</a>
+      <a href="/crm-for-education">CRM for education</a>
+      <a href="/clinic-crm">Clinic CRM</a>
+      <a href="/insurance-crm">Insurance CRM</a>
+      <a href="/recruitment-crm">Recruitment CRM</a>
+      <a href="/travel-agency-crm">Travel agency CRM</a>
+      <a href="/b2b-sales-crm">B2B sales CRM</a>
+    </nav>
+    <nav aria-label="Account" class="footer-links">
+      <a href="/login" data-app-link>Sign in</a>
+      <a href="/#demo">Book a demo</a>
+      
+    </nav>
+  </div>
+  <div class="wrap footer-base">© 2026 FlowCRM</div>
+</footer>
+<script src="/site/site.js" defer></script>
 </body>
-
 </html>

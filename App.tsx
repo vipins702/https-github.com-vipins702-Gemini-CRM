@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { ViewAsBanner } from './components/ViewAsRole';
 import { ForcedPasswordChange } from './components/ChangePassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { ModuleView } from './pages/ModuleView';
 import { WorkflowBuilder } from './pages/WorkflowBuilder';
@@ -49,6 +50,7 @@ const App: React.FC = () => {
   const [backStack, setBackStack] = useState<{ view: ViewState; params: any }[]>([]);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isPublicRoute, setIsPublicRoute] = useState(false);
+  const [isResetRoute] = useState(() => typeof window !== 'undefined' && window.location.pathname.startsWith('/reset-password'));
 
   // System Metadata State
   const [isReady, setIsReady] = useState(false);
@@ -80,6 +82,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // Check for Public Routes (e.g., /form/:id)
     const path = window.location.pathname;
+    if (isResetRoute) { setIsReady(true); return; }
     if (path.startsWith('/form/')) {
       setIsPublicRoute(true);
       setIsReady(true); // Skip bootstrap for public route in this simple router
@@ -150,6 +153,17 @@ const App: React.FC = () => {
     setBackStack([]);
     setViewParams(null); // Reset params on sidebar click
   };
+
+  // Keep the address bar honest: /app while signed in, /login while signed out.
+  useEffect(() => {
+    if (!isReady || isPublicRoute || isResetRoute) return;
+    const want = session ? '/app' : '/login';
+    if (window.location.pathname !== want) window.history.replaceState(null, '', want);
+  }, [isReady, session, isPublicRoute, isResetRoute]);
+
+  if (isResetRoute) {
+    return <ResetPassword />;
+  }
 
   if (!isReady) {
     return (

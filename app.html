@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="FlowCRM — Enterprise metadata-driven CRM platform. Manage leads, customers, deals, and automate workflows from a single platform." />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://ui-avatars.com data:; connect-src 'self' http://localhost:* ws://localhost:* https://generativelanguage.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;">
+  <title>FlowCRM</title>
+  <meta name="robots" content="noindex">
+
+  <meta name="color-scheme" content="light dark">
+
+  <!-- Apple's system font where available; Inter elsewhere (Windows, Android).
+       Other fonts a workspace picks in Settings are loaded on demand by services/theme.ts. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,600..800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script>
+    // Apply the saved light/dark choice before first paint (no white flash). services/theme.ts owns it after load.
+    (function () {
+      try {
+        var m = localStorage.getItem('flowcrm_theme');
+        var dark = m === 'dark' || (m === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    /* React Flow Customization */
+    .react-flow__node {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+    }
+  </style>
+  <script type="module" src="/index.tsx"></script>
+</head>
+
+<body class="text-gray-900 font-sans antialiased">
+  <div id="root"></div>
+</body>
+
+</html>

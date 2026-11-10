@@ -1,4 +1,5 @@
 
+import { DEFAULT_DASHBOARD } from './services/dashboardDefaults.js';
 import { SQLiteAdapter } from './db/sqlite.js';
 import { PostgresAdapter } from './db/postgres.js';
 import bcrypt from 'bcrypt';
@@ -597,6 +598,22 @@ export async function initDB() {
             )
         `);
 
+        // Password-reset links (only a hash of each token is stored)
+        await dbInstance.exec(`
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                used_at TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+        `);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id)`);
+
         // 27. Scoring Rules (auto-score leads based on field values)
         await dbInstance.exec(`
             CREATE TABLE IF NOT EXISTS scoring_rules (
@@ -718,13 +735,7 @@ export async function initDB() {
         // Seed Default Dashboard Widgets if missing
         const widgetConfig = await dbInstance.get('SELECT * FROM dashboard_widgets WHERE tenant_id = ?', 'default');
         if (!widgetConfig) {
-            const defaultWidgets = [
-                { id: 'w1', title: 'Total Revenue', type: 'stat', visible: true, order: 1, width: 'third' },
-                { id: 'w2', title: 'Active Leads', type: 'stat', visible: true, order: 2, width: 'third' },
-                { id: 'w3', title: 'Conversion Rate', type: 'stat', visible: true, order: 3, width: 'third' },
-                { id: 'w4', title: 'Revenue Trend', type: 'chart', visible: true, order: 4, width: 'half' },
-                { id: 'w5', title: 'Recent Leads', type: 'list', visible: true, order: 5, width: 'half' }
-            ];
+            const defaultWidgets = DEFAULT_DASHBOARD;
             await dbInstance.run('INSERT INTO dashboard_widgets (id, tenant_id, config) VALUES (?, ?, ?)', 'default_widgets', 'default', JSON.stringify(defaultWidgets));
             console.log('Seeded default dashboard widgets');
         }

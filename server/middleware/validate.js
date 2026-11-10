@@ -64,6 +64,43 @@ export const validateRoleId = async (req, res, next) => {
     } catch (e) { next(e); }
 };
 
+// ── Workspace menu and settings: stored as given and read by every screen, so a wrong shape breaks the app ──
+const menuProblem = (items, depth = 0) => {
+    if (!Array.isArray(items)) return 'The menu must be a list of items';
+    // An empty menu leaves nothing to click, including the Menu Builder that could repair it.
+    if (depth === 0 && items.length === 0) return 'The menu needs at least one item';
+    if (items.length > 200) return 'The menu has too many items';
+    if (depth > 3) return 'The menu is nested too deeply';
+    for (const [i, it] of items.entries()) {
+        if (!it || typeof it !== 'object' || Array.isArray(it)) return `Menu item ${i + 1} must be an object`;
+        if (typeof it.id !== 'string' || !it.id.trim() || it.id.length > 80) return `Menu item ${i + 1} needs an id`;
+        if (typeof it.label !== 'string' || !it.label.trim() || it.label.length > 120) return `Menu item "${it.id}" needs a label`;
+        if (it.type !== undefined && !['item', 'group'].includes(it.type)) return `Menu item "${it.id}" has an unknown type`;
+        for (const k of ['view', 'icon']) if (it[k] !== undefined && it[k] !== null && (typeof it[k] !== 'string' || it[k].length > 80)) return `Menu item "${it.id}": ${k} must be text`;
+        if (it.allowedRoles !== undefined && (!Array.isArray(it.allowedRoles) || it.allowedRoles.some(r => typeof r !== 'string'))) return `Menu item "${it.id}": allowedRoles must be a list of role ids`;
+        if (it.children !== undefined) { const p = menuProblem(it.children, depth + 1); if (p) return p; }
+    }
+    return null;
+};
+export const validateMenu = (req, res, next) => {
+    const problem = menuProblem(req.body);
+    if (problem) return res.status(400).json({ error: 'Validation Failed', details: [problem] });
+    next();
+};
+
+export const validateSettings = (req, res, next) => {
+    const b = req.body;
+    const fail = (m) => res.status(400).json({ error: 'Validation Failed', details: [m] });
+    if (!b || typeof b !== 'object' || Array.isArray(b)) return fail('Settings must be an object');
+    if (JSON.stringify(b).length > 20000) return fail('Settings are too large');
+    if (typeof b.organizationName !== 'string') return fail('organizationName is required');
+    if (b.theme !== undefined && !['light', 'dark', 'system'].includes(b.theme)) return fail('theme must be light, dark or system');
+    if (b.primaryColor !== undefined && typeof b.primaryColor !== 'string') return fail('primaryColor must be text');
+    if (b.customColor && !/^#[0-9a-fA-F]{6}$/.test(b.customColor)) return fail('customColor must look like #RRGGBB');
+    if (b.logoUrl && !/^(https?:\/\/|\/)/i.test(String(b.logoUrl))) return fail('logoUrl must be an http(s) address or a path on this site');
+    next();
+};
+
 export const rules = {
     roles: { id: 'string', name: 'string!', description: 'string', permissions: 'object' },
     users: (body) => ({ id: 'string', email: body.id ? 'string' : 'string!', password: 'string', roleId: 'string!', name: 'string', isActive: 'boolean' }),
@@ -78,4 +115,9 @@ export const rules = {
     webContent: { slug: 'string!', type: 'string!', title: 'string|null!', content: 'string|null!' },
     schemas: { entityType: 'string!', config: 'object!' },
     changePassword: { currentPassword: 'string!', newPassword: 'string!' },
+    audit: { entityType: 'string', recordId: 'string!', action: 'string', details: 'object' },
+    forgotPassword: { email: 'string!' },
+    resetCheck: { token: 'string!' },
+    resetPassword: { token: 'string!', newPassword: 'string!' },
+    demoRequest: { name: 'string!', email: 'string!', company: 'string', phone: 'string', industry: 'string', message: 'string', website: 'string' },
 };

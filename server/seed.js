@@ -22,11 +22,11 @@ const INITIAL_MENU = [
         type: 'group',
         allowedRoles: ['*'],
         children: [
-            { id: 'lead', label: 'Leads', icon: 'FolderOpen', type: 'item', view: 'lead', allowedRoles: ['*'] },
-            { id: 'customer', label: 'Customers', icon: 'FolderOpen', type: 'item', view: 'customer', allowedRoles: ['*'] },
-            { id: 'case', label: 'Cases', icon: 'FolderOpen', type: 'item', view: 'case', allowedRoles: ['*'] },
-            { id: 'task', label: 'Tasks', icon: 'FolderOpen', type: 'item', view: 'task', allowedRoles: ['*'] },
-            { id: 'product', label: 'Products', icon: 'FolderOpen', type: 'item', view: 'product', allowedRoles: ['*'] }
+            { id: 'lead', label: 'Leads', icon: 'Users', type: 'item', view: 'lead', allowedRoles: ['*'] },
+            { id: 'customer', label: 'Customers', icon: 'Building2', type: 'item', view: 'customer', allowedRoles: ['*'] },
+            { id: 'case', label: 'Cases', icon: 'LifeBuoy', type: 'item', view: 'case', allowedRoles: ['*'] },
+            { id: 'task', label: 'Tasks', icon: 'CheckSquare', type: 'item', view: 'task', allowedRoles: ['*'] },
+            { id: 'product', label: 'Products', icon: 'Package', type: 'item', view: 'product', allowedRoles: ['*'] }
         ]
     },
     {

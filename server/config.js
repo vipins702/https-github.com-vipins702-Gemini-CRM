@@ -41,3 +41,9 @@ export const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
 export const SMTP_USER = process.env.SMTP_USER || '';
 export const SMTP_PASS = process.env.SMTP_PASS || '';
 export const EMAIL_FROM = process.env.EMAIL_FROM || 'FlowCRM <noreply@flowcrm.com>';
+
+// Product name used in e-mails, and the public address of the web app (password-reset links point here).
+export const BRAND_NAME = process.env.BRAND_NAME || 'FlowCRM';
+export const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+// Workspace that receives demo requests sent from the public website.
+export const DEMO_TENANT_ID = process.env.DEMO_TENANT_ID || 'default';

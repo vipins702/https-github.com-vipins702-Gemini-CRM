@@ -1,152 +1,119 @@
-
 import React, { useState } from 'react';
-import { Hexagon, Lock, Mail, ArrowRight, Loader2, Eye, EyeOff, ShieldCheck, Zap, Workflow } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { api } from '../services/api';
 import { AuthSession } from '../types';
+import { AuthLayout, AuthError, authHeading, authDisplay, authInput, authButton, authLink, authLabel } from '../components/AuthLayout';
 
 interface LoginProps {
    onLogin: (session: AuthSession) => void;
 }
 
+type Mode = 'signin' | 'forgot' | 'sent';
+
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
+   const [mode, setMode] = useState<Mode>('signin');
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
    const [showPassword, setShowPassword] = useState(false);
-   const [showResetHint, setShowResetHint] = useState(false);
    const [loading, setLoading] = useState(false);
    const [error, setError] = useState('');
-   const [shake, setShake] = useState(false);
 
-   const handleSubmit = async (e: React.FormEvent) => {
+   const switchTo = (m: Mode) => { setMode(m); setError(''); };
+
+   const signIn = async (e: React.FormEvent) => {
       e.preventDefault();
+      if (!email.trim() || !password) { setError('Enter your e-mail and password.'); return; }
       setLoading(true);
       setError('');
       try {
-         const session = await api.login(email, password);
-         onLogin(session);
+         onLogin(await api.login(email.trim(), password));
       } catch (err) {
-         setError(err instanceof Error && err.message ? err.message : 'Something went wrong. Please try again.');
-         setShake(true);
-         setTimeout(() => setShake(false), 500);
+         setError(err instanceof Error && err.message ? err.message : 'Sign-in failed. Try again.');
       } finally {
          setLoading(false);
       }
    };
 
-   const inputCls = "w-full h-12 pl-11 pr-4 text-[15px] border border-gray-200 rounded-xl outline-none transition-colors bg-surface placeholder:text-gray-400 focus:border-accent focus-ring";
+   const sendLink = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) { setError('Enter the e-mail address you sign in with.'); return; }
+      setLoading(true);
+      setError('');
+      try {
+         await api.forgotPassword(email.trim());
+         setMode('sent');
+      } catch (err) {
+         setError(err instanceof Error && err.message ? err.message : 'The link could not be sent. Try again.');
+      } finally {
+         setLoading(false);
+      }
+   };
 
    return (
-      <div className="min-h-dvh flex items-center justify-center font-sans p-5 sm:p-8 relative overflow-hidden bg-hero">
-         {/* Centered showcase glass panel */}
-         <div className={`relative z-10 w-full max-w-4xl glass-hero panel-rise grid lg:grid-cols-2 overflow-hidden ${shake ? 'animate-shake' : ''}`}>
-            {/* Left — brand / value prop */}
-            <div className="hidden lg:flex flex-col justify-between p-10 xl:p-12 bg-surface/40 border-r border-gray-200/60">
-               <div className="flex items-center gap-2.5">
-                  <div className="tri-ring-sq w-10 h-10">
-                     <div className="flex items-center justify-center"><Hexagon className="w-5 h-5 text-white" strokeWidth={2.4} /></div>
+      <AuthLayout>
+         {mode === 'signin' && (
+            <>
+               <h2 className={authHeading} style={authDisplay}>Sign in</h2>
+               <p className="mt-2 text-[15px] text-[#5f6d7b]">Use the e-mail address your workspace invited.</p>
+               <form onSubmit={signIn} className="mt-8 space-y-5" noValidate>
+                  <div>
+                     <label htmlFor="login-email" className={authLabel}>E-mail</label>
+                     <input id="login-email" name="email" type="email" autoComplete="email" inputMode="email" required
+                        value={email} onChange={e => setEmail(e.target.value)} className={authInput} placeholder="you@company.com" />
                   </div>
-                  <span className="font-heading text-xl font-semibold tracking-tight text-gray-900">FlowCRM</span>
-               </div>
-
-               <div className="max-w-md">
-                  <h1 className="font-heading text-[40px] font-bold tracking-tight leading-[1.08] text-ink">
-                     The CRM that <span className="gradient-text">runs itself</span>.
-                  </h1>
-                  <p className="text-[15px] text-ink-soft leading-relaxed mt-5">
-                     Custom layouts, automated journeys, and a unified customer view — all on one metadata-driven platform.
-                  </p>
-                  <ul className="mt-8 space-y-3">
-                     {[
-                        { icon: Workflow, text: 'Visual workflow automation', tint: 'text-accent bg-accent/10' },
-                        { icon: Zap, text: 'AI lead capture & routing', tint: 'text-warning bg-warning/10' },
-                        { icon: ShieldCheck, text: 'Role-based access & audit trail', tint: 'text-success bg-success/10' },
-                     ].map(({ icon: Icon, text, tint }) => (
-                        <li key={text} className="flex items-center gap-3 text-ink-soft text-sm font-medium">
-                           <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${tint}`}>
-                              <Icon className="w-4 h-4" />
-                           </span>
-                           {text}
-                        </li>
-                     ))}
-                  </ul>
-               </div>
-
-               <p className="text-sm text-gray-500">Leads, customers and conversations — in one place.</p>
-            </div>
-
-            {/* Right — form */}
-            <div className="p-8 sm:p-10 xl:p-12 bg-surface/70">
-               <div className="lg:hidden flex items-center gap-2.5 mb-8">
-                  <div className="tri-ring-sq w-9 h-9"><div className="flex items-center justify-center"><Hexagon className="w-[18px] h-[18px] text-white" strokeWidth={2.4} /></div></div>
-                  <span className="font-heading text-lg font-semibold tracking-tight text-gray-900">FlowCRM</span>
-               </div>
-
-               <div className="mb-8">
-                  <h2 className="font-heading text-[28px] font-semibold tracking-tight text-ink">Welcome back</h2>
-                  <p className="text-gray-500 mt-1 text-[15px]">Sign in to your workspace to continue.</p>
-               </div>
-
-               <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-                  <div className="space-y-1.5">
-                     <label htmlFor="login-email" className="block text-sm font-medium text-ink-soft">Email address</label>
-                     <div className="relative">
-                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-[18px] h-[18px]" aria-hidden="true" />
-                        <input
-                           id="login-email" name="email" type="email" required autoComplete="email" inputMode="email"
-                           value={email} onChange={(e) => setEmail(e.target.value)}
-                           className={inputCls} placeholder="you@company.com"
-                        />
+                  <div>
+                     <div className="flex items-baseline justify-between mb-1.5">
+                        <label htmlFor="login-password" className="text-sm font-semibold text-[#0d2b3e]">Password</label>
+                        <button type="button" onClick={() => switchTo('forgot')} className={`text-sm ${authLink}`}>Forgot password?</button>
                      </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                     <div className="flex items-center justify-between">
-                        <label htmlFor="login-password" className="block text-sm font-medium text-ink-soft">Password</label>
-                        <button type="button" onClick={() => setShowResetHint(v => !v)} className="text-sm text-accent hover:text-accent-deep font-semibold">Forgot?</button>
-                     </div>
-                     {showResetHint && (
-                        <p role="status" className="text-xs text-ink-muted">Ask your workspace administrator to reset your password (Users, then Edit user).</p>
-                     )}
                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-[18px] h-[18px]" aria-hidden="true" />
-                        <input
-                           id="login-password" name="password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password"
-                           value={password} onChange={(e) => setPassword(e.target.value)}
-                           className={`${inputCls} !pr-11`} placeholder="••••••••"
-                        />
+                        <input id="login-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required
+                           value={password} onChange={e => setPassword(e.target.value)} className={`${authInput} pr-12`} />
                         <button type="button" onClick={() => setShowPassword(s => !s)} aria-label={showPassword ? 'Hide password' : 'Show password'}
-                           className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md">
+                           className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md text-[#5f6d7b] hover:text-[#0d2b3e]">
                            {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
                         </button>
                      </div>
                   </div>
-
-                  <label htmlFor="remember" className="flex items-center gap-2 text-sm text-ink-soft select-none cursor-pointer">
-                     <input type="checkbox" id="remember" className="rounded border-slate-300 text-accent focus:ring-accent w-4 h-4" />
-                     Keep me signed in
-                  </label>
-
-                  {error && (
-                     <div role="alert" aria-live="assertive" className="p-3 bg-red-50 text-red-700 text-sm rounded-xl flex items-start gap-2.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 mt-1.5"></span>
-                        <span className="font-medium">{error}</span>
-                     </div>
-                  )}
-
-                  <button
-                     type="submit" disabled={loading}
-                     className="btn-tri-primary w-full h-12 text-[15px] font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed focus-ring"
-                  >
-                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Sign in <ArrowRight className="w-[18px] h-[18px]" /></>}
+                  {error && <AuthError message={error} />}
+                  <button type="submit" disabled={loading} className={authButton}>
+                     {loading && <Loader2 className="w-5 h-5 animate-spin" />} Sign in
                   </button>
                </form>
-
-               <p className="mt-8 text-center text-sm text-ink-muted">
-                  Need a workspace? Contact your platform administrator.
+               <p className="mt-10 text-sm text-[#5f6d7b]">
+                  No account yet? <a href="/#demo" className={authLink}>Book a demo</a> and we will set up your workspace.
                </p>
+            </>
+         )}
 
+         {mode === 'forgot' && (
+            <>
+               <h2 className={authHeading} style={authDisplay}>Reset your password</h2>
+               <p className="mt-2 text-[15px] text-[#5f6d7b]">We will e-mail you a link to choose a new one. It works for 30 minutes.</p>
+               <form onSubmit={sendLink} className="mt-8 space-y-5" noValidate>
+                  <div>
+                     <label htmlFor="forgot-email" className={authLabel}>E-mail</label>
+                     <input id="forgot-email" type="email" autoComplete="email" inputMode="email" required autoFocus
+                        value={email} onChange={e => setEmail(e.target.value)} className={authInput} placeholder="you@company.com" />
+                  </div>
+                  {error && <AuthError message={error} />}
+                  <button type="submit" disabled={loading} className={authButton}>
+                     {loading && <Loader2 className="w-5 h-5 animate-spin" />} Send reset link
+                  </button>
+               </form>
+               <button type="button" onClick={() => switchTo('signin')} className={`mt-8 text-sm ${authLink}`}>Back to sign in</button>
+            </>
+         )}
+
+         {mode === 'sent' && (
+            <div role="status">
+               <h2 className={authHeading} style={authDisplay}>Check your e-mail</h2>
+               <p className="mt-3 text-[15px] leading-relaxed text-[#5f6d7b]">
+                  If <b className="text-[#253341]">{email.trim()}</b> has an account, a reset link is on its way. Open it within 30 minutes. Nothing there? Check spam, or ask your workspace admin.
+               </p>
+               <button type="button" onClick={() => switchTo('signin')} className={`mt-8 ${authButton}`}>Back to sign in</button>
             </div>
-         </div>
-      </div>
+         )}
+      </AuthLayout>
    );
 };

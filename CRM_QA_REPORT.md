@@ -331,6 +331,25 @@ for screens, in the browser.
 - Saving a record now rejects values it used to accept (an unknown picklist value, a number that is not a number, an invalid date or phone).
 - `nodemailer` moved from 7 or 8 to 10; the code only uses `createTransport` and sending.
 
+### 7.8 Self-service reset, public website, and what a UI pass found
+
+| Item | Status | Notes |
+|---|---|---|
+| E-mailed password reset | **Done** | "Forgot password?" on the sign-in page, a one-time link valid 30 minutes (stored hashed, single use, a newer request cancels the older link, using it ends every session). The same answer is given for known and unknown addresses; limits of 3 requests per address and 10 per IP in 15 minutes. Needs SMTP and `APP_URL` to deliver; without SMTP the link is printed to the development log only. Covered in `reset-and-site.mjs` |
+| Marketing website | **Done** | Home plus 8 industry pages as static, crawlable HTML with titles, descriptions, one h1, FAQ and software structured data, breadcrumbs, robots.txt and (with `SITE_URL`) canonical tags and a sitemap. A demo form creates a lead (honeypot field, per-IP limit). Checked on desktop and a 375 px phone with no sideways scroll |
+| Sign-in screens | **Done** | Redesigned sign-in, forgot-password and reset screens sharing one layout |
+| **Blank dashboard on every new install** | **Fixed** | Fresh databases seeded five old-style widgets the dashboard no longer draws, so the home screen showed only a greeting. New workspaces now start from the Dashboard Summary pack, old saved dashboards fall back to it, and a real empty state appears when no widget can be drawn |
+| **App shows a white page when one saved value is wrong** | **Fixed** | An invalid menu (saved by my own fuzz test) crashed the sidebar and blanked the app, with no way back. Now: an error boundary shows a message with Reload and Sign out; menu and settings saves are validated (shape, size, colour, logo address); an empty menu is refused because it would remove the Menu Builder; the menu fetch always returns a list |
+| Audit endpoint accepted entries it could not store | **Fixed** | `POST /audit` without a record id returned success while the write failed silently; it now returns 400 |
+| CRM module icons | **Fixed** | Leads, Customers, Cases, Tasks and Products all used the same folder icon; each has its own, which matters when the sidebar collapses to icons |
+
+**Still open from the UI pass**
+
+- The app's default look (ivory and gold, hexagon logo) does not match the new website and sign-in (navy and saffron). Workspaces can restyle themselves in Settings; the decision is which look becomes the default.
+- On phones the sidebar is a permanent icon rail that takes about a quarter of the width, and there is no bottom navigation. Lists and forms were not reviewed screen by screen at phone width.
+- The dashboard, lists and 360 pages were reviewed on desktop and one phone width only; no accessibility audit, keyboard-only walkthrough or screen-reader pass was done.
+- No server-side paging, no real Opportunity or Contact entity, no versioned migrations (unchanged from 7.7).
+
 ---
 
 ## 8. Top 10 improvements, by priority (re-ranked after the skill review)

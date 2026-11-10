@@ -10,8 +10,11 @@ import db from './database.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { authenticateToken, requirePermission, requireSuperadmin } from './middleware/auth.js';
-import { validate, validateRoleId, validatePassword, rules } from './middleware/validate.js';
+import { validate, validateRoleId, validatePassword, validateMenu, validateSettings, rules } from './middleware/validate.js';
 import { passwordProblem } from './utils/passwordPolicy.js';
+import { requestPasswordReset, isResetTokenValid, resetPassword } from './services/passwordReset.js';
+import { DEMO_TENANT_ID } from './config.js';
+import { DEFAULT_DASHBOARD, hasRenderableWidgets } from './services/dashboardDefaults.js';
 import { policyGate, can, isAdminUser, isRestrictedScope, hasAnyAccess, hiddenFields, filterFields, protectFields } from './middleware/access.js';
 import { listTenants, createTenant, updateTenant, ensureSuperadmin } from './services/platform.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -399,6 +402,65 @@ function loginRateLimiter(req, res, next) {
 
 // --- Auth Routes ---
 
+// Simple in-memory budget for public forms: at most `max` requests per key in `windowMs`.
+const publicBudget = new Map();
+const overBudget = (key, max, windowMs) => {
+    const now = Date.now();
+    const hits = (publicBudget.get(key) || []).filter(t => now - t < windowMs);
+    if (hits.length >= max) { publicBudget.set(key, hits); return true; }
+    hits.push(now); publicBudget.set(key, hits);
+    return false;
+};
+setInterval(() => { const now = Date.now(); for (const [k, v] of publicBudget) { const keep = v.filter(t => now - t < 60 * 60 * 1000); if (keep.length) publicBudget.set(k, keep); else publicBudget.delete(k); } }, 10 * 60 * 1000).unref();
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/;
+
+// Forgot password: always the same answer, so the form cannot be used to find out who has an account.
+app.post('/api/auth/forgot-password', validate(rules.forgotPassword), async (req, res) => {
+    const email = req.body.email.trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Validation Failed', details: ['Enter a valid e-mail address'] });
+    if (overBudget('fp-ip:' + req.ip, 10, 15 * 60 * 1000) || overBudget('fp-mail:' + email, 3, 15 * 60 * 1000)) {
+        return res.status(429).json({ error: 'Too many reset requests. Try again in 15 minutes.' });
+    }
+    // Not awaited: answering before the e-mail is built keeps the response time the same for unknown addresses.
+    requestPasswordReset(email, req.ip).catch(e => console.error('[password-reset] request failed:', e.message));
+    res.json({ success: true, message: 'If an account exists for that address, a reset link is on its way. It works for 30 minutes.' });
+});
+
+app.post('/api/auth/reset-password/check', validate(rules.resetCheck), async (req, res) => {
+    res.json({ valid: await isResetTokenValid(req.body.token) });
+});
+
+app.post('/api/auth/reset-password', validate(rules.resetPassword), async (req, res) => {
+    if (overBudget('rp-ip:' + req.ip, 20, 15 * 60 * 1000)) return res.status(429).json({ error: 'Too many attempts. Try again in 15 minutes.' });
+    await resetPassword(req.body.token, req.body.newPassword, req.ip);
+    res.json({ success: true });
+});
+
+// Demo requests from the public website become leads in the workspace named by DEMO_TENANT_ID.
+app.post('/api/public/demo-request', validate(rules.demoRequest), async (req, res) => {
+    const b = req.body;
+    if (b.website) return res.json({ success: true }); // honeypot field: bots fill it, people never see it
+    const email = b.email.trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Validation Failed', details: ['Enter a valid e-mail address'] });
+    if (b.phone && !/^\+?[0-9 ()\-.]{5,40}$/.test(b.phone)) return res.status(400).json({ error: 'Validation Failed', details: ['Enter a valid phone number'] });
+    if (overBudget('demo-ip:' + req.ip, 5, 60 * 60 * 1000)) return res.status(429).json({ error: 'Too many requests from this network. Try again later or e-mail us.' });
+    const tenant = await db.get('SELECT id FROM tenants WHERE id = ?', DEMO_TENANT_ID);
+    if (!tenant) return res.status(503).json({ error: 'Demo requests are not set up yet.' });
+    const cut = (v, n) => String(v || '').trim().slice(0, n);
+    const [firstName, ...rest] = cut(b.name, 120).split(/\s+/);
+    const data = {
+        firstName, lastName: rest.join(' ') || '-', email, phone: cut(b.phone, 40), company: cut(b.company, 160),
+        industry: cut(b.industry, 80), notes: cut(b.message, 2000), source: 'Web', status: 'New',
+        _via: 'website_demo_request',
+    };
+    const id = uuidv4();
+    await db.run('INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)',
+        id, DEMO_TENANT_ID, 'lead', displayNameOf(data), 'New', JSON.stringify(data));
+    await logAudit({ tenantId: DEMO_TENANT_ID, entityType: 'lead', recordId: id, action: 'create', actorId: null, details: { _via: 'website_demo_request', email } });
+    try { await assignLead(DEMO_TENANT_ID, id, data); } catch { /* unassigned is fine */ }
+    res.json({ success: true });
+});
+
 // Sign out everywhere: every token issued to this user so far stops working.
 app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     await db.run('UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = ? AND tenant_id = ?', req.user.id, req.tenantId);
@@ -578,18 +640,16 @@ app.get('/api/metadata/menu', authenticateToken, async (req, res) => {
         console.log('Fetching menu for tenant:', req.tenantId);
         const row = await db.get('SELECT config FROM menus WHERE tenant_id = ?', req.tenantId);
         console.log('Menu row found:', !!row);
-        if (row) {
-            res.json(JSON.parse(row.config));
-        } else {
-            res.json([]);
-        }
+        let menu = [];
+        try { menu = row ? JSON.parse(row.config) : []; } catch { menu = []; }
+        res.json(Array.isArray(menu) ? menu : []);
     } catch (error) {
         console.error('Menu fetch error:', error);
         res.status(500).json({ error: 'Failed to fetch menu' });
     }
 });
 
-app.post('/api/metadata/menu', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/metadata/menu', authenticateToken, requireAdmin, validateMenu, async (req, res) => {
     const menuConfig = req.body;
     try {
         // Manual upsert (the menus table has no UNIQUE(tenant_id), so ON CONFLICT can't be used)
@@ -1854,7 +1914,7 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
 });
 
 // Save settings
-app.post('/api/settings', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/settings', authenticateToken, requireAdmin, validateSettings, async (req, res) => {
     const config = req.body;
     try {
         const id = uuidv4();
@@ -2012,18 +2072,10 @@ app.post('/api/email/send', authenticateToken, async (req, res) => {
 app.get('/api/dashboard/widgets', authenticateToken, async (req, res) => {
     try {
         const row = await db.get('SELECT config FROM dashboard_widgets WHERE tenant_id = ?', req.tenantId);
-        if (row) {
-            res.json(JSON.parse(row.config));
-        } else {
-            const defaultWidgets = [
-                { id: 'w1', title: 'Total Revenue', type: 'stat', visible: true, order: 1, width: 'third' },
-                { id: 'w2', title: 'Active Leads', type: 'stat', visible: true, order: 2, width: 'third' },
-                { id: 'w3', title: 'Conversion Rate', type: 'stat', visible: true, order: 3, width: 'third' },
-                { id: 'w4', title: 'Revenue Trend', type: 'chart', visible: true, order: 4, width: 'half' },
-                { id: 'w5', title: 'Recent Leads', type: 'list', visible: true, order: 5, width: 'half' }
-            ];
-            res.json(defaultWidgets);
-        }
+        const stored = row ? JSON.parse(row.config) : null;
+        // A workspace with no saved dashboard, or one saved before pack widgets existed (those tiles draw nothing),
+        // starts from the standard dashboard.
+        res.json(hasRenderableWidgets(stored) ? stored : DEFAULT_DASHBOARD);
     } catch (error) {
         console.error('Fetch widgets error:', error);
         res.status(500).json({ error: 'Failed to fetch dashboard widgets' });
@@ -2141,7 +2193,7 @@ app.get('/api/dashboard/chart-data', authenticateToken, async (req, res) => {
 });
 
 // --- Audit Log Routes ---
-app.post('/api/audit', authenticateToken, async (req, res) => {
+app.post('/api/audit', authenticateToken, validate(rules.audit), async (req, res) => {
     const { entityType, recordId, action, details } = req.body;
     try {
         await logAudit({
