@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { ViewAsBanner } from './components/ViewAsRole';
+import { ForcedPasswordChange } from './components/ChangePassword';
 import { Dashboard } from './pages/Dashboard';
 import { ModuleView } from './pages/ModuleView';
 import { WorkflowBuilder } from './pages/WorkflowBuilder';
@@ -174,6 +175,17 @@ const App: React.FC = () => {
   // Unauthenticated State
   if (!session) {
     return <Login onLogin={handleLogin} />;
+  }
+
+  // New users and admin resets must pick their own password before using the app.
+  if (session.user?.mustChangePassword) {
+    return (
+      <ForcedPasswordChange
+        email={session.user.email}
+        onDone={async () => setSession(await api.getSession())}
+        onSignOut={() => { api.logout(); setSession(null); }}
+      />
+    );
   }
 
   const renderContent = () => {

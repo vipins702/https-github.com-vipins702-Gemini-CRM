@@ -10,7 +10,8 @@ import db from './database.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { authenticateToken, requirePermission, requireSuperadmin } from './middleware/auth.js';
-import { validate, validateRoleId, rules } from './middleware/validate.js';
+import { validate, validateRoleId, validatePassword, rules } from './middleware/validate.js';
+import { passwordProblem } from './utils/passwordPolicy.js';
 import { policyGate, can, isAdminUser, isRestrictedScope, hasAnyAccess, hiddenFields, filterFields, protectFields } from './middleware/access.js';
 import { listTenants, createTenant, updateTenant, ensureSuperadmin } from './services/platform.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -59,7 +60,21 @@ for (const method of ['get', 'post', 'put', 'patch', 'delete', 'all', 'use']) {
 // given number of hops makes req.ip the real client again, so per-IP limits (login) work.
 if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
 
-app.use(cors());
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'); // the web app on another origin shows uploaded images
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    if (req.path.startsWith('/api')) res.setHeader('Cache-Control', 'no-store'); // authenticated data must not sit in shared caches
+    next();
+});
+// CORS_ORIGINS="https://app.example.com,https://other.example.com" limits browsers to those sites.
+// Left empty, every site may call the API from a browser (kept for existing deployments).
+const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
+if (!corsOrigins.length && process.env.NODE_ENV === 'production') console.warn('[security] CORS_ORIGINS is not set: any website can call this API from a browser. Set it to your frontend URL(s).');
 app.use(express.json({
     // Webhook signatures are computed over the exact bytes received, so keep them.
     verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/webhooks/')) req.rawBody = buf; },
@@ -99,7 +114,19 @@ const displayNameOf = (d) =>
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-app.use('/uploads', express.static(UPLOAD_DIR));
+// Files are served so they cannot run as a page: no sniffing, sandboxed, and only plain raster images are
+// shown inline. Everything else downloads.
+const INLINE_IMAGE = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif']);
+app.use('/uploads', express.static(UPLOAD_DIR, {
+    index: false,
+    setHeaders: (res, filePath) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+        if (!INLINE_IMAGE.has(path.extname(filePath).toLowerCase())) res.setHeader('Content-Disposition', 'attachment');
+    },
+}));
+const BLOCKED_UPLOAD_EXT = new Set(['.html', '.htm', '.xhtml', '.shtml', '.svg', '.svgz', '.xml', '.xsl', '.js', '.mjs', '.cjs', '.jsp', '.php', '.asp', '.aspx', '.exe', '.dll', '.bat', '.cmd', '.com', '.msi', '.scr', '.sh', '.ps1', '.jar', '.vbs', '.hta', '.swf']);
+const uploadRefused = (message) => Object.assign(new Error(message), { status: 400, expose: true });
 
 const upload = multer({
     storage: multer.diskStorage({
@@ -107,6 +134,9 @@ const upload = multer({
         filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
     }),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (req, file, cb) => (BLOCKED_UPLOAD_EXT.has(path.extname(file.originalname).toLowerCase())
+        ? cb(uploadRefused('This file type is not allowed'))
+        : cb(null, true)),
 });
 
 // Initialize Database
@@ -328,37 +358,69 @@ app.get('/', (req, res) => {
     res.send('FlowCRM Backend v1.0 is running. API is at /api');
 });
 
-// Failed-login limiter, per IP (in memory, per process). Only failures count: a successful login
-// clears the record, and requests refused while blocked do not extend the block.
+// Failed-login limits (in memory, per process). Only failures count, a successful login clears them, and
+// requests refused while blocked do not extend the block. Two limits: 5 failures a minute from one IP, and
+// 10 failures in 15 minutes against one account, which slows an attack spread over many IPs. The price is that
+// someone who knows an e-mail address can lock that account out for a few minutes.
 const loginFailures = new Map();
-const LOGIN_WINDOW_MS = 60 * 1000;
-const LOGIN_MAX_FAILURES = 5;
+const IP_WINDOW_MS = 60 * 1000, IP_MAX = 5, ACCOUNT_WINDOW_MS = 15 * 60 * 1000, ACCOUNT_MAX = 10;
 setInterval(() => {
     const now = Date.now();
-    for (const [ip, list] of loginFailures) {
-        const recent = list.filter(t => now - t < LOGIN_WINDOW_MS);
-        if (recent.length) loginFailures.set(ip, recent); else loginFailures.delete(ip);
+    for (const [k, list] of loginFailures) {
+        const recent = list.filter(t => now - t < ACCOUNT_WINDOW_MS);
+        if (recent.length) loginFailures.set(k, recent); else loginFailures.delete(k);
     }
-}, LOGIN_WINDOW_MS).unref();
+}, 60 * 1000).unref();
+const recentFailures = (key, windowMs, now) => (loginFailures.get(key) || []).filter(t => now - t < windowMs);
 
 function loginRateLimiter(req, res, next) {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const ip = 'ip:' + (req.ip || req.socket.remoteAddress || 'unknown');
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const acct = email ? 'acct:' + email : null;
     const now = Date.now();
-    const recent = (loginFailures.get(ip) || []).filter(t => now - t < LOGIN_WINDOW_MS);
-    if (recent.length >= LOGIN_MAX_FAILURES) {
-        const wait = Math.max(1, Math.ceil((recent[0] + LOGIN_WINDOW_MS - now) / 1000));
+    const ipHits = recentFailures(ip, IP_WINDOW_MS, now);
+    const acctHits = acct ? recentFailures(acct, ACCOUNT_WINDOW_MS, now) : [];
+    const blocked = ipHits.length >= IP_MAX ? [ipHits, IP_WINDOW_MS] : acctHits.length >= ACCOUNT_MAX ? [acctHits, ACCOUNT_WINDOW_MS] : null;
+    if (blocked) {
+        const wait = Math.max(1, Math.ceil((blocked[0][0] + blocked[1] - now) / 1000));
         res.set('Retry-After', String(wait));
-        return res.status(429).json({ error: `Too many failed login attempts. Try again in ${wait}s.` });
+        return res.status(429).json({ error: `Too many failed login attempts. Try again in ${wait < 90 ? wait + 's' : Math.ceil(wait / 60) + ' min'}.` });
     }
-    loginFailures.set(ip, recent);
     res.on('finish', () => {
-        if (res.statusCode === 200) loginFailures.delete(ip);
-        else if (res.statusCode === 401 || res.statusCode === 403) loginFailures.set(ip, [...(loginFailures.get(ip) || []), Date.now()]);
+        if (res.statusCode === 200) {
+            loginFailures.delete(ip);
+            if (acct) loginFailures.delete(acct);
+        } else if (res.statusCode === 401 || res.statusCode === 403) {
+            for (const k of [ip, acct].filter(Boolean)) loginFailures.set(k, [...(loginFailures.get(k) || []), Date.now()]);
+        }
     });
     next();
 }
 
 // --- Auth Routes ---
+
+// Sign out everywhere: every token issued to this user so far stops working.
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+    await db.run('UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = ? AND tenant_id = ?', req.user.id, req.tenantId);
+    await logAudit({ tenantId: req.tenantId, entityType: 'auth', recordId: req.user.id, action: 'logout', actorId: req.user.id, details: { ip: req.ip } });
+    res.json({ success: true });
+});
+
+// Change your own password. Ends the user's other sessions and returns a fresh token for this one.
+app.post('/api/auth/change-password', loginRateLimiter, authenticateToken, validate(rules.changePassword), async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    const row = await db.get('SELECT password_hash, token_version FROM users WHERE id = ? AND tenant_id = ?', req.user.id, req.tenantId);
+    // 403, not 401: a 401 makes the web app sign the person out.
+    if (!row || !bcrypt.compareSync(currentPassword, row.password_hash)) return res.status(403).json({ error: 'Current password is incorrect' });
+    const problem = passwordProblem(newPassword);
+    if (problem) return res.status(400).json({ error: 'Validation Failed', details: [problem] });
+    if (newPassword === currentPassword) return res.status(400).json({ error: 'Validation Failed', details: ['New password must be different from the current one'] });
+    const tv = (row.token_version || 0) + 1;
+    await db.run('UPDATE users SET password_hash = ?, must_change_password = 0, token_version = ? WHERE id = ? AND tenant_id = ?', bcrypt.hashSync(newPassword, 10), tv, req.user.id, req.tenantId);
+    await logAudit({ tenantId: req.tenantId, entityType: 'auth', recordId: req.user.id, action: 'password_changed', actorId: req.user.id, details: { ip: req.ip } });
+    const token = jwt.sign({ id: req.user.id, email: req.user.email, role: req.user.role, tenantId: req.tenantId, isSuperadmin: !!req.user.isSuperadmin, tv }, JWT_SECRET, { expiresIn: '24h' });
+    res.json({ success: true, token });
+});
 
 // Who am I, with the role's permissions as they are right now (the UI refreshes from this).
 app.get('/api/auth/me', authenticateToken, (req, res) => {
@@ -379,12 +441,14 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
 
         if (!user.is_active) {
             console.log('Login failed: User inactive', email);
+            await logAudit({ tenantId: user.tenant_id, entityType: 'auth', recordId: user.id, action: 'login_blocked', actorId: user.id, details: { email, ip: req.ip, reason: 'inactive' } });
             return res.status(403).json({ error: 'Account is inactive. Contact administrator.' });
         }
 
         const validPassword = bcrypt.compareSync(password, user.password_hash);
         if (!validPassword) {
             console.log('Login failed: Invalid password', email);
+            await logAudit({ tenantId: user.tenant_id, entityType: 'auth', recordId: user.id, action: 'login_failed', actorId: user.id, details: { email, ip: req.ip } });
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
@@ -395,11 +459,13 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
             const tenant = await db.get('SELECT status FROM tenants WHERE id = ?', user.tenant_id);
             if (tenant && tenant.status === 'suspended') {
                 console.log('Login failed: tenant suspended', user.tenant_id);
+                await logAudit({ tenantId: user.tenant_id, entityType: 'auth', recordId: user.id, action: 'login_blocked', actorId: user.id, details: { email, ip: req.ip, reason: 'workspace suspended' } });
                 return res.status(403).json({ error: 'This workspace is suspended. Contact the platform administrator.' });
             }
         }
 
         console.log('Login successful', email);
+        await logAudit({ tenantId: user.tenant_id, entityType: 'auth', recordId: user.id, action: 'login', actorId: user.id, details: { email, ip: req.ip } });
 
         // Fetch Permissions
         let permissions = {};
@@ -416,7 +482,7 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
             }
         }
 
-        const token = jwt.sign({ id: user.id, email: user.email, role: user.role, tenantId: user.tenant_id, isSuperadmin }, JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role, tenantId: user.tenant_id, isSuperadmin, tv: user.token_version || 0 }, JWT_SECRET, { expiresIn: '24h' });
         res.json({
             token,
             user: {
@@ -805,28 +871,47 @@ app.get('/api/data/:entityType', authenticateToken, async (req, res) => {
 
 // --- Validation Logic ---
 
-const mapFieldTypeToZod = (field) => {
+// Fields the server sets itself; a client value for them is ignored.
+const RESERVED_FIELDS = new Set(['id', 'created_at', 'updated_at']);
+const MAX_TEXT = 1000;
+const MAX_LONG_TEXT = 20000;
+
+// `extraOptions`: values that are also acceptable for a select/status field (pipeline stages, the value the
+// record already holds), so old data and renamed stages never block an unrelated edit.
+const mapFieldTypeToZod = (field, extraOptions = []) => {
     let schema;
     switch (field.type) {
-        case 'text':
         case 'textarea':
-        case 'email':
-        case 'phone':
-        case 'url':
-        case 'select':
-        case 'status':
-        case 'lookup':
-            schema = z.string();
-            if (field.type === 'email') schema = schema.email();
-            if (field.type === 'url') schema = schema.url().or(z.literal(''));
+            schema = z.string().max(MAX_LONG_TEXT);
             break;
+        case 'email':
+            schema = z.string().max(320).email();
+            break;
+        case 'url':
+            schema = z.string().max(2000).url().or(z.literal(''));
+            break;
+        case 'phone':
+            schema = z.string().regex(/^\+?[0-9 ()\-.]{5,40}$/, 'Invalid phone number');
+            break;
+        case 'text':
+        case 'lookup':
+            schema = z.string().max(MAX_TEXT);
+            break;
+        case 'select':
+        case 'status': {
+            const listed = (Array.isArray(field.options) ? field.options : []).map(o => (typeof o === 'string' ? o : (o?.value ?? o?.label)));
+            const allowed = [...listed, ...extraOptions].filter(v => typeof v === 'string');
+            schema = z.string().max(MAX_TEXT);
+            if (listed.length) schema = schema.refine(v => v === '' || allowed.includes(v), { message: `must be one of: ${listed.join(', ')}` });
+            break;
+        }
         case 'number':
         case 'currency':
-            // Handle strings mimicking numbers
-            schema = z.union([z.number(), z.string().transform(val => Number(val))]);
+            // Numbers arrive as numbers or numeric strings; anything else (NaN, "lots") is refused.
+            schema = z.union([z.number(), z.string().transform(val => Number(val))]).refine(v => Number.isFinite(v), { message: 'must be a number' });
             break;
         case 'date':
-            schema = z.string().or(z.date());
+            schema = z.union([z.string().refine(v => v === '' || !Number.isNaN(Date.parse(v)), { message: 'must be a valid date' }), z.date()]);
             break;
         case 'boolean':
             schema = z.boolean();
@@ -835,6 +920,9 @@ const mapFieldTypeToZod = (field) => {
             schema = z.any();
     }
 
+    if (field.required && ['text', 'textarea', 'email', 'phone', 'url', 'select', 'status', 'lookup'].includes(field.type)) {
+        schema = schema.refine(v => typeof v === 'string' && v.trim() !== '', { message: 'is required' });
+    }
     if (!field.required) {
         schema = schema.optional().nullable().or(z.literal(''));
     }
@@ -844,6 +932,8 @@ const mapFieldTypeToZod = (field) => {
 app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
     const { entityType } = req.params;
     const recordData = req.body;
+    if (!recordData || typeof recordData !== 'object' || Array.isArray(recordData)) return res.status(400).json({ error: 'Request body must be a JSON object' });
+    if (recordData.id !== undefined && recordData.id !== null && typeof recordData.id !== 'string') return res.status(400).json({ error: 'Validation Failed', details: ['id must be a string'] });
 
     // Check Permissions (create or update)
     const action = recordData.id ? 'edit' : 'create';
@@ -864,11 +954,19 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
 
         // 2. Build Zod Schema Dynamically
         const shape = {};
+        // Status fields also accept this record type's pipeline stages (a workspace can rename them), and an
+        // edit never fails because of a value the record already holds (imported leads, old statuses).
+        const proc = definition.fields.some(f => f.type === 'status') ? await getProcess(req.tenantId, entityType).catch(() => null) : null;
+        const stageNames = (proc?.stages || []).map(st => st.name);
+        let storedData = {};
+        if (recordData.id) {
+            const stored = await db.get('SELECT data FROM records WHERE id = ? AND tenant_id = ?', recordData.id, req.tenantId);
+            try { storedData = JSON.parse(stored?.data || '{}'); } catch { storedData = {}; }
+        }
         definition.fields.forEach(field => {
-            // System fields like 'id', 'created_at' are handled separately or allowable
-            if (!field.system) {
-                shape[field.name] = mapFieldTypeToZod(field);
-            }
+            if (RESERVED_FIELDS.has(field.name)) return;
+            const extra = (field.type === 'status' ? stageNames : []).concat(typeof storedData[field.name] === 'string' ? [storedData[field.name]] : []);
+            shape[field.name] = mapFieldTypeToZod(field, extra);
         });
 
         // Allow ID and standard fields
@@ -901,6 +999,8 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
 
         // Clean data for JSON column (remove ID if present)
         const { id: _, ...jsonData } = recordData;
+        // Keys starting with "_" (_isDeal, _converted_to_customer, _assigned_to ...) are set by the server only.
+        for (const k of Object.keys(jsonData)) if (k.startsWith('_')) delete jsonData[k];
         const actorId = req.user.id;
 
         if (recordData.id) {
@@ -915,6 +1015,7 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             // Fields this role cannot see or edit keep their stored value.
             let oldData = {}; try { oldData = JSON.parse(oldRecord.data); } catch { oldData = {}; }
             protectFields(req, entityType, jsonData, oldData);
+            for (const k of Object.keys(oldData)) if (k.startsWith('_')) jsonData[k] = oldData[k]; // keep what the server stored
 
             await db.run(`
             UPDATE records 
@@ -1078,6 +1179,7 @@ app.post('/api/data/:entityType/:id/status', authenticateToken, async (req, res)
         let data = {};
         try { data = JSON.parse(row.data); } catch { data = {}; }
         const prevStatus = data.status || row.status;
+        if (status === prevStatus) return res.json({ id, status, unchanged: true }); // no history row, no entry actions
 
         // Configurable process: enforce the target stage's entry requirements.
         const targetStage = await findStage(req.tenantId, entityType, status);
@@ -1231,7 +1333,10 @@ app.post('/api/attachments/:entityType/:id', authenticateToken, upload.single('f
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
         const { entityType, id } = req.params;
-        const kind = (req.file.mimetype || '').startsWith('image/') ? 'image' : 'file';
+        // The record must exist in this workspace.
+        const target = await db.get('SELECT id FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
+        if (!target) { try { fs.unlinkSync(path.join(UPLOAD_DIR, req.file.filename)); } catch { /* ignore */ } return res.status(404).json({ error: 'Record not found' }); }
+        const kind = INLINE_IMAGE.has(path.extname(req.file.originalname).toLowerCase()) ? 'image' : 'file';
         const attId = uuidv4();
         await db.run(
             `INSERT INTO attachments (id, tenant_id, entity_type, record_id, filename, stored_name, mime, size, kind, uploaded_by)
@@ -1781,8 +1886,9 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 });
 
 // Create/Update User
-app.post('/api/users', authenticateToken, requireAdmin, validate(rules.users), validateRoleId, async (req, res) => {
+app.post('/api/users', authenticateToken, requireAdmin, validate(rules.users), validatePassword, validateRoleId, async (req, res) => {
     const { id, email, password, roleId, name, isActive = true } = req.body;
+    const newUserId = uuidv4();
 
     // Split name into first and last
     let firstName = '';
@@ -1801,7 +1907,7 @@ app.post('/api/users', authenticateToken, requireAdmin, validate(rules.users), v
 
             if (password) {
                 const hashedPassword = bcrypt.hashSync(password, 10);
-                updateQuery += ', password_hash = ?';
+                updateQuery += ', password_hash = ?, must_change_password = 1, token_version = COALESCE(token_version, 0) + 1'; // an admin reset ends that user's sessions
                 params.push(hashedPassword);
             }
 
@@ -1816,8 +1922,9 @@ app.post('/api/users', authenticateToken, requireAdmin, validate(rules.users), v
             await db.run(`
                 INSERT INTO users (id, tenant_id, email, password_hash, role, is_active, first_name, last_name, must_change_password)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-            `, uuidv4(), req.tenantId, email, hashedPassword, roleId, isActive ? 1 : 0, firstName, lastName);
+            `, newUserId, req.tenantId, email, hashedPassword, roleId, isActive ? 1 : 0, firstName, lastName);
         }
+        await logAudit({ tenantId: req.tenantId, entityType: 'user', recordId: id || newUserId, action: id ? 'update' : 'create', actorId: req.user.id, details: { email, roleId, isActive, passwordChanged: !!password } });
         res.json({ success: true });
     } catch (error) {
         console.error('Save user error:', error);
@@ -1859,6 +1966,7 @@ app.post('/api/roles', authenticateToken, requireAdmin, validate(rules.roles, { 
                 description = excluded.description,
                 permissions = excluded.permissions
         `, roleId, req.tenantId, name, description, JSON.stringify(permissions));
+        await logAudit({ tenantId: req.tenantId, entityType: 'role', recordId: roleId, action: id ? 'update' : 'create', actorId: req.user.id, details: { name, permissions } });
         res.json({ success: true, id: roleId });
     } catch (error) {
         console.error('Save role error:', error);
@@ -1872,6 +1980,7 @@ app.delete('/api/roles/:id', authenticateToken, requireAdmin, async (req, res) =
         const inUse = await db.get('SELECT COUNT(*) AS c FROM users WHERE role = ? AND tenant_id = ?', req.params.id, req.tenantId);
         if (inUse?.c) return res.status(409).json({ error: `${inUse.c} user(s) still have this role. Move them to another role first.` });
         await db.run('DELETE FROM roles WHERE id = ? AND tenant_id = ?', req.params.id, req.tenantId);
+        await logAudit({ tenantId: req.tenantId, entityType: 'role', recordId: req.params.id, action: 'delete', actorId: req.user.id, details: {} });
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete role' });
@@ -3166,7 +3275,7 @@ app.post('/api/upload/profile/:entityType/:recordId', authenticateToken, (req, r
             filename: (req2, file, cb) => cb(null, `profile${path.extname(file.originalname).toLowerCase()}`),
         }),
         limits: { fileSize: 5 * 1024 * 1024 },
-        fileFilter: (req2, file, cb) => file.mimetype.startsWith('image/') ? cb(null, true) : cb(new Error('Images only')),
+        fileFilter: (req2, file, cb) => (file.mimetype.startsWith('image/') && INLINE_IMAGE.has(path.extname(file.originalname).toLowerCase())) ? cb(null, true) : cb(uploadRefused('Images only (png, jpg, gif, webp)')),
     }).single('file')(req, res, next);
 }, async (req, res) => {
     try {

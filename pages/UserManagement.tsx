@@ -109,10 +109,14 @@ export const UserManagement: React.FC = () => {
 
   const handleSaveUser = async () => {
     if (!editingUser.name || !editingUser.email || !editingUser.roleId) return;
-    await api.saveUser(editingUser as User & { password?: string });
-    setIsUserModalOpen(false);
-    addToast('User saved successfully', 'success');
-    loadData();
+    try {
+      await api.saveUser(editingUser as User & { password?: string });
+      setIsUserModalOpen(false);
+      addToast('User saved successfully', 'success');
+      loadData();
+    } catch (e: any) {
+      addToast(e?.message || 'Could not save the user', 'error');
+    }
   };
 
   const handleSaveRole = async () => {

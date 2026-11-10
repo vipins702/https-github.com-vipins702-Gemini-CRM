@@ -16,6 +16,10 @@ services:
         value: "22"
       - key: DB_TYPE
         value: postgres
+      - key: NODE_ENV         # production mode: no stack traces in error responses
+        value: production
+      - key: CORS_ORIGINS     # your web app's URL(s), comma separated, e.g. https://app.example.com
+        sync: false
       - key: TRUST_PROXY      # requests arrive via Vercel then Render's proxy
         value: "2"
       - key: DATABASE_URL     # Neon *pooled* connection string (host contains -pooler)

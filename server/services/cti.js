@@ -147,8 +147,8 @@ export async function convertLeadToCustomer(tenantId, leadId, actorId = 'system'
         try {
             await db.run('BEGIN TRANSACTION');
             await db.run(
-                'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data, normalized_phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                customerId, tenantId, 'customer', customerName, 'Active', JSON.stringify(customerData), normalized
+                'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data, normalized_phone, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                customerId, tenantId, 'customer', customerName, 'Active', JSON.stringify(customerData), normalized, leadRow.owner_id || null
             );
             await logAudit({ tenantId, entityType: 'customer', recordId: customerId, action: 'create', actorId, details: { ...customerData, _via: 'lead_conversion' } });
             await db.run('COMMIT');

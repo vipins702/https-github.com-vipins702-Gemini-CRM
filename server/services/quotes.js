@@ -80,8 +80,20 @@ export async function getQuote(tenantId, id) {
 
 /** Create or update a quote. Totals are recomputed server-side. */
 export async function saveQuote(tenantId, payload = {}, actorId = 'system') {
+    // Reject values that would silently produce a wrong total: negatives, non-numbers, tax outside 0-100.
+    const rawItems = payload.items === undefined || payload.items === null ? [] : payload.items;
+    if (!Array.isArray(rawItems)) throw new Error('items must be a list');
+    rawItems.forEach((it, i) => {
+        const qty = Number(it?.qty ?? 0);
+        const price = Number(it?.unitPrice ?? 0);
+        if (!Number.isFinite(qty) || qty < 0) throw new Error(`Line ${i + 1}: quantity must be a number of 0 or more`);
+        if (!Number.isFinite(price) || price < 0) throw new Error(`Line ${i + 1}: unit price must be a number of 0 or more`);
+    });
+    const rate = payload.taxRate === undefined || payload.taxRate === null || payload.taxRate === '' ? 0 : Number(payload.taxRate);
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new Error('Tax rate must be a number between 0 and 100');
+    if (rawItems.length === 0 && payload.status && payload.status !== 'Draft') throw new Error('A quote needs at least one line item');
     const items = normalizeItems(payload.items);
-    const taxRate = Number(payload.taxRate) || 0;
+    const taxRate = rate;
     const totals = computeTotals(items, taxRate);
 
     if (payload.id) {
@@ -190,9 +202,10 @@ export async function convertQuote(tenantId, id, actorId = 'system') {
         status: 'Won', source: 'Quote', relatedCustomer: customerId, customerId,
         _fromQuote: id, _quoteNumber: d.quoteNumber, _isDeal: true,
     };
+    const customerOwner = await db.get('SELECT owner_id FROM records WHERE id = ? AND tenant_id = ?', customerId, tenantId);
     await db.run(
-        'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)',
-        dealId, tenantId, 'lead', dealName, 'Won', JSON.stringify(dealData)
+        'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        dealId, tenantId, 'lead', dealName, 'Won', JSON.stringify(dealData), customerOwner?.owner_id || null
     );
     await logAudit({ tenantId, entityType: 'lead', recordId: dealId, action: 'create', actorId, details: { ...dealData, _via: 'quote_conversion' } });
 

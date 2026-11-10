@@ -35,6 +35,10 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
    const [detailTab, setDetailTab] = useState<'overview' | 'timeline' | 'related'>('overview');
    const [selectedRecord, setSelectedRecord] = useState<CRMRecord | null>(null);
    const [searchTerm, setSearchTerm] = useState('');
+   const [statusFilter, setStatusFilter] = useState('');
+   const [page, setPage] = useState(0);
+   const PAGE_SIZE = 25;
+   useEffect(() => { setPage(0); }, [searchTerm, statusFilter, entityType]);
    const [isSaving, setIsSaving] = useState(false);
    const [errors, setErrors] = useState<Record<string, string>>({});
    const { addToast } = useToast();
@@ -683,7 +687,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
                   {detailTab === 'timeline' && (
                      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                        <Card title="Activity Stream" action={<Button size="sm" variant="secondary" icon={<Plus className="w-3 h-3" />}>Add Note</Button>}>
+                        <Card title="Activity Stream">
                            <div className="space-y-6">
                               {activities.map((act) => (
                                  <div key={act.id} className="flex gap-4">
@@ -840,6 +844,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
    // --- LIST VIEW ---
    const filteredData = data.filter(record =>
+      (!statusFilter || record.status === statusFilter) &&
       JSON.stringify(record).toLowerCase().includes(searchTerm.toLowerCase())
    );
    const listable = schema.fields.filter(f => !['image', 'iframe', 'attachment', 'textarea'].includes(f.type));
@@ -850,6 +855,31 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
    // Calculate stats
    const totalRecords = data.length;
+   const pageCount = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+   const currentPage = Math.min(page, pageCount - 1);
+   const pageData = filteredData.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+   const statusOptions = Array.from(new Set(data.map(r => r.status).filter((v): v is string => typeof v === 'string' && v !== ''))).sort();
+
+   // Download what the list currently shows (search and status filter applied) as a CSV file.
+   const exportCsv = () => {
+      if (!schema) return;
+      const fields = schema.fields.filter(f => fieldAccess(entityType, f.name).read);
+      // A cell starting with = + - @ would run as a formula when opened in a spreadsheet; prefix it with a quote.
+      const cell = (v: unknown) => {
+         let t = v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+         if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+         return '"' + t.replace(/"/g, '""') + '"';
+      };
+      const lines = [fields.map(f => cell(f.label || f.name)).join(',')];
+      filteredData.forEach(r => lines.push(fields.map(f => cell((r as any)[f.name])).join(',')));
+      const url = URL.createObjectURL(new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${schema.pluralLabel.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      addToast(`Exported ${filteredData.length} ${schema.pluralLabel.toLowerCase()}`, 'success');
+   };
    const CLOSED = ['won', 'lost', 'closed', 'closed won', 'closed lost', 'converted', 'resolved', 'done', 'completed', 'inactive', 'paid', 'rejected', 'cancelled'];
    const openRecords = data.filter(r => r.status && !CLOSED.includes(String(r.status).toLowerCase())).length;
    const statusCounts = data.reduce<Record<string, number>>((acc, r) => {
@@ -1053,8 +1083,22 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                      <p className="text-ink-muted text-sm mt-1">Manage and track your {schema.pluralLabel.toLowerCase()}.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                     <Button variant="secondary" icon={<Filter className="w-4 h-4" />}>Filter</Button>
-                     <Button variant="secondary" icon={<Download className="w-4 h-4" />}>Export</Button>
+                     {statusOptions.length > 1 && (
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                           <Filter className="w-4 h-4" aria-hidden="true" />
+                           <span className="sr-only">Filter by status</span>
+                           <select
+                              aria-label="Filter by status"
+                              value={statusFilter}
+                              onChange={e => setStatusFilter(e.target.value)}
+                              className="h-10 rounded-lg border border-slate-200 bg-surface px-2 text-sm text-slate-900"
+                           >
+                              <option value="">All statuses</option>
+                              {statusOptions.map(st => <option key={st} value={st}>{st}</option>)}
+                           </select>
+                        </label>
+                     )}
+                     <Button variant="secondary" icon={<Download className="w-4 h-4" />} onClick={exportCsv} disabled={filteredData.length === 0}>Export</Button>
                      {canCreate && <Button
                         variant="secondary"
                         icon={<Upload className="w-4 h-4" />}
@@ -1146,7 +1190,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                               </td>
                            </tr>
                         ) : (
-                           filteredData.map((record) => (
+                           pageData.map((record) => (
                               <tr
                                  key={record.id}
                                  className="group hover:bg-slate-50 transition-colors cursor-pointer"
@@ -1188,9 +1232,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                                     </td>
                                  ))}
                                  <td className="px-4 py-3 text-right">
-                                    <button aria-label="Row actions" className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
-                                       <MoreHorizontal className="w-4 h-4 text-slate-400" />
-                                    </button>
+                                    
                                  </td>
                               </tr>
                            ))
@@ -1203,11 +1245,12 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                {filteredData.length > 0 && (
                   <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
                      <div className="text-sm text-slate-500">
-                        Showing <span className="font-medium text-slate-900 tnum">{filteredData.length}</span> of <span className="font-medium text-slate-900 tnum">{totalRecords}</span> {schema.pluralLabel.toLowerCase()}
+                        Showing <span className="font-medium text-slate-900 tnum">{currentPage * PAGE_SIZE + 1}-{Math.min((currentPage + 1) * PAGE_SIZE, filteredData.length)}</span> of <span className="font-medium text-slate-900 tnum">{filteredData.length}</span>{filteredData.length !== totalRecords ? ` (filtered from ${totalRecords})` : ''} {schema.pluralLabel.toLowerCase()}
                      </div>
                      <div className="flex gap-2">
-                        <Button variant="secondary" size="sm" disabled>Previous</Button>
-                        <Button variant="secondary" size="sm" disabled>Next</Button>
+                        <Button variant="secondary" size="sm" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</Button>
+                        <span className="text-sm text-slate-500 self-center tnum">Page {currentPage + 1} of {pageCount}</span>
+                        <Button variant="secondary" size="sm" disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)}>Next</Button>
                      </div>
                   </div>
                )}

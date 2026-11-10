@@ -89,6 +89,17 @@ export async function initDB() {
             console.error('Migration error (users.is_superadmin):', e);
         }
 
+        // Migration: token_version lets a logout / password change end every session of that user
+        try {
+            const columns = await dbInstance.columns('users');
+            if (!columns.includes('token_version')) {
+                console.log('Migrating users table: Adding token_version column...');
+                await dbInstance.run(`ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0`);
+            }
+        } catch (e) {
+            console.error('Migration error (users.token_version):', e);
+        }
+
         // 3. Entity Definitions
         await dbInstance.exec(`
             CREATE TABLE IF NOT EXISTS entity_definitions (
@@ -672,6 +683,7 @@ export async function initDB() {
         // and linking, so these lookups stay fast as the records table grows.
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_status ON records(tenant_id, entity_type, status)`);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_owner ON records(tenant_id, owner_id)`);
+        await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`); // login looks users up by e-mail alone
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_created ON records(tenant_id, entity_type, created_at)`);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_records_phone ON records(tenant_id, normalized_phone)`);
         for (const field of ['email', 'phone', 'customerId', 'relatedId']) {

@@ -12,6 +12,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
    const [showPassword, setShowPassword] = useState(false);
+   const [showResetHint, setShowResetHint] = useState(false);
    const [loading, setLoading] = useState(false);
    const [error, setError] = useState('');
    const [shake, setShake] = useState(false);
@@ -101,8 +102,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <div className="space-y-1.5">
                      <div className="flex items-center justify-between">
                         <label htmlFor="login-password" className="block text-sm font-medium text-ink-soft">Password</label>
-                        <a href="#" className="text-sm text-accent hover:text-accent-deep font-semibold">Forgot?</a>
+                        <button type="button" onClick={() => setShowResetHint(v => !v)} className="text-sm text-accent hover:text-accent-deep font-semibold">Forgot?</button>
                      </div>
+                     {showResetHint && (
+                        <p role="status" className="text-xs text-ink-muted">Ask your workspace administrator to reset your password (Users, then Edit user).</p>
+                     )}
                      <div className="relative">
                         <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-[18px] h-[18px]" aria-hidden="true" />
                         <input
@@ -138,7 +142,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                </form>
 
                <p className="mt-8 text-center text-sm text-ink-muted">
-                  Don't have an account? <a href="#" className="text-accent font-semibold hover:underline">Create a workspace</a>
+                  Need a workspace? Contact your platform administrator.
                </p>
 
             </div>

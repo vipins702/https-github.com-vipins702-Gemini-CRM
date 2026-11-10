@@ -1,4 +1,5 @@
 import db from '../database.js';
+import { safeFetch, assertPublicHttpUrl } from '../utils/safeFetch.js';
 import { v4 as uuidv4 } from 'uuid';
 import { logAudit } from './audit.js';
 import { sendEmail } from './email.js';
@@ -82,6 +83,8 @@ export async function getProcess(tenantId, entityType) {
 
 export async function saveProcess(tenantId, entityType, config = {}) {
     const stages = normalizeStages(config.stages);
+    // A webhook may only point at a public address (see utils/safeFetch.js).
+    for (const st of stages) for (const a of st.entryActions) if (a?.type === 'webhook' && a.url) await assertPublicHttpUrl(a.url);
     if (!stages.length) throw new Error('A process needs at least one stage');
     const payload = JSON.stringify({ name: config.name || entityType, stages });
     const existing = await db.get('SELECT id FROM processes WHERE tenant_id = ? AND entity_type = ?', tenantId, entityType);
@@ -151,10 +154,10 @@ export async function runStageEntryActions(tenantId, entityType, recordId, data,
                     tenantId, actorId,
                 });
             } else if (action.type === 'webhook' && action.url) {
-                await fetch(action.url, {
+                await safeFetch(action.url, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ event: 'stage_entered', entityType, recordId, stage: stage.name, data }),
-                }).catch(() => {});
+                }).catch((e) => console.warn(`[processes] webhook to ${action.url} refused or failed: ${e.message}`));
             }
         } catch (e) {
             console.warn(`[processes] entry action (${action.type}) failed for ${entityType}/${recordId} @ ${stage.name}:`, e.message);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
+import { ChangePasswordForm } from '../components/ChangePassword';
 import { Button } from '../components/ui/Button';
 import { api } from '../services/api';
 import { applySettings, setPersonalTheme, getThemeMode, onThemeChange, ThemeMode } from '../services/theme';
@@ -8,8 +9,7 @@ import { AppearanceEditor } from '../components/AppearanceEditor';
 import { CURRENCIES, formatCurrency } from '../services/currency';
 import {
    Settings as SettingsIcon, Palette, Building, Bell, Moon, Sun,
-   Monitor, Type, Layout, Save, Loader2, Check
-} from 'lucide-react';
+   Monitor, Type, Layout, Save, Loader2, Check, Lock } from 'lucide-react';
 
 const LOCALES = [
    { id: '', label: 'Auto (browser default)' },
@@ -41,7 +41,7 @@ const TIMEZONES = [
 ];
 
 export const Settings: React.FC = () => {
-   const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'notifications'>('appearance');
+   const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'notifications' | 'security'>('appearance');
    const [settings, setSettings] = useState<SystemSettings | null>(null);
    // Theme actually in use (a top-bar toggle can differ from the saved workspace default).
    const [activeTheme, setActiveTheme] = useState<ThemeMode>(getThemeMode);
@@ -124,6 +124,12 @@ export const Settings: React.FC = () => {
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'notifications' ? 'bg-surface shadow-sm text-indigo-600 ring-1 ring-gray-200' : 'text-gray-500 hover:bg-gray-100'}`}
                >
                   <Bell className="w-5 h-5" /> Notifications
+               </button>
+               <button
+                  onClick={() => setActiveTab('security')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'security' ? 'bg-surface shadow-sm text-indigo-600 ring-1 ring-gray-200' : 'text-gray-500 hover:bg-gray-100'}`}
+               >
+                  <Lock className="w-5 h-5" /> Security
                </button>
             </div>
 
@@ -384,6 +390,12 @@ export const Settings: React.FC = () => {
                         </div>
                      </Card>
                   </div>
+               )}
+
+               {activeTab === 'security' && (
+                  <Card title="Change your password" className="animate-in fade-in slide-in-from-bottom-2">
+                     <ChangePasswordForm />
+                  </Card>
                )}
 
                {activeTab === 'notifications' && (

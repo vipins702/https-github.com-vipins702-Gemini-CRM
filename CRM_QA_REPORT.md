@@ -74,6 +74,8 @@ All **[TESTED]** unless marked.
 
 ## 4. Critical bugs
 
+> Status: bugs 1 to 5 and 7 were fixed (7.6 and 7.7). Bug 6 (no server-side paging) is partly addressed: the list screens page in the browser, the API still returns every row. Bug 8 (duplicate lead e-mails) is still open.
+
 Ranked by impact. The validation ones sit on the data path every module uses.
 
 1. **[FIXED in the working tree, see 7.6] One malformed request crashes the whole server.** `POST /api/users` with a non-string `name` (for example `{"name": 5}`) throws `name.trim is not a function` inside an async handler that has no `try`. Node 22 exits on the unhandled rejection and nothing in the repo catches it or restarts the process, so **every workspace goes down** until someone restarts it. Any workspace admin can trigger it. Reproduced twice. Another 38 malformed-body requests on 12 endpoints return HTTP 5xx instead of 400 (Section 7.3). **[TESTED]** `server/index.js:1766-1773`
@@ -86,6 +88,8 @@ Ranked by impact. The validation ones sit on the data path every module uses.
 8. **Duplicate lead emails are accepted** by the API (the UI only warns on phone). **[TESTED]**
 
 ## 5. Security issues
+
+> Status: the upload, SSRF, headers, audit-log, dependency and internal-field findings below were fixed in a second round, see 7.7. What is still open is listed there.
 
 | Severity | Issue | Evidence |
 |---|---|---|
@@ -287,17 +291,57 @@ The Add User and New Role forms were also saved through the real UI after the ch
 Still open from the earlier list: missing audit events, quote and record value validation, uploads, SSRF,
 dependency upgrades, and everything else under Section 8 items 2 to 10.
 
+### 7.7 Second round of fixes
+
+After the crash fix I worked through the rest of the top 10. Each change below was checked by a test and,
+for screens, in the browser.
+
+| Item | Status | What changed and how it was checked |
+|---|---|---|
+| Record validation (R2) | **Done** | Required name fields are no longer skipped as "system" fields; picklists, numbers, dates, phone, URL and length are enforced. A select or status value the record already holds stays valid, so editing imported leads (source "Instagram", "WhatsApp") still works, and pipeline stage names count as valid statuses. Covered in `hardening.mjs` |
+| Quotes (R3) | **Done** | Negative or non-numeric quantity or price, tax outside 0 to 100, and a sent quote with no lines are refused; the blank draft line the UI starts with is still accepted; arithmetic re-checked (0.59) |
+| Uploads (R4) | **Mostly done** | `.html`, `.svg`, scripts and executables are refused; files are served with `nosniff`, a sandboxing CSP, and only raster images inline (everything else downloads); attaching to a record that does not exist is refused; profile photos must be real images. **Still open:** files are reachable by URL without signing in (the web app shows them in `<img>` tags, which cannot send a token). Signed, expiring URLs would close that |
+| SSRF (R7) | **Done** | New `server/utils/safeFetch.js`: workflow webhooks must be http or https and may not point at, or resolve to, loopback, private, link-local, metadata or multicast addresses; no embedded credentials; redirects are not followed; 5 s timeout. Checked on save (400) and again at run time. Not covered: DNS rebinding between the check and the connection |
+| Passwords and sessions (R5) | **Partly done** | Done: password policy (8+ characters, letter and number) for new users, admin resets, new workspaces and changes; change-password endpoint and a Settings > Security tab; **forced change screen** for users flagged "must change" (new users, admin resets, the seeded admin); sign-out now ends the user's sessions on the server (`token_version`); a password change or admin reset ends the other sessions; per-account lockout (10 failures in 15 minutes) next to the per-IP limit. **Not done:** self-service signup, and e-mail password reset (the login page now says to ask an administrator instead of linking nowhere) |
+| Audit logging (R11) | **Done** | User create and update, role create, update and delete, sign-in, failed and blocked sign-in, sign-out and password changes are logged (never with passwords). Same-stage "moves" are now a no-op, so history is not padded and entry actions do not re-run |
+| Ownership (R8) | **Done** | The customer made by a lead conversion inherits the lead's owner; the deal made by a quote inherits the customer's owner |
+| Internal fields | **Done** | Client-supplied keys starting with `_` are dropped on create and ignored on edit, and server-set ones are preserved |
+| Headers and configuration (A02) | **Done** | `nosniff`, `X-Frame-Options`, `Referrer-Policy`, HSTS behind HTTPS, `Cache-Control: no-store` on the API, no `X-Powered-By`; optional `CORS_ORIGINS` allow-list (left empty, any site may still call the API, so existing deployments keep working; a startup warning appears in production); `render.yaml` now sets `NODE_ENV=production` and asks for `CORS_ORIGINS`; a short `JWT_SECRET` now logs a warning |
+| Dependencies (R12) | **Done** | `npm audit fix` plus `nodemailer` upgraded to 10.4.0: both packages now report 0 vulnerabilities (before: server 1 critical and 4 high, frontend 13 high). Mail sending re-checked; the frontend still builds |
+| List screens (R14) | **Done** | Previous and Next work (25 per page), a status filter replaces the dead Filter button, Export downloads the filtered rows as CSV (formula-safe), the dead row menu and Activity Stream "Add Note" buttons are gone, and the two dead login links are replaced by honest text. Index added on `users(email)` |
+| Server-side paging (R10) | **Open** | The API still returns every row; the browser pages them |
+| Versioned migrations, real Opportunity and Contact entities, delete or archive for custom objects, database-level references for role and entity type (R9, R13) | **Open** | Need product decisions and a migration design; not started |
+| CI (R6) | **Open** | The four test scripts exist and pass, but there is still no pipeline or `npm test` script |
+
+| Measure | Before this round | After |
+|---|---|---|
+| Permission matrix | 204 of 204 | 204 of 204 |
+| Older end-to-end suite | 88 passed, 4 failed, 5 gaps | 88 passed, 4 failed, 5 gaps (the same four) |
+| Malformed-input test | 262 of 262 | 262 of 262 |
+| New `hardening.mjs` against the new code | n/a | **95 of 95** |
+| New `hardening.mjs` against the previous server | n/a | **34 failures** (so it does detect the problems) |
+| `npm audit`, server and frontend | 1 critical + 17 high | **0** |
+
+**Behaviour changes to know about**
+
+- Users whose account is flagged "must change password" (every user created through the app so far, because the flag was never enforced) will be asked to choose a new password at their next sign-in.
+- Tokens issued before this release carry no session version and stay valid until they expire (up to 24 h); new ones are revocable.
+- Uploads of `.html`, `.svg`, script and executable files are now refused.
+- New passwords must meet the policy; existing passwords are not checked.
+- Saving a record now rejects values it used to accept (an unknown picklist value, a number that is not a number, an invalid date or phone).
+- `nodemailer` moved from 7 or 8 to 10; the code only uses `createTransport` and sending.
+
 ---
 
 ## 8. Top 10 improvements, by priority (re-ranked after the skill review)
 
 1. **[Done, see 7.6] Stop one request from killing the server.** Add a try/catch (or an async wrapper) to every route, an `unhandledRejection` handler, a global JSON error handler, and run the API under a supervisor. Fix `POST /users` first; the 38 other 5xx responses are the same class of bug. (R1, score 25)
-2. **Fix record validation** across all modules: validate `system` required fields, enforce picklists, reject non-numeric numbers and invalid dates, add length limits, validate quote quantities, prices and tax. (R2, R3)
-3. **Lock down uploads:** require login for `/uploads`, allow-list file types, send `nosniff` and force download for active types. (R4)
-4. **Block server-side request forgery** from stage webhooks and any user-supplied URL: deny loopback and private ranges, allow-list hosts, set short timeouts. (R7)
-5. **Add self-service signup, password reset and change, a password policy, per-account lockout and logout/token revocation;** enforce `mustChangePassword`. (R5)
-6. **Put the two test scripts in CI** with an `npm test` script, and add a fuzz job for malformed bodies so item 1 cannot regress. Add `npm audit` (or OSV-Scanner) as a gate and upgrade `nodemailer`, `multer` and the Express chain. (R6, R12)
-7. **Server-side pagination, sorting and filters** for `GET /data/:type`, then enable paging in the UI; add an index on `users(email)`. (R10)
-8. **Audit more events:** user creation, role and permission changes, sign-ins and failures, and ownerless records; reject same-stage "moves". (R11, R8)
-9. **Harden configuration:** security headers (helmet), CORS allow-list, hide `X-Powered-By`, set `NODE_ENV=production` in `render.yaml`, validate `roleId` against the workspace on `POST /users`, and stop accepting client-supplied internal fields (`_isDeal`, `score`, `_converted_to_customer`). (A02, A01)
-10. **Introduce versioned migrations with `down` scripts and a schema-version table,** plus a real Opportunity entity, metadata delete/archive, and removal of the dead Filter, Export, paging and signup/reset controls. Add the missing database references (role, entity type) at the same time. (R9, R13, R14)
+2. **[Done, see 7.7] Fix record validation** across all modules: validate `system` required fields, enforce picklists, reject non-numeric numbers and invalid dates, add length limits, validate quote quantities, prices and tax. (R2, R3)
+3. **[Mostly done, see 7.7] Lock down uploads:** require login for `/uploads`, allow-list file types, send `nosniff` and force download for active types. (R4)
+4. **[Done, see 7.7] Block server-side request forgery** from stage webhooks and any user-supplied URL: deny loopback and private ranges, allow-list hosts, set short timeouts. (R7)
+5. **[Partly done, see 7.7] Add self-service signup, password reset and change, a password policy, per-account lockout and logout/token revocation;** enforce `mustChangePassword`. (R5)
+6. **[Partly done, see 7.7] Put the two test scripts in CI** with an `npm test` script, and add a fuzz job for malformed bodies so item 1 cannot regress. Add `npm audit` (or OSV-Scanner) as a gate and upgrade `nodemailer`, `multer` and the Express chain. (R6, R12)
+7. **[Partly done, see 7.7] Server-side pagination, sorting and filters** for `GET /data/:type`, then enable paging in the UI; add an index on `users(email)`. (R10)
+8. **[Done, see 7.7] Audit more events:** user creation, role and permission changes, sign-ins and failures, and ownerless records; reject same-stage "moves". (R11, R8)
+9. **[Done, see 7.7] Harden configuration:** security headers (helmet), CORS allow-list, hide `X-Powered-By`, set `NODE_ENV=production` in `render.yaml`, validate `roleId` against the workspace on `POST /users`, and stop accepting client-supplied internal fields (`_isDeal`, `score`, `_converted_to_customer`). (A02, A01)
+10. **[Partly done, see 7.7] Introduce versioned migrations with `down` scripts and a schema-version table,** plus a real Opportunity entity, metadata delete/archive, and removal of the dead Filter, Export, paging and signup/reset controls. Add the missing database references (role, entity type) at the same time. (R9, R13, R14)

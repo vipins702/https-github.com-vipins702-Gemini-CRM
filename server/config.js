@@ -14,6 +14,7 @@ if (!process.env.JWT_SECRET) {
     );
 }
 export const JWT_SECRET = process.env.JWT_SECRET;
+if (JWT_SECRET.length < 32) console.warn('[security] JWT_SECRET is shorter than 32 characters. Use a long random value (see the command above).');
 // Encrypts saved integration secrets (tokens, app secrets, SMTP passwords). Defaults to a key
 // derived from JWT_SECRET — set SECRETS_KEY too if you may ever change JWT_SECRET, or saved
 // secrets become unreadable and must be re-entered.

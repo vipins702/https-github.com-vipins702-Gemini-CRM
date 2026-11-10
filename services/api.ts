@@ -1,5 +1,5 @@
 
-import { getViewAs, isRealAdmin, currentUser } from './permissions';
+import { getViewAs, setViewAs, isRealAdmin, currentUser } from './permissions';
 import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult, ReportDefinition, RunReportOptions, ReportResult, PackDefinition, PackResult, WaConversation, WaMessage, EmailConversation, EmailMessage, TaskItem, Quote, RelatedActivity, ProcessDefinition, Attachment, CategoryNode, BulkCampaign, IntegrationConfig, Tenant } from '../types';
 
 const API_BASE = '/api';
@@ -97,7 +97,20 @@ export const api = {
   },
 
   async logout() {
+    // Ask the server to end this user's sessions first (best effort), then forget them here.
+    try { await fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: getAuthHeaders() }); } catch { /* offline */ }
+    setViewAs(null);
     localStorage.removeItem('flowcrm_session');
+  },
+
+  /** Changes your own password; the server returns a fresh token because it ends your other sessions. */
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    const res = await fetchWithAuth(`${API_BASE}/auth/change-password`, { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) });
+    const raw = localStorage.getItem('flowcrm_session');
+    if (raw && res?.token) {
+      const session = JSON.parse(raw);
+      localStorage.setItem('flowcrm_session', JSON.stringify({ ...session, token: res.token, user: { ...session.user, mustChangePassword: false } }));
+    }
   },
 
   async getSession(): Promise<AuthSession | null> {

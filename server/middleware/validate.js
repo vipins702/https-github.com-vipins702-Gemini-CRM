@@ -3,6 +3,7 @@
 // crashed server). Spec: { field: 'type' } where type is string | number | boolean | object | array | any,
 // with `!` = required and `|null` = null allowed. Optional fields may be absent or null.
 import db from '../database.js';
+import { passwordProblem } from '../utils/passwordPolicy.js';
 
 const typeOk = (t, v) => {
     switch (t) {
@@ -43,6 +44,15 @@ export const validate = (spec, { defaults } = {}) => (req, res, next) => {
     next();
 };
 
+/** When a password is supplied it must meet the password policy. */
+export const validatePassword = (req, res, next) => {
+    const pw = req.body?.password;
+    if (pw === undefined || pw === null || pw === '') return next();
+    const problem = passwordProblem(pw);
+    if (problem) return res.status(400).json({ error: 'Validation Failed', details: [problem] });
+    next();
+};
+
 /** A user's role must be the built-in admin role or a role of the caller's own workspace. */
 export const validateRoleId = async (req, res, next) => {
     const id = req.body?.roleId;
@@ -67,4 +77,5 @@ export const rules = {
     logCall: { direction: 'string', from: 'string', to: 'string', status: 'string', entityType: 'string', recordId: 'string', name: 'string', outcome: 'string', notes: 'string' },
     webContent: { slug: 'string!', type: 'string!', title: 'string|null!', content: 'string|null!' },
     schemas: { entityType: 'string!', config: 'object!' },
+    changePassword: { currentPassword: 'string!', newPassword: 'string!' },
 };

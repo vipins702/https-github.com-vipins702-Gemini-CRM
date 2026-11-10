@@ -1,6 +1,7 @@
 import db from '../database.js';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
+import { passwordProblem } from '../utils/passwordPolicy.js';
 import crypto from 'crypto';
 import { logAudit } from './audit.js';
 
@@ -53,6 +54,8 @@ export async function createTenant({ name, adminEmail, adminPassword, adminName 
     if (!name || !adminEmail || !adminPassword) {
         throw new Error('name, adminEmail and adminPassword are required');
     }
+    const pwProblem = passwordProblem(adminPassword);
+    if (pwProblem) throw new Error(pwProblem);
     const dupe = await db.get('SELECT id FROM users WHERE email = ?', adminEmail);
     if (dupe) throw new Error('A user with that email already exists');
 

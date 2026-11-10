@@ -18,9 +18,14 @@ export const authenticateToken = async (req, res, next) => {
 
         // A token must stop working the moment the person is deactivated or loses
         // their role, not 24 hours later. Superadmins are checked the same way.
-        const live = await db.get('SELECT is_active, role FROM users WHERE id = ? AND tenant_id = ?', user.id, user.tenantId);
+        const live = await db.get('SELECT is_active, role, token_version FROM users WHERE id = ? AND tenant_id = ?', user.id, user.tenantId);
         if (!live || !live.is_active) {
             return res.status(403).json({ error: 'Account is inactive' });
+        }
+        // Logging out, changing the password or an admin reset raises users.token_version; older tokens stop working.
+        // (Tokens issued before this existed carry no "tv" and stay valid until they expire.)
+        if (user.tv !== undefined && (live.token_version || 0) !== user.tv) {
+            return res.status(401).json({ error: 'Session ended. Sign in again.' });
         }
         req.user.role = live.role;
 
