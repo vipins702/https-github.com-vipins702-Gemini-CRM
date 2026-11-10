@@ -10,6 +10,7 @@ import db from './database.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { authenticateToken, requirePermission, requireSuperadmin } from './middleware/auth.js';
+import { validate, validateRoleId, rules } from './middleware/validate.js';
 import { policyGate, can, isAdminUser, isRestrictedScope, hasAnyAccess, hiddenFields, filterFields, protectFields } from './middleware/access.js';
 import { listTenants, createTenant, updateTenant, ensureSuperadmin } from './services/platform.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -36,6 +37,23 @@ import { runTenantQuery, SandboxQueryError } from './services/sqlSandbox.js';
 import { createReadStream } from 'fs';
 
 const app = express();
+
+// Express 4 does not catch errors thrown (or promises rejected) inside async handlers. They became
+// unhandled rejections and, on Node 22, ended the whole process: one bad request took every
+// workspace offline. Hand them to the error handler at the end of this file instead.
+const forwardAsyncErrors = (fn) => {
+    if (Array.isArray(fn)) return fn.map(forwardAsyncErrors);
+    if (typeof fn !== 'function' || fn.length === 4) return fn; // not a handler, or already an error handler
+    return function (req, res, next) {
+        const out = fn.call(this, req, res, next);
+        if (out && typeof out.catch === 'function') out.catch(next);
+        return out;
+    };
+};
+for (const method of ['get', 'post', 'put', 'patch', 'delete', 'all', 'use']) {
+    const original = app[method].bind(app);
+    app[method] = (...args) => original(...args.map(forwardAsyncErrors)); // app.get('setting') passes through untouched
+}
 
 // Behind proxies (Vercel → Render) every request comes from the proxy's IP; trusting the
 // given number of hops makes req.ip the real client again, so per-IP limits (login) work.
@@ -433,7 +451,7 @@ app.get('/api/metadata/schemas', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/metadata/schemas', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/metadata/schemas', authenticateToken, requireAdmin, validate(rules.schemas), async (req, res) => {
     const { entityType, config } = req.body;
     try {
         const id = uuidv4();
@@ -599,7 +617,7 @@ app.get('/api/web-content/:slug/data', async (req, res) => {
 });
 
 // Save content
-app.post('/api/web-content', authenticateToken, async (req, res) => {
+app.post('/api/web-content', authenticateToken, validate(rules.webContent), async (req, res) => {
     const { slug, type, title, content, metadata } = req.body;
     try {
         const id = uuidv4();
@@ -648,7 +666,7 @@ app.get('/api/saved-reports', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/saved-reports', authenticateToken, async (req, res) => {
+app.post('/api/saved-reports', authenticateToken, validate(rules.savedReports), async (req, res) => {
     const { id, name, description, entityType, columns, filters, groupBy, sortBy, vizType } = req.body;
     try {
         const reportId = id || uuidv4();
@@ -1763,13 +1781,13 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 });
 
 // Create/Update User
-app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/users', authenticateToken, requireAdmin, validate(rules.users), validateRoleId, async (req, res) => {
     const { id, email, password, roleId, name, isActive = true } = req.body;
 
     // Split name into first and last
     let firstName = '';
     let lastName = '';
-    if (name) {
+    if (typeof name === 'string' && name.trim()) {
         const parts = name.trim().split(' ');
         firstName = parts[0];
         lastName = parts.slice(1).join(' ') || '';
@@ -1824,7 +1842,7 @@ app.get('/api/roles', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // Create/Update Role
-app.post('/api/roles', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/roles', authenticateToken, requireAdmin, validate(rules.roles, { defaults: { description: '', permissions: () => ({}) } }), async (req, res) => {
     const { id, name, description, permissions } = req.body;
     try {
         const roleId = id || uuidv4();
@@ -2113,7 +2131,7 @@ app.get('/api/cti/calls', authenticateToken, async (req, res) => {
 });
 
 // Manually log / update a call outcome (agent)
-app.post('/api/cti/log-call', authenticateToken, async (req, res) => {
+app.post('/api/cti/log-call', authenticateToken, validate(rules.logCall), async (req, res) => {
     try {
         const b = req.body || {};
         const result = await logCall(req.tenantId, {
@@ -2786,7 +2804,7 @@ app.get('/api/workflows', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/workflows', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/workflows', authenticateToken, requireAdmin, validate(rules.workflows), async (req, res) => {
     try {
         const { nodes, edges } = req.body;
         
@@ -2874,7 +2892,7 @@ app.get('/api/notes/:entityType/:recordId', authenticateToken, async (req, res) 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/notes/:entityType/:recordId', authenticateToken, async (req, res) => {
+app.post('/api/notes/:entityType/:recordId', authenticateToken, validate(rules.notes), async (req, res) => {
     try {
         const { note, stageName, kind = 'comment' } = req.body;
         if (!note?.trim()) return res.status(400).json({ error: 'note required' });
@@ -2930,7 +2948,7 @@ app.post('/api/notifications/mark-read', authenticateToken, async (req, res) => 
 });
 
 // Create notification (internal helper exposed for testing)
-app.post('/api/notifications', authenticateToken, async (req, res) => {
+app.post('/api/notifications', authenticateToken, validate(rules.notifications), async (req, res) => {
     try {
         const { userId, title, body, kind = 'info', recordId, entityType, scheduledAt } = req.body;
         const id = uuidv4();
@@ -2960,7 +2978,7 @@ app.get('/api/saved-reports', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/saved-reports', authenticateToken, async (req, res) => {
+app.post('/api/saved-reports', authenticateToken, validate(rules.savedReports), async (req, res) => {
     try {
         const { name, description, entityType, columns, filters, groupBy, sortBy, vizType } = req.body;
         if (!name || !entityType || !columns?.length) return res.status(400).json({ error: 'name, entityType, columns required' });
@@ -3422,7 +3440,7 @@ app.get('/api/scoring-rules', authenticateToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/scoring-rules', authenticateToken, async (req, res) => {
+app.post('/api/scoring-rules', authenticateToken, validate(rules.scoringRules), async (req, res) => {
     const { id, name, field, operator, value, points, is_active } = req.body;
     try {
         const ruleId = id || uuidv4();
@@ -3455,7 +3473,7 @@ app.get('/api/assignment-rules', authenticateToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/assignment-rules', authenticateToken, async (req, res) => {
+app.post('/api/assignment-rules', authenticateToken, validate(rules.assignmentRules), async (req, res) => {
     const { id, name, conditions, assign_to, mode, priority, is_active } = req.body;
     try {
         const ruleId = id || uuidv4();
@@ -3494,7 +3512,7 @@ app.get('/api/sequences/:id', authenticateToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/sequences', authenticateToken, async (req, res) => {
+app.post('/api/sequences', authenticateToken, validate(rules.sequences), async (req, res) => {
     try { res.json(await saveSequence(req.tenantId, req.body)); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3522,6 +3540,26 @@ app.post('/api/sequences/enrollments/:enrollmentId/cancel', authenticateToken, a
 // ═══════════════════════════════════════════════════════
 // SERVER START
 // ═══════════════════════════════════════════════════════
+
+// FALLBACK HANDLERS (must come after every route)
+
+app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+
+// Everything a route did not answer itself: always JSON, never a stack trace, never a dead process.
+app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    if (err?.type === 'entity.parse.failed') return res.status(400).json({ error: 'Request body is not valid JSON' });
+    if (err?.type === 'entity.too.large') return res.status(413).json({ error: 'Request body is too large' });
+    if (err?.name === 'MulterError') return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: err.message });
+    const status = Number(err?.status || err?.statusCode);
+    if (status >= 400 && status < 500) return res.status(status).json({ error: err.expose ? err.message : 'Bad request' });
+    console.error(`[error] ${req.method} ${req.originalUrl}:`, err);
+    res.status(500).json({ error: 'Internal server error' });
+});
+
+// Background work (schedulers, webhooks) that fails outside a request must not end the process either.
+process.on('unhandledRejection', (reason) => { console.error('[unhandledRejection]', reason); });
+process.on('uncaughtException', (err) => { console.error('[uncaughtException]', err); process.exit(1); }); // state unknown: exit, let the supervisor restart
 
 const server = app.listen(PORT, () => {
     console.log(`FlowCRM Backend running on http://localhost:${PORT}`);
