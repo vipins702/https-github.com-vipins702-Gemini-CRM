@@ -124,6 +124,8 @@ const FILTER_OPS = {
 };
 
 /** Public metadata (never exposes SQL). */
+export const reportEntity = (id) => REPORTS[id]?.entityType;
+
 export function listReports() {
   return Object.values(REPORTS).map((r) => ({
     id: r.id, name: r.name, description: r.description, category: r.category,
@@ -167,6 +169,8 @@ export async function runReport(tenantId, reportId, opts = {}) {
   // Base WHERE — tenant + entity, always bound.
   const where = ['r.tenant_id = ?', 'r.entity_type = ?'];
   const args = [tenantId, def.entityType];
+  const sc = scopeSqlFor(opts.scope, def.entityType);
+  if (sc) { where.push(sc.sql); args.push(...sc.args); }
 
   const paramClauses = applyParamClauses(def, params);
   where.push(...paramClauses.clauses);
@@ -250,9 +254,26 @@ const VALUE     = NUM('value');
  * @param {string} entityType
  * @param {object} params  — { since?: string, until?: string }
  */
+/**
+ * Record scope of the person running the report, set by the server (never by the caller):
+ * a JSON string { <entityType>: null (all) | [userIds] (own/team) | [] (no access) }.
+ * Kept as a string so it is part of the report cache key: one user's figures are never served to another.
+ */
+export function scopeSqlFor(scope, entityType) {
+  if (!scope) return null;
+  let map; try { map = typeof scope === 'string' ? JSON.parse(scope) : scope; } catch { return { sql: '1 = 0', args: [] }; }
+  const ids = map?.[entityType];
+  if (ids === undefined || ids === null) return null;
+  if (!Array.isArray(ids) || !ids.length) return { sql: '1 = 0', args: [] };
+  const marks = ids.map(() => '?').join(', ');
+  return { sql: `(r.owner_id IN (${marks}) OR r.created_by IN (${marks}))`, args: [...ids, ...ids] };
+}
+
 function baseWhere(tenantId, entityType, params = {}) {
   const clauses = ['r.tenant_id = ?', 'r.entity_type = ?'];
   const args    = [tenantId, entityType];
+  const sc = scopeSqlFor(params._scope, entityType);
+  if (sc) { clauses.push(sc.sql); args.push(...sc.args); }
   if (params.since)  { clauses.push('r.created_at >= ?'); args.push(String(params.since)); }
   if (params.until)  { clauses.push('r.created_at <= ?'); args.push(String(params.until)); }
   return { clauses, args };
@@ -631,6 +652,8 @@ export async function runPack(tenantId, packId, opts = {}) {
 
   const { params = {}, datasets: requestedDatasets, page, pageSize } = opts;
   const effectiveParams = { ...params };
+  delete effectiveParams._scope;                          // only the server sets the scope
+  if (opts.scope) effectiveParams._scope = opts.scope;
   if (page)     effectiveParams.page     = page;
   if (pageSize) effectiveParams.pageSize = pageSize;
 
@@ -659,7 +682,7 @@ export async function runPack(tenantId, packId, opts = {}) {
 
   return {
     packId,
-    params: effectiveParams,
+    params: Object.fromEntries(Object.entries(effectiveParams).filter(([k]) => k !== '_scope')),
     generatedAt: new Date().toISOString(),
     datasets:    Object.fromEntries(results),
     meta:        { cacheHits, cacheMisses, totalMs: Date.now() - t0 },

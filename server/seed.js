@@ -44,6 +44,7 @@ const INITIAL_MENU = [
             { id: 'lead-capture', label: 'Lead Capture', icon: 'Inbox', type: 'item', view: 'lead-capture', allowedRoles: ['admin'] },
             { id: 'agent-console', label: 'Agent Console', icon: 'PhoneCall', type: 'item', view: 'agent-console', allowedRoles: ['admin'] },
             { id: 'layout', label: 'Form Designer', icon: 'PaintBucket', type: 'item', view: 'layout', allowedRoles: ['admin'] },
+            { id: 'field-triggers', label: 'Field Triggers', icon: 'Zap', type: 'item', view: 'field-triggers', allowedRoles: ['admin'] },
             { id: 'web-presenter', label: 'Web Presenter', icon: 'Globe', type: 'item', view: 'web-presenter', allowedRoles: ['admin'] },
             { id: 'users', label: 'Users & Roles', icon: 'Users', type: 'item', view: 'users', allowedRoles: ['admin'] },
         ]
@@ -278,6 +279,16 @@ export async function seedCoreMetadata() {
     } else if (/"view":"(leads|contacts|deals)"/.test(String(menu.config).replace(/\s/g, ''))) {
         // The built-in placeholder menu points at screens (leads / contacts / deals) that have no definition.
         await db.run('UPDATE menus SET config = ? WHERE id = ?', JSON.stringify(INITIAL_MENU), menu.id);
+    }
+    // Menus saved before Field Triggers existed: add the entry after Form Designer (every workspace, once).
+    for (const m of await db.all('SELECT id, config FROM menus')) {
+        let cfg; try { cfg = JSON.parse(m.config); } catch { continue; }
+        if (!Array.isArray(cfg) || JSON.stringify(cfg).includes('"field-triggers"')) continue;
+        const tools = cfg.find(g => g && g.id === 'tools' && Array.isArray(g.children));
+        if (!tools) continue;
+        const at = tools.children.findIndex(x => x && x.id === 'layout');
+        tools.children.splice(at >= 0 ? at + 1 : tools.children.length, 0, { id: 'field-triggers', label: 'Field Triggers', icon: 'Zap', type: 'item', view: 'field-triggers', allowedRoles: ['admin'] });
+        await db.run('UPDATE menus SET config = ? WHERE id = ?', JSON.stringify(cfg), m.id);
     }
     for (const [key, value] of Object.entries(SCHEMAS)) {
         const has = await db.get('SELECT id FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', TENANT_ID, key);

@@ -1,5 +1,6 @@
 
 import { DEFAULT_DASHBOARD } from './services/dashboardDefaults.js';
+import { ensureFieldRulesTable } from './services/fieldRules.js';
 import { SQLiteAdapter } from './db/sqlite.js';
 import { PostgresAdapter } from './db/postgres.js';
 import bcrypt from 'bcrypt';
@@ -613,6 +614,21 @@ export async function initDB() {
             )
         `);
         await dbInstance.exec(`CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id)`);
+
+        // Record visibility: who created a record (owner_id is who it is assigned to), and who each user reports to.
+        {
+            const rc = await dbInstance.columns('records');
+            if (!rc.includes('created_by')) {
+                await dbInstance.run('ALTER TABLE records ADD COLUMN created_by TEXT');
+                await dbInstance.run('UPDATE records SET created_by = owner_id WHERE created_by IS NULL');
+            }
+            const uc = await dbInstance.columns('users');
+            if (!uc.includes('reports_to')) await dbInstance.run('ALTER TABLE users ADD COLUMN reports_to TEXT');
+            await dbInstance.exec('CREATE INDEX IF NOT EXISTS idx_records_owner ON records(tenant_id, entity_type, owner_id)');
+            await dbInstance.exec('CREATE INDEX IF NOT EXISTS idx_records_creator ON records(tenant_id, entity_type, created_by)');
+        }
+        // Field triggers (server/services/fieldRules.js)
+        await ensureFieldRulesTable(dbInstance);
 
         // 27. Scoring Rules (auto-score leads based on field values)
         await dbInstance.exec(`

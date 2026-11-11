@@ -1,6 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
+import { showsOn } from '../components/LayoutDetails';
 import { EntityType, LayoutDefinition, EntityDefinition, CRMRecord, FieldDefinition, VisibilityRule, LayoutFieldConfig, Activity, RelatedActivity } from '../types';
 import { formatCurrency, getCurrencySymbol } from '../services/currency';
 import { Card } from '../components/ui/Card';
@@ -169,8 +170,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
          const fieldDef = schema.fields.find(f => f.name === fieldName);
          if (!fieldDef) continue;
          const fc = layout?.fieldConfigs?.[fieldName];
-         if (fc?.hidden) continue;
-         if (fc?.visibilityRule && !checkVisibility(fc.visibilityRule, selectedRecord)) continue;
+         if (!showsOn(fc, 'form', selectedRecord) || fieldDef.type === 'formula') continue;
 
          const v = fc?.validation || {};
          const raw = selectedRecord[fieldName];
@@ -341,6 +341,9 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
    const renderFieldInput = (field: FieldDefinition, value: any, readOnly = false, config: LayoutFieldConfig | undefined, record: CRMRecord) => {
       const baseClasses = `w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-surface ${config?.styles?.textColor || 'text-gray-900'} ${config?.styles?.fontWeight === 'bold' ? 'font-bold' : ''} ${config?.styles?.fontStyle === 'italic' ? 'italic' : ''}`;
 
+      if (field.type === 'formula') {
+         return <div className="py-2 text-sm text-gray-900 font-medium border-b border-gray-100 flex items-center justify-between gap-2"><span>{value === '' || value == null ? '-' : String(value)}</span><span className="text-xs font-normal text-gray-400">Calculated on save</span></div>;
+      }
       if (readOnly) {
          const display = field.type === 'currency' && value !== '' && value != null
             ? formatCurrency(value, record?.currency)
@@ -658,7 +661,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                                           const fieldDef = schema.fields.find(f => f.name === fieldName);
                                           if (!fieldDef) return null;
                                           const fieldConfig = layout.fieldConfigs?.[fieldName];
-                                          if (!checkVisibility(fieldConfig?.visibilityRule, selectedRecord)) return null;
+                                          if (!showsOn(fieldConfig, 'form', selectedRecord)) return null;
                                           const access = fieldAccess(entityType, fieldName);
                                           if (!access.read) return null;
 

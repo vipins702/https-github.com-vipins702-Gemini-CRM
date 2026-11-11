@@ -13,6 +13,7 @@ import {
   Avatar360, QuickActions, contactActions, StageProgress, StatTile, AboutList, ActivityTimeline,
 } from '../components/Record360';
 import { api } from '../services/api';
+import { LayoutDetails } from '../components/LayoutDetails';
 import { formatCurrency } from '../services/currency';
 import { can } from '../services/permissions';
 import { RelatedActivity, Activity, ViewState, ProcessStage } from '../types';
@@ -283,6 +284,7 @@ export const Customer360: React.FC<Props> = ({ customerId, onBack, onNavigate })
 
         {/* Right */}
         <div className="col-span-12 lg:col-span-8 space-y-6">
+          <LayoutDetails entityType="customer" record={customer} skip={['firstName', 'lastName', 'name', 'status', 'email', 'phone', 'mobile', 'company', 'industry', 'website', 'address', 'segment', 'tier']} />
           <ActivityTimeline
             timeline={timeline}
             activity={activity}

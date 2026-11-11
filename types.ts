@@ -4,7 +4,7 @@ import { Edge, Node } from 'reactflow';
 
 export type EntityType = 'lead' | 'customer' | 'case' | 'task' | 'product' | string;
 
-export type FieldType = 'text' | 'number' | 'currency' | 'email' | 'phone' | 'select' | 'status' | 'textarea' | 'lookup' | 'attachment' | 'image' | 'iframe' | 'date' | 'cascade';
+export type FieldType = 'text' | 'number' | 'currency' | 'email' | 'phone' | 'select' | 'status' | 'textarea' | 'lookup' | 'attachment' | 'image' | 'iframe' | 'date' | 'cascade' | 'url' | 'formula';
 
 export interface CategoryNode {
   name: string;
@@ -31,6 +31,8 @@ export interface FieldDefinition {
   lookupTarget?: EntityType;
   urlTemplate?: string;
   categorySet?: string; // for type 'cascade' — which category tree to use
+  /** For type 'formula': worked out by the server on every save, e.g. "{firstName} {lastName}" or "{amount} * {quantity}". */
+  formula?: string;
 }
 
 export interface EntityDefinition {
@@ -191,6 +193,8 @@ export interface LayoutFieldConfig {
   styles?: ComponentStyle;
   labelOverride?: string;
   hidden?: boolean;
+  /** Where the field appears: the edit form, the record's detail page, or both (default). */
+  showOn?: 'both' | 'form' | 'detail';
   validation?: ValidationRule;
   // Instance specific overrides
   lookupTarget?: EntityType;
@@ -230,7 +234,7 @@ export interface FlowNodeData {
 export type FlowNode = Node<FlowNodeData>;
 export type FlowEdge = Edge;
 
-export type ViewState = 'dashboard' | 'autoflow' | 'layout' | 'settings' | 'web-presenter' | 'users' | 'object-manager' | 'campaigns' | 'menu-manager' | 'lookups' | 'customer-360' | 'lead-rules' | 'lead-capture' | 'agent-console' | 'reports' | 'whatsapp' | 'email-inbox' | 'calendar' | 'quotes' | 'pipeline' | 'processes' | 'lead-360' | 'categories' | 'integrations' | 'platform' | 'audit-log' | 'scoring-rules' | 'assignment-rules' | 'sequences' | EntityType;
+export type ViewState = 'dashboard' | 'autoflow' | 'layout' | 'settings' | 'web-presenter' | 'users' | 'object-manager' | 'campaigns' | 'menu-manager' | 'lookups' | 'customer-360' | 'lead-rules' | 'lead-capture' | 'agent-console' | 'reports' | 'whatsapp' | 'email-inbox' | 'calendar' | 'quotes' | 'pipeline' | 'processes' | 'lead-360' | 'categories' | 'integrations' | 'platform' | 'audit-log' | 'scoring-rules' | 'assignment-rules' | 'sequences' | 'field-triggers' | EntityType;
 
 // --- Integrations (per-tenant credentials) ---
 export interface IntegrationConfig {
@@ -501,6 +505,8 @@ export interface User {
   isActive: boolean;
   avatar?: string;
   isSuperadmin?: boolean; // platform owner — bypasses tenant scoping
+  /** Manager this user reports to: drives the "Team" record scope. */
+  reportsTo?: string | null;
   permissions?: any; // Full permission tree
 }
 
@@ -756,3 +762,18 @@ export interface Relationship {
   display_field?: string;
 }
 
+
+// Field triggers: set field values before a record is saved when conditions match.
+export type RuleOperator = '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'empty' | 'not_empty' | 'changed';
+export interface FieldRuleCondition { field: string; operator: RuleOperator; value?: string }
+export interface FieldRuleAction { field: string; value: string }
+export interface FieldRule {
+  id?: string;
+  entityType?: string;
+  name: string;
+  active: boolean;
+  match: 'all' | 'any';
+  conditions: FieldRuleCondition[];
+  actions: FieldRuleAction[];
+  sortOrder?: number;
+}

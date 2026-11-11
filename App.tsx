@@ -24,6 +24,7 @@ import { CategoryManager } from './pages/CategoryManager';
 import { Integrations } from './pages/Integrations';
 import { Platform } from './pages/Platform';
 import { LeadRules } from './pages/LeadRules';
+import { FieldTriggers } from './pages/FieldTriggers';
 import { LeadCapture } from './pages/LeadCapture';
 import { AgentConsole } from './pages/AgentConsole';
 import { Reports } from './pages/Reports';
@@ -230,6 +231,8 @@ const App: React.FC = () => {
         return <MenuManager />;
       case 'lookups':
         return <LookupManager />;
+      case 'field-triggers':
+        return <FieldTriggers />;
       case 'lead-rules':
         return <LeadRules />;
       case 'lead-capture':

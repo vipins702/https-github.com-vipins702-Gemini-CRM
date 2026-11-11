@@ -103,7 +103,7 @@ export const validateSettings = (req, res, next) => {
 
 export const rules = {
     roles: { id: 'string', name: 'string!', description: 'string', permissions: 'object' },
-    users: (body) => ({ id: 'string', email: body.id ? 'string' : 'string!', password: 'string', roleId: 'string!', name: 'string', isActive: 'boolean' }),
+    users: (body) => ({ id: 'string', email: body.id ? 'string' : 'string!', password: 'string', roleId: 'string!', name: 'string', isActive: 'boolean', reportsTo: 'string' }),
     notes: { note: 'string!', stageName: 'string', kind: 'string' },
     scoringRules: { id: 'string', name: 'string!', field: 'string!', operator: 'string!' },
     assignmentRules: { id: 'string', name: 'string!', assign_to: 'string', mode: 'string' },

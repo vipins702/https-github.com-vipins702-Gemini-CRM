@@ -28,7 +28,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
 
    // Modal State for New Field
    const [isNewFieldModalOpen, setIsNewFieldModalOpen] = useState(false);
-   const [newFieldConfig, setNewFieldConfig] = useState({ name: '', label: '', type: 'text' as FieldType });
+   const [newFieldConfig, setNewFieldConfig] = useState({ name: '', label: '', type: 'text' as FieldType, formula: '' });
 
    // Load Initial Data
    useEffect(() => {
@@ -146,7 +146,8 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
          name: fieldName,
          label: newFieldConfig.label,
          type: newFieldConfig.type,
-         required: false
+         required: false,
+         ...(newFieldConfig.type === 'formula' ? { formula: newFieldConfig.formula.trim() } : {}),
       };
 
       setSchemas(prev => ({
@@ -158,7 +159,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
       }));
 
       setIsNewFieldModalOpen(false);
-      setNewFieldConfig({ name: '', label: '', type: 'text' });
+      setNewFieldConfig({ name: '', label: '', type: 'text', formula: '' });
    };
 
    // --- Property Setters ---
@@ -365,6 +366,35 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                   <h3 className="font-semibold text-gray-900">{fieldDef?.label}</h3>
                   <p className="text-xs text-gray-500">Field Type: {fieldDef?.type}</p>
                </div>
+
+               {/* Where the field appears */}
+               <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Show on</label>
+                  <div className="grid grid-cols-3 gap-1 p-1 bg-gray-100 rounded-lg">
+                     {([['both', 'Both'], ['form', 'Edit form'], ['detail', 'Detail page']] as const).map(([v, label]) => (
+                        <button
+                           key={v}
+                           type="button"
+                           onClick={() => updateFieldConfig(selected.id, { showOn: v })}
+                           className={`text-xs py-1.5 rounded-md font-medium ${(config.showOn || 'both') === v ? 'bg-surface shadow text-gray-900' : 'text-gray-500 hover:text-gray-800'}`}
+                        >{label}</button>
+                     ))}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">Use "Edit form" for helper or input fields you do not want on the detail page.</p>
+               </div>
+
+               {fieldDef?.type === 'formula' && (
+                  <div>
+                     <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Formula</label>
+                     <input
+                        className="w-full text-xs font-mono border border-gray-300 rounded p-2"
+                        value={fieldDef.formula || ''}
+                        placeholder="{firstName} {lastName}"
+                        onChange={(e) => setSchemas(prev => ({ ...prev, [activeEntity]: { ...prev[activeEntity], fields: prev[activeEntity].fields.map(f => f.name === fieldDef.name ? { ...f, formula: e.target.value } : f) } }))}
+                     />
+                     <p className="text-[11px] text-gray-400 mt-1">Saved with the layout. Existing records update the next time they are saved.</p>
+                  </div>
+               )}
 
                {/* Configuration Logic based on Type */}
                {(fieldDef?.type === 'iframe' || fieldDef?.type === 'lookup') && (
@@ -771,8 +801,25 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                            <option value="lookup">Lookup</option>
                            <option value="iframe">iFrame</option>
                            <option value="image">Image</option>
+                           <option value="url">Web address</option>
+                           <option value="formula">Formula (worked out from other fields)</option>
                         </select>
                      </div>
+
+                     {newFieldConfig.type === 'formula' && (
+                        <div>
+                           <label className="block text-sm font-medium text-gray-700 mb-1">Formula</label>
+                           <input
+                              type="text"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="{firstName} {lastName}   or   {amount} * {quantity}"
+                              value={newFieldConfig.formula}
+                              onChange={(e) => setNewFieldConfig(prev => ({ ...prev, formula: e.target.value }))}
+                           />
+                           <p className="text-xs text-gray-500 mt-1">Put field names in braces. With only numbers and + - * / ( ) it is calculated; otherwise the text is joined. Worked out on every save, never typed in.</p>
+                           <p className="text-xs text-gray-400 mt-1 break-words">Fields: {schemas[activeEntity]?.fields.filter(f => f.type !== 'formula').map(f => `{${f.name}}`).join(' ')}</p>
+                        </div>
+                     )}
                   </div>
 
                   <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">

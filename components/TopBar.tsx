@@ -34,6 +34,7 @@ const STATIC_LABELS: Record<string, string> = {
   'lead-360': 'Lead 360',
   categories: 'Product Categories',
   'lead-rules': 'Lead Rules',
+  'field-triggers': 'Field Triggers',
   autoflow: 'Journeys',
   layout: 'Form Designer',
   'web-presenter': 'Web Presenter',

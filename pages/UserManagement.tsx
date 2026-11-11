@@ -604,7 +604,7 @@ export const UserManagement: React.FC = () => {
                                     {(['all', 'team', 'own'] as const).map(scope => (
                                       <button
                                         key={scope}
-                                        title={scope === 'team' ? 'There are no teams yet, so Team works like Own' : scope === 'own' ? 'Only records this person owns' : 'Every record'}
+                                        title={scope === 'team' ? 'Records they or anyone reporting to them (at any level) created or are assigned' : scope === 'own' ? 'Only records they created or are assigned' : 'Every record'}
                                         onClick={() => updateScope(schema.id, scope)}
                                         className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-all ${
                                           currentScope === scope
@@ -732,6 +732,20 @@ export const UserManagement: React.FC = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Reports to: drives the "Team" record scope */}
+              <div>
+                <label className="block text-sm font-semibold text-ink mb-1.5">Reports to</label>
+                <select
+                  className="w-full border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-ink focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-[var(--surface)] cursor-pointer"
+                  value={editingUser.reportsTo || ''}
+                  onChange={e => setEditingUser({ ...editingUser, reportsTo: e.target.value || null })}
+                >
+                  <option value="">No manager</option>
+                  {users.filter(u => u.id !== editingUser.id).map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+                </select>
+                <p className="text-xs text-ink-muted mt-1">A manager whose role uses the Team scope sees the records of everyone who reports to them.</p>
               </div>
 
               {/* Active toggle */}

@@ -14,6 +14,7 @@ import {
   Avatar360, QuickActions, contactActions, StageProgress, StatTile, AboutList, ActivityTimeline, parseTs, timeAgo,
 } from '../components/Record360';
 import { api } from '../services/api';
+import { LayoutDetails } from '../components/LayoutDetails';
 import { formatCurrency } from '../services/currency';
 import { can } from '../services/permissions';
 import { RelatedActivity, Activity, ViewState, ProcessStage, User } from '../types';
@@ -237,7 +238,8 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
         </div>
 
         {/* Right: everything that happened, in one place */}
-        <div className="col-span-12 lg:col-span-8">
+        <div className="col-span-12 lg:col-span-8 space-y-6">
+          <LayoutDetails entityType="lead" record={lead} skip={['firstName', 'lastName', 'status', 'email', 'phone', 'mobile', 'company', 'title', 'source', 'industry', 'website']} />
           <ActivityTimeline
             timeline={timeline}
             activity={activity}

@@ -15,18 +15,19 @@ import { passwordProblem } from './utils/passwordPolicy.js';
 import { requestPasswordReset, isResetTokenValid, resetPassword } from './services/passwordReset.js';
 import { DEMO_TENANT_ID } from './config.js';
 import { DEFAULT_DASHBOARD, hasRenderableWidgets } from './services/dashboardDefaults.js';
-import { policyGate, can, isAdminUser, isRestrictedScope, hasAnyAccess, hiddenFields, filterFields, protectFields } from './middleware/access.js';
+import { policyGate, can, isAdminUser, isRestrictedScope, scopeUserIds, scopeClause, inScope, hasAnyAccess, hiddenFields, filterFields, protectFields } from './middleware/access.js';
 import { listTenants, createTenant, updateTenant, ensureSuperadmin } from './services/platform.js';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { logAudit } from './services/audit.js';
 import { sendEmail, getConversations as getEmailConversations, getThread as getEmailThread, isConfigured as emailConfigured } from './services/email.js';
 import { evaluateWorkflows } from './services/workflow.js';
+import { applyFieldLogic, checkRule, toRow, fromRow, RULE_OPERATORS } from './services/fieldRules.js';
 import { runLeadRule, runAllActiveRules, evaluateRealtimeLeadRules, startLeadRuleScheduler } from './services/leadgen.js';
 import { generateCustomerInsight, isAIEnabled, generateLeadFollowupTasks } from './services/ai.js';
 import { ingestLead, mapPayload } from './services/ingest.js';
 import { lookupByPhone, logCall, getRecentCalls, convertLeadToCustomer, handleInboundCall, routeInbound } from './services/cti.js';
-import { listReports, runReport, listPacks, runPack } from './services/reporting.js';
+import { listReports, runReport, listPacks, runPack, reportEntity } from './services/reporting.js';
 import { reportCache } from './services/reportCache.js';
 import { verifyWebhook, parseWebhookPayload, handleIncomingMessage, sendMessage, getConversations, getThread, isConfigured as waConfigured, authenticateMessages as waAuthenticateMessages } from './services/whatsapp.js';
 import { listForClient as listIntegrations, getForClient as getIntegration, saveIntegration, getIngestKey, rotateIngestKey, resolveTenantByIngestKey, encryptStoredSecrets } from './services/integrations.js';
@@ -108,6 +109,23 @@ const requireAdmin = (req, res, next) => {
 
 // Role scope "own": the user only sees and changes records they own (records.owner_id).
 const ownOnly = (req, entityType) => isRestrictedScope(req, entityType);
+
+// Rows of one record type this user may see: none without read permission, else their scope (own / team / all).
+const scopedRows = async (req, entityType, cols = 'data') => {
+    if (!can(req, entityType, 'read')) return [];
+    const ids = await scopeUserIds(req, entityType);
+    if (!ids) return db.all(`SELECT ${cols} FROM records WHERE tenant_id = ? AND entity_type = ?`, req.tenantId, entityType);
+    const sc = scopeClause(ids);
+    return db.all(`SELECT ${cols} FROM records WHERE tenant_id = ? AND entity_type = ? AND ${sc.sql}`, req.tenantId, entityType, ...sc.args);
+};
+// The same, as the scope string the report engine understands (services/reporting.js scopeSqlFor).
+const REPORT_TYPES = ['lead', 'customer', 'case', 'task', 'product', 'deal', 'quote'];
+const reportScope = async (req) => {
+    if (isAdminUser(req)) return null;
+    const out = {};
+    for (const t of REPORT_TYPES) out[t] = can(req, t, 'read') ? await scopeUserIds(req, t) : [];
+    return JSON.stringify(out);
+};
 
 // What to call a record in lists, search and duplicate warnings.
 const displayNameOf = (d) =>
@@ -597,12 +615,44 @@ app.post('/api/metadata/schemas', authenticateToken, requireAdmin, validate(rule
 
 // --- Layout Routes ---
 
+// A form layout: sections → columns → field names, plus per-field settings. Anything else is refused,
+// because the Form Designer, the edit form and the detail pages all draw from it.
+const layoutProblems = (l) => {
+    const errs = [];
+    const str = (v, max) => typeof v === 'string' && v.length <= max;
+    if (!l || typeof l !== 'object' || Array.isArray(l)) return ['layout must be an object'];
+    if (JSON.stringify(l).length > 200000) return ['layout is too large'];
+    if (!Array.isArray(l.sections) || !l.sections.length || l.sections.length > 50) return ['sections must be a list of 1 to 50 sections'];
+    l.sections.forEach((sec, i) => {
+        if (!sec || typeof sec !== 'object' || !str(sec.id, 100) || (sec.title !== undefined && !str(sec.title, 200))) { errs.push(`section ${i + 1}: needs an id and a title`); return; }
+        if (!Array.isArray(sec.columns) || !sec.columns.length || sec.columns.length > 12) { errs.push(`section ${i + 1}: needs 1 to 12 columns`); return; }
+        sec.columns.forEach((col, j) => {
+            if (!col || typeof col !== 'object' || !str(col.id, 100)) errs.push(`section ${i + 1} column ${j + 1}: needs an id`);
+            else if (!Number.isInteger(col.width) || col.width < 1 || col.width > 12) errs.push(`section ${i + 1} column ${j + 1}: width must be 1 to 12`);
+            else if (!Array.isArray(col.fields) || col.fields.length > 200 || !col.fields.every(x => str(x, 100))) errs.push(`section ${i + 1} column ${j + 1}: fields must be a list of field names`);
+        });
+    });
+    if (l.fieldConfigs !== undefined) {
+        if (!l.fieldConfigs || typeof l.fieldConfigs !== 'object' || Array.isArray(l.fieldConfigs)) errs.push('fieldConfigs must be an object');
+        else for (const [k, v] of Object.entries(l.fieldConfigs)) {
+            if (!v || typeof v !== 'object' || Array.isArray(v)) { errs.push(`fieldConfigs.${k} must be an object`); continue; }
+            if (v.showOn !== undefined && !['both', 'form', 'detail'].includes(v.showOn)) errs.push(`fieldConfigs.${k}.showOn must be both, form or detail`);
+        }
+    }
+    return errs.slice(0, 10);
+};
+const defaultLayout = (entityType) => ({ entityType, sections: [{ id: 'main', title: 'Details', columns: [{ id: 'c1', width: 12, fields: [] }] }], fieldConfigs: {} });
+
 app.get('/api/metadata/layouts/:entityType', authenticateToken, async (req, res) => {
     try {
         const { entityType } = req.params;
         const row = await db.get('SELECT config FROM layouts WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
-        if (row) {
-            res.json(JSON.parse(row.config));
+        let stored = null;
+        try { stored = row ? JSON.parse(row.config) : null; } catch { stored = null; }
+        if (stored && !layoutProblems(stored).length) {
+            res.json(stored);
+        } else if (row) {
+            res.json(defaultLayout(entityType)); // a damaged saved layout: show a working one instead of breaking the page
         } else {
             // Return a default layout structure
             res.json({
@@ -619,6 +669,8 @@ app.get('/api/metadata/layouts/:entityType', authenticateToken, async (req, res)
 app.post('/api/metadata/layouts/:entityType', authenticateToken, requireAdmin, async (req, res) => {
     const { entityType } = req.params;
     const layoutConfig = req.body;
+    const problems = layoutProblems(layoutConfig);
+    if (problems.length) return res.status(400).json({ error: 'Validation Failed', details: problems });
     try {
         const id = uuidv4();
         await db.run(`
@@ -694,51 +746,79 @@ app.get('/api/web-content/:slug', authenticateToken, async (req, res) => {
 });
 
 // Parameterized CRM Data View endpoint (public — tenant resolved from slug)
+// Public data feed of a Web Presenter "CRM view". No sign-in, so it shares ONLY what the view's author chose:
+//   - the fields listed in the view (config.fields); a view with no field list shares nothing
+//   - records matching its filters; a {param} used in a filter must be supplied (?city=Mumbai), else 400
+//   - one page at a time: ?page=1&pageSize=25 (max 100), optional ?sort=<shared field>&dir=asc|desc
+// Limited to 120 requests a minute per address.
 app.get('/api/web-content/:slug/data', async (req, res) => {
-    const { slug } = req.params;
-    const queryParams = req.query; // e.g. ?city=Mumbai&status=active
+    if (overBudget('wc:' + req.ip, 120, 60 * 1000)) return res.status(429).json({ error: 'Too many requests. Try again in a minute.' });
+    const q = req.query || {};
+    const one = (v) => (Array.isArray(v) ? v[0] : v);
     try {
-        const row = await db.get(
-            "SELECT * FROM web_content WHERE slug = ? AND type = 'crm'",
-            slug
-        );
+        const row = await db.get("SELECT * FROM web_content WHERE slug = ? AND type = 'crm'", String(req.params.slug));
         if (!row) return res.status(404).json({ error: 'CRM view not found' });
-
-        let config = {};
-        try { config = JSON.parse(row.content || '{}'); } catch {}
-        const meta = (() => { try { return JSON.parse(row.metadata || '{}'); } catch { return {}; } })();
+        let config = {}; try { config = JSON.parse(row.content || '{}'); } catch { config = {}; }
+        let meta = {}; try { meta = JSON.parse(row.metadata || '{}'); } catch { meta = {}; }
 
         const entity = config.entity || meta.crmEntity || 'lead';
-        const filters = config.filters || meta.crmFilters || [];
+        const filters = (Array.isArray(config.filters) ? config.filters : Array.isArray(meta.crmFilters) ? meta.crmFilters : []).filter(f => f && f.field);
+        const fields = (Array.isArray(config.fields) ? config.fields : Array.isArray(meta.crmFields) ? meta.crmFields : []).filter(f => typeof f === 'string' && f && !f.startsWith('_'));
+        if (!fields.length) return res.status(409).json({ error: 'This view does not share any fields yet. Choose the fields to share in Web Presenter.' });
+
+        // Every {param} used by a filter must be supplied; a missing one used to match empty values silently.
+        const params = new Set();
+        for (const f of filters) String(f.value ?? '').replace(/\{(\w+)\}/g, (_, k) => { params.add(k); return ''; });
+        const declared = Array.isArray(meta.crmParams) ? meta.crmParams : [];
+        const value = (k) => {
+            const v = one(q[k]);
+            if (v !== undefined && String(v) !== '') return String(v).slice(0, 200);
+            const d = declared.find(p => p && p.name === k)?.defaultValue;
+            return d !== undefined && String(d) !== '' ? String(d) : undefined;
+        };
+        const missing = [...params].filter(k => value(k) === undefined);
+        if (missing.length) return res.status(400).json({ error: 'Missing parameters', missing });
+
         const tenantId = row.tenant_id || 'default';
-
-        // Fetch all records for entity
-        const allRows = await db.all(
-            'SELECT data FROM records WHERE tenant_id = ? AND entity_type = ?',
-            tenantId, entity
-        );
-        let records = allRows.map(r => {
-            try { return JSON.parse(r.data || '{}'); } catch { return {}; }
-        });
-
-        // Apply filters with param substitution
+        const allRows = await db.all('SELECT id, data, created_at FROM records WHERE tenant_id = ? AND entity_type = ?', tenantId, entity);
+        let records = allRows.map(r => { try { return { id: r.id, created_at: r.created_at, ...JSON.parse(r.data || '{}') }; } catch { return { id: r.id }; } });
         records = records.filter(r => filters.every(f => {
-            if (!f.field) return true;
-            const resolved = f.value.replace(/\{(\w+)\}/g, (_, k) => queryParams[k] ?? '');
+            const resolved = String(f.value ?? '').replace(/\{(\w+)\}/g, (_, k) => value(k) ?? '');
             const rv = String(r[f.field] ?? '');
-            if (f.op === 'eq')       return rv === resolved;
-            if (f.op === 'neq')      return rv !== resolved;
-            if (f.op === 'contains') return rv.toLowerCase().includes(resolved.toLowerCase());
-            if (f.op === 'starts')   return rv.toLowerCase().startsWith(resolved.toLowerCase());
-            if (f.op === 'gt')       return Number(rv) > Number(resolved);
-            if (f.op === 'lt')       return Number(rv) < Number(resolved);
-            return true;
+            switch (f.op) {
+                case 'eq': return rv.toLowerCase() === resolved.toLowerCase();
+                case 'neq': return rv.toLowerCase() !== resolved.toLowerCase();
+                case 'contains': return rv.toLowerCase().includes(resolved.toLowerCase());
+                case 'starts': return rv.toLowerCase().startsWith(resolved.toLowerCase());
+                case 'gt': return Number(rv) > Number(resolved);
+                case 'lt': return Number(rv) < Number(resolved);
+                default: return true;
+            }
         }));
 
-        res.json({ entity, count: records.length, data: records });
+        const sort = one(q.sort);
+        if (sort && fields.includes(String(sort))) {
+            const dir = String(one(q.dir)).toLowerCase() === 'desc' ? -1 : 1;
+            records.sort((a, b) => {
+                const x = a[sort], y = b[sort];
+                const nx = Number(x), ny = Number(y);
+                const cmp = Number.isFinite(nx) && Number.isFinite(ny) && x !== '' && y !== '' ? nx - ny : String(x ?? '').localeCompare(String(y ?? ''));
+                return cmp * dir;
+            });
+        }
+        const total = records.length;
+        const pageSize = Math.min(100, Math.max(1, parseInt(one(q.pageSize), 10) || 25));
+        const pages = Math.max(1, Math.ceil(total / pageSize));
+        const page = Math.min(pages, Math.max(1, parseInt(one(q.page), 10) || 1));
+        const data = records.slice((page - 1) * pageSize, page * pageSize).map(r => {
+            const out = { id: r.id };
+            for (const f of fields) out[f] = r[f] ?? null;
+            return out;
+        });
+        res.json({ entity, fields, total, page, pageSize, pages, count: data.length, data });
     } catch (err) {
         console.error('CRM view data error:', err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Could not load this view' });
     }
 });
 
@@ -827,6 +907,15 @@ app.post('/api/saved-reports/run', authenticateToken, async (req, res) => {
     const { entityType, columns = [], filters = [], groupBy = [], sortBy = [] } = req.body;
     
     if (!entityType) return res.status(400).json({ error: 'Entity type is required' });
+    if (typeof entityType !== 'string' || !can(req, entityType, 'read')) return res.status(403).json({ error: 'Insufficient permissions to view this record type' });
+    // Fields this role may not read cannot be shown, grouped, filtered or sorted on.
+    const hidden = new Set(hiddenFields(req, entityType));
+    const used = [...(Array.isArray(columns) ? columns.map(x => x?.field) : []), ...(Array.isArray(groupBy) ? groupBy : []), ...(Array.isArray(filters) ? filters.map(x => x?.field) : []), ...(Array.isArray(sortBy) ? sortBy.map(x => x?.field) : [])];
+    const blocked = used.filter(x => hidden.has(x));
+    if (blocked.length) return res.status(403).json({ error: `Your role cannot see: ${[...new Set(blocked)].join(', ')}` });
+    // Only the records this user may see (own / team / all).
+    const scopeIds = await scopeUserIds(req, entityType);
+    const scope = scopeIds && scopeClause(scopeIds);
 
     // Field names and aggregates come from the client, so quote/whitelist them —
     // only values travel as bound parameters.
@@ -836,10 +925,10 @@ app.post('/api/saved-reports/run', authenticateToken, async (req, res) => {
     try {
         let selectParts = [];
         let groupByParts = [];
-        let params = [req.tenantId, entityType];
+        let params = [req.tenantId, entityType, ...(scope ? scope.args : [])];
 
         let sql = `SELECT `;
-        const fromClause = ` FROM records WHERE tenant_id = ? AND entity_type = ?`;
+        const fromClause = ` FROM records WHERE tenant_id = ? AND entity_type = ?${scope ? ' AND ' + scope.sql : ''}`;
 
         // 1. SELECT and GROUP BY Builder
         if (groupBy.length > 0) {
@@ -900,7 +989,9 @@ app.post('/api/saved-reports/run', authenticateToken, async (req, res) => {
 
         sql += ` LIMIT 1000`; // Safety limit
 
-        const rows = await db.all(sql, ...params);
+        let rows = await db.all(sql, ...params);
+        // Raw mode without columns returns the whole record: drop the hidden fields.
+        if (hidden.size) rows = rows.map(r => (r.data ? { ...r, data: JSON.stringify(filterFields(req, entityType, JSON.parse(r.data))) } : r));
         res.json({ rows, total: rows.length });
     } catch (e) {
         console.error('Report Run Error:', e);
@@ -916,8 +1007,10 @@ app.get('/api/data/:entityType', authenticateToken, async (req, res) => {
         return res.status(403).json({ error: `Insufficient permissions to view ${entityType}` });
     }
     try {
-        const rows = ownOnly(req, entityType)
-            ? await db.all('SELECT * FROM records WHERE tenant_id = ? AND entity_type = ? AND owner_id = ?', req.tenantId, entityType, req.user.id)
+        const ids = await scopeUserIds(req, entityType);
+        const sc = ids && scopeClause(ids);
+        const rows = sc
+            ? await db.all(`SELECT * FROM records WHERE tenant_id = ? AND entity_type = ? AND ${sc.sql}`, req.tenantId, entityType, ...sc.args)
             : await db.all('SELECT * FROM records WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
         const records = rows.map(row => {
             const data = JSON.parse(row.data);
@@ -1066,8 +1159,8 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
         if (recordData.id) {
             // Update
             if (ownOnly(req, entityType)) {
-                const mine = await db.get('SELECT owner_id FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
-                if (!mine || mine.owner_id !== req.user.id) return res.status(403).json({ error: 'You can only change records you own' });
+                const mine = await db.get('SELECT owner_id, created_by FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
+                if (!(await inScope(req, entityType, mine))) return res.status(403).json({ error: 'You can only change records you own or that belong to your team' });
             }
             // The id must be a record of THIS type: an edit right on leads is no right to overwrite a case.
             const oldRecord = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
@@ -1076,12 +1169,14 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             let oldData = {}; try { oldData = JSON.parse(oldRecord.data); } catch { oldData = {}; }
             protectFields(req, entityType, jsonData, oldData);
             for (const k of Object.keys(oldData)) if (k.startsWith('_')) jsonData[k] = oldData[k]; // keep what the server stored
+            // Field triggers, then formula fields (server/services/fieldRules.js)
+            await applyFieldLogic(db, req.tenantId, entityType, definition, jsonData, oldData);
 
             await db.run(`
             UPDATE records 
             SET primary_display = ?, status = ?, data = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND tenant_id = ?
-        `, displayNameOf(jsonData), status, JSON.stringify(jsonData), id, req.tenantId);
+        `, displayNameOf(jsonData), jsonData.status || status, JSON.stringify(jsonData), id, req.tenantId);
 
             // Log Audit
             await logAudit({
@@ -1109,6 +1204,7 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             // Create
             // Auto-score leads before insert
             let finalData = protectFields(req, entityType, { ...jsonData });
+            await applyFieldLogic(db, req.tenantId, entityType, definition, finalData, null);
             if (entityType === 'lead') {
                 try {
                     const computedScore = await calculateLeadScore(finalData, req.tenantId);
@@ -1117,9 +1213,9 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             }
 
             await db.run(`
-            INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data, owner_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, id, req.tenantId, entityType, primaryDisplay, status, JSON.stringify(finalData), actorId);
+            INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data, owner_id, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `, id, req.tenantId, entityType, displayNameOf(finalData), finalData.status || status, JSON.stringify(finalData), actorId, actorId);
 
             // Log Audit
             await logAudit({
@@ -1195,7 +1291,7 @@ app.delete('/api/data/:entityType/:id', authenticateToken, async (req, res) => {
 
         const record = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
         if (!record) return res.status(404).json({ error: 'Record not found' });
-        if (ownOnly(req, entityType) && record.owner_id !== req.user.id) return res.status(403).json({ error: 'You can only delete records you own' });
+        if (!(await inScope(req, entityType, record))) return res.status(403).json({ error: 'You can only delete records you own or that belong to your team' });
 
         await db.run('DELETE FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
 
@@ -1235,7 +1331,7 @@ app.post('/api/data/:entityType/:id/status', authenticateToken, async (req, res)
     try {
         const row = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ? AND entity_type = ?', id, req.tenantId, entityType);
         if (!row) return res.status(404).json({ error: 'Record not found' });
-        if (ownOnly(req, entityType) && row.owner_id !== req.user.id) return res.status(403).json({ error: 'You can only change records you own' });
+        if (!(await inScope(req, entityType, row))) return res.status(403).json({ error: 'You can only change records you own or that belong to your team' });
         let data = {};
         try { data = JSON.parse(row.data); } catch { data = {}; }
         const prevStatus = data.status || row.status;
@@ -1847,8 +1943,9 @@ app.get('/api/data/:entityType/:recordId/related/:targetEntity', authenticateTok
                     AND ${db.json('data', reverseRel.source_field)} = ?
                 `, req.tenantId, targetEntity, recordId);
 
-                const records = rows.map(row => ({ ...JSON.parse(row.data), id: row.id, status: row.status }));
-                return res.json(records);
+                const visible = [];
+                for (const row of rows) if (await inScope(req, targetEntity, row)) visible.push({ ...filterFields(req, targetEntity, JSON.parse(row.data)), id: row.id, status: row.status });
+                return res.json(visible);
             }
             return res.json([]);
         }
@@ -1870,8 +1967,8 @@ app.get('/api/data/:entityType/:recordId/related/:targetEntity', authenticateTok
         const relatedRow = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ? AND entity_type = ?',
             fkValue, req.tenantId, targetEntity);
 
-        if (relatedRow) {
-            res.json([{ ...JSON.parse(relatedRow.data), id: relatedRow.id, status: relatedRow.status }]);
+        if (relatedRow && await inScope(req, targetEntity, relatedRow)) {
+            res.json([{ ...filterFields(req, targetEntity, JSON.parse(relatedRow.data)), id: relatedRow.id, status: relatedRow.status }]);
         } else {
             res.json([]);
         }
@@ -1936,7 +2033,7 @@ app.post('/api/settings', authenticateToken, requireAdmin, validateSettings, asy
 app.get('/api/users', authenticateToken, async (req, res) => {
     try {
         const users = await db.all(`
-            SELECT id, email, role as roleId, first_name || ' ' || last_name as name, is_active as isActive 
+            SELECT id, email, role as roleId, first_name || ' ' || last_name as name, is_active as isActive, reports_to as "reportsTo"
             FROM users WHERE tenant_id = ?
         `, req.tenantId);
         res.json(users);
@@ -1949,6 +2046,17 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 app.post('/api/users', authenticateToken, requireAdmin, validate(rules.users), validatePassword, validateRoleId, async (req, res) => {
     const { id, email, password, roleId, name, isActive = true } = req.body;
     const newUserId = uuidv4();
+    // Reports to: drives the "team" record scope. Must be another user of this workspace, and never a loop.
+    const reportsTo = typeof req.body.reportsTo === 'string' && req.body.reportsTo ? req.body.reportsTo : null;
+    if (reportsTo) {
+        const all = await db.all('SELECT id, reports_to FROM users WHERE tenant_id = ?', req.tenantId);
+        const byId = new Map(all.map(u => [u.id, u.reports_to]));
+        if (!byId.has(reportsTo)) return res.status(400).json({ error: 'Validation Failed', details: ['reportsTo: that user is not in this workspace'] });
+        const self = id || newUserId;
+        for (let cur = reportsTo, hops = 0; cur && hops <= all.length; cur = byId.get(cur), hops++) {
+            if (cur === self) return res.status(400).json({ error: 'Validation Failed', details: ['reportsTo: a user cannot report to themselves or to someone who reports to them'] });
+        }
+    }
 
     // Split name into first and last
     let firstName = '';
@@ -1964,6 +2072,7 @@ app.post('/api/users', authenticateToken, requireAdmin, validate(rules.users), v
             // Update
             let updateQuery = 'UPDATE users SET role = ?, is_active = ?, first_name = ?, last_name = ?';
             const params = [roleId, isActive ? 1 : 0, firstName, lastName];
+            if (req.body.reportsTo !== undefined) { updateQuery += ', reports_to = ?'; params.push(reportsTo); }
 
             if (password) {
                 const hashedPassword = bcrypt.hashSync(password, 10);
@@ -1980,9 +2089,9 @@ app.post('/api/users', authenticateToken, requireAdmin, validate(rules.users), v
             const defaultPassword = Math.random().toString(36).slice(-10) + 'A1!';
             const hashedPassword = bcrypt.hashSync(password || defaultPassword, 10);
             await db.run(`
-                INSERT INTO users (id, tenant_id, email, password_hash, role, is_active, first_name, last_name, must_change_password)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-            `, newUserId, req.tenantId, email, hashedPassword, roleId, isActive ? 1 : 0, firstName, lastName);
+                INSERT INTO users (id, tenant_id, email, password_hash, role, is_active, first_name, last_name, must_change_password, reports_to)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+            `, newUserId, req.tenantId, email, hashedPassword, roleId, isActive ? 1 : 0, firstName, lastName, reportsTo);
         }
         await logAudit({ tenantId: req.tenantId, entityType: 'user', recordId: id || newUserId, action: id ? 'update' : 'create', actorId: req.user.id, details: { email, roleId, isActive, passwordChanged: !!password } });
         res.json({ success: true });
@@ -1990,6 +2099,45 @@ app.post('/api/users', authenticateToken, requireAdmin, validate(rules.users), v
         console.error('Save user error:', error);
         res.status(500).json({ error: 'Failed to save user' });
     }
+});
+
+// --- Field triggers (rules that set field values before a record is saved) ---
+const ruleEntity = async (req, res) => {
+    const row = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', req.tenantId, req.params.entityType);
+    if (!row) { res.status(404).json({ error: 'Unknown record type' }); return null; }
+    return JSON.parse(row.config);
+};
+app.get('/api/field-rules/:entityType', authenticateToken, requireAdmin, async (req, res) => {
+    const rows = await db.all('SELECT * FROM field_rules WHERE tenant_id = ? AND entity_type = ? ORDER BY sort_order, created_at', req.tenantId, req.params.entityType);
+    res.json({ rules: rows.map(fromRow), operators: RULE_OPERATORS });
+});
+app.post('/api/field-rules/:entityType', authenticateToken, requireAdmin, async (req, res) => {
+    const def = await ruleEntity(req, res); if (!def) return;
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const errs = checkRule(body, def.fields || []);
+    if (errs.length) return res.status(400).json({ error: 'Validation Failed', details: errs });
+    let existing = null;
+    if (body.id !== undefined) {
+        if (typeof body.id !== 'string') return res.status(400).json({ error: 'Validation Failed', details: ['id must be a string'] });
+        existing = await db.get('SELECT id FROM field_rules WHERE id = ? AND tenant_id = ? AND entity_type = ?', body.id, req.tenantId, req.params.entityType);
+        if (!existing) return res.status(404).json({ error: 'Rule not found' });
+    }
+    const r = toRow(req.tenantId, req.params.entityType, body, existing?.id);
+    if (existing) {
+        await db.run('UPDATE field_rules SET name = ?, active = ?, match = ?, conditions = ?, actions = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?',
+            r.name, r.active, r.match, r.conditions, r.actions, r.sort_order, r.id, req.tenantId);
+    } else {
+        await db.run('INSERT INTO field_rules (id, tenant_id, entity_type, name, active, match, conditions, actions, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            r.id, r.tenant_id, r.entity_type, r.name, r.active, r.match, r.conditions, r.actions, r.sort_order);
+    }
+    await logAudit({ tenantId: req.tenantId, entityType: 'field_rule', recordId: r.id, action: existing ? 'update' : 'create', actorId: req.user.id, details: { entityType: req.params.entityType, name: r.name } });
+    res.json(fromRow({ ...r }));
+});
+app.delete('/api/field-rules/:entityType/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const out = await db.run('DELETE FROM field_rules WHERE id = ? AND tenant_id = ? AND entity_type = ?', req.params.id, req.tenantId, req.params.entityType);
+    if (!(out?.changes ?? out?.rowCount)) return res.status(404).json({ error: 'Rule not found' });
+    await logAudit({ tenantId: req.tenantId, entityType: 'field_rule', recordId: req.params.id, action: 'delete', actorId: req.user.id, details: {} });
+    res.json({ success: true });
 });
 
 // --- Role Routes ---
@@ -2100,8 +2248,8 @@ app.post('/api/dashboard/widgets', authenticateToken, async (req, res) => {
 // --- Dashboard Stats Route ---
 app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
     try {
-        const leads = await db.all("SELECT data FROM records WHERE tenant_id = ? AND entity_type = 'lead'", req.tenantId);
-        const customers = await db.all("SELECT data FROM records WHERE tenant_id = ? AND entity_type = 'customer'", req.tenantId);
+        const leads = await scopedRows(req, 'lead');
+        const customers = await scopedRows(req, 'customer');
         
         let totalRevenue = 0;
         let leadCount = leads.length;
@@ -2118,7 +2266,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
             } catch (e) {}
         });
         
-        const deals = await db.all("SELECT data FROM records WHERE tenant_id = ? AND entity_type = 'deal'", req.tenantId);
+        const deals = await scopedRows(req, 'deal');
         deals.forEach(r => {
             try {
                 const data = JSON.parse(r.data);
@@ -2145,7 +2293,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
 // --- Dashboard Chart Data Route ---
 app.get('/api/dashboard/chart-data', authenticateToken, async (req, res) => {
     try {
-        const leads = await db.all("SELECT created_at, data FROM records WHERE tenant_id = ? AND entity_type = 'lead'", req.tenantId);
+        const leads = await scopedRows(req, 'lead', 'created_at, data');
         
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const monthlyRevenue = {};
@@ -2170,7 +2318,7 @@ app.get('/api/dashboard/chart-data', authenticateToken, async (req, res) => {
             } catch (e) {}
         });
 
-        const deals = await db.all("SELECT created_at, data FROM records WHERE tenant_id = ? AND entity_type = 'deal'", req.tenantId);
+        const deals = await scopedRows(req, 'deal', 'created_at, data');
         deals.forEach(r => {
             try {
                 const data = JSON.parse(r.data);
@@ -2335,7 +2483,10 @@ app.get('/api/reports', authenticateToken, async (req, res) => {
 app.post('/api/reports/:id/run', authenticateToken, async (req, res) => {
     try {
         const b = req.body || {};
+        const type = reportEntity(req.params.id);
+        if (type && !can(req, type, 'read')) return res.status(403).json({ error: `Insufficient permissions to view ${type}` });
         const result = await runReport(req.tenantId, req.params.id, {
+            scope: await reportScope(req),
             params: b.params || {}, filters: b.filters || [],
             sort: b.sort, page: b.page, pageSize: b.pageSize,
         });
@@ -2356,6 +2507,7 @@ app.post('/api/reports/packs/:packId/run', authenticateToken, async (req, res) =
     try {
         const b = req.body || {};
         const result = await runPack(req.tenantId, req.params.packId, {
+            scope: await reportScope(req),
             params:   b.params   || {},
             datasets: b.datasets || null,
             page:     b.page,
@@ -2511,10 +2663,15 @@ app.get('/api/email/thread/:email', authenticateToken, async (req, res) => {
 app.get('/api/tasks', authenticateToken, async (req, res) => {
     try {
         const { mine, assigneeId, status, from, to } = req.query;
-        const rows = await db.all(
-            'SELECT id, primary_display, status, data, created_at, updated_at FROM records WHERE tenant_id = ? AND entity_type = ?',
+        let rows = await db.all(
+            'SELECT id, primary_display, status, data, created_at, updated_at, owner_id, created_by FROM records WHERE tenant_id = ? AND entity_type = ?',
             req.tenantId, 'task'
         );
+        const taskScope = await scopeUserIds(req, 'task');
+        if (taskScope) rows = rows.filter(r => {
+            let d = {}; try { d = JSON.parse(r.data); } catch { d = {}; }
+            return taskScope.includes(r.owner_id) || taskScope.includes(r.created_by) || taskScope.includes(d.assigneeId);
+        });
         let tasks = rows.map((r) => {
             let d = {};
             try { d = JSON.parse(r.data); } catch { d = {}; }
@@ -2646,8 +2803,8 @@ app.post('/api/leads/:id/convert', authenticateToken, async (req, res) => {
                 return res.status(403).json({ error: 'Converting a lead needs permission to edit leads and create customers' });
             }
             if (ownOnly(req, 'lead')) {
-                const mine = await db.get('SELECT owner_id FROM records WHERE id = ? AND tenant_id = ?', req.params.id, req.tenantId);
-                if (!mine || mine.owner_id !== req.user.id) return res.status(403).json({ error: 'You can only convert leads you own' });
+                const mine = await db.get('SELECT owner_id, created_by FROM records WHERE id = ? AND tenant_id = ?', req.params.id, req.tenantId);
+                if (!(await inScope(req, 'lead', mine))) return res.status(403).json({ error: 'You can only convert leads you own or that belong to your team' });
             }
         }
         const result = await convertLeadToCustomer(req.tenantId, req.params.id, req.user.id);
@@ -2692,9 +2849,10 @@ app.get('/api/search', authenticateToken, async (req, res) => {
             if (!types.length) return res.json([]);
             for (const t of types) {
                 const hidden = hiddenFields(req, t).length > 0;
-                const own = ownOnly(req, t);
-                scopeSql.push(`(entity_type = ?${own ? ' AND owner_id = ?' : ''}${hidden ? ' AND primary_display ' + db.like + ' ?' : ''})`);
-                scopeArgs.push(t); if (own) scopeArgs.push(req.user.id); if (hidden) scopeArgs.push(like);
+                const ids = await scopeUserIds(req, t);
+                const sc = ids && scopeClause(ids);
+                scopeSql.push(`(entity_type = ?${sc ? ' AND ' + sc.sql : ''}${hidden ? ' AND primary_display ' + db.like + ' ?' : ''})`);
+                scopeArgs.push(t); if (sc) scopeArgs.push(...sc.args); if (hidden) scopeArgs.push(like);
             }
         }
         const rows = await db.all(
@@ -3166,75 +3324,7 @@ app.delete('/api/saved-reports/:id', authenticateToken, async (req, res) => {
 });
 
 // Run a report query dynamically against real records
-app.post('/api/saved-reports/run', authenticateToken, async (req, res) => {
-    try {
-        const { entityType, columns = [], filters = [], groupBy = [], sortBy = [] } = req.body;
-        // Fetch all records for entity, parse JSON data, apply filters + grouping in JS
-        const rows = await db.all(
-            `SELECT id, primary_display, status, created_at, data FROM records WHERE tenant_id=? AND entity_type=?`,
-            req.tenantId, entityType
-        );
-
-        // Parse + flatten records
-        let records = rows.map(r => {
-            let d = {}; try { d = JSON.parse(r.data || '{}'); } catch {}
-            return { id: r.id, _display: r.primary_display, _status: r.status, _created_at: r.created_at, ...d };
-        });
-
-        // Apply filters
-        const OPS = { eq: (a,b)=>String(a??'')===String(b), neq: (a,b)=>String(a??'')!==String(b),
-            contains: (a,b)=>String(a??'').toLowerCase().includes(String(b).toLowerCase()),
-            gt: (a,b)=>Number(a)>Number(b), lt: (a,b)=>Number(a)<Number(b) };
-        for (const f of filters) {
-            if (!f.field || f.value===undefined || f.value===null || f.value==='') continue;
-            const fn = OPS[f.op] || OPS.eq;
-            records = records.filter(r => fn(r[f.field], f.value));
-        }
-
-        // Group by
-        let resultRows;
-        if (groupBy.length > 0) {
-            const groupField = groupBy[0];
-            const groups = {};
-            for (const r of records) {
-                const key = r[groupField] ?? '(empty)';
-                if (!groups[key]) groups[key] = { [groupField]: key, count: 0, _sum: {}, _records: [] };
-                groups[key].count++;
-                groups[key]._records.push(r);
-                for (const col of columns) {
-                    if (col.aggregate === 'sum') {
-                        groups[key]._sum[col.field] = (groups[key]._sum[col.field] || 0) + (Number(r[col.field]) || 0);
-                    }
-                }
-            }
-            resultRows = Object.values(groups).map(g => {
-                const out = { [groupField]: g[groupField], count: g.count };
-                for (const col of columns) if (col.aggregate === 'sum') out[col.field] = g._sum[col.field] || 0;
-                return out;
-            });
-        } else {
-            // Return selected columns only
-            const fieldNames = columns.map(c => c.field);
-            resultRows = records.map(r => {
-                const out = {};
-                for (const f of fieldNames) out[f] = r[f];
-                out.id = r.id;
-                return out;
-            });
-        }
-
-        // Sort
-        if (sortBy.length > 0) {
-            const { field, dir = 'asc' } = sortBy[0];
-            resultRows.sort((a, b) => {
-                const av = a[field] ?? '', bv = b[field] ?? '';
-                return (dir === 'desc' ? -1 : 1) * (String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0);
-            });
-        }
-
-        res.json({ rows: resultRows, total: resultRows.length });
-    } catch (e) { console.error(e); res.status(500).json({ error: e.message }); }
-});
+// (A second, never-reached copy of POST /api/saved-reports/run was removed; the handler above is the live one.)
 
 // ─── Campaign Form Submissions (public) ──────────────────────────────────────
 

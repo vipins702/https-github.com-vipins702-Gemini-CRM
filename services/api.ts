@@ -1,6 +1,6 @@
 
 import { getViewAs, setViewAs, isRealAdmin, currentUser } from './permissions';
-import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult, ReportDefinition, RunReportOptions, ReportResult, PackDefinition, PackResult, WaConversation, WaMessage, EmailConversation, EmailMessage, TaskItem, Quote, RelatedActivity, ProcessDefinition, Attachment, CategoryNode, BulkCampaign, IntegrationConfig, Tenant } from '../types';
+import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult, ReportDefinition, RunReportOptions, ReportResult, PackDefinition, PackResult, WaConversation, WaMessage, EmailConversation, EmailMessage, TaskItem, Quote, RelatedActivity, ProcessDefinition, Attachment, CategoryNode, BulkCampaign, IntegrationConfig, Tenant, FieldRule } from '../types';
 
 const API_BASE = '/api';
 
@@ -351,6 +351,17 @@ export const api = {
   },
 
   // --- USER MANAGEMENT ---
+  // Field triggers (Configuration → Field Triggers)
+  async getFieldRules(entityType: string): Promise<{ rules: FieldRule[]; operators: string[] }> {
+    return fetchWithAuth(`${API_BASE}/field-rules/${encodeURIComponent(entityType)}`);
+  },
+  async saveFieldRule(entityType: string, rule: FieldRule): Promise<FieldRule> {
+    return fetchWithAuth(`${API_BASE}/field-rules/${encodeURIComponent(entityType)}`, { method: 'POST', body: JSON.stringify(rule) });
+  },
+  async deleteFieldRule(entityType: string, id: string) {
+    return fetchWithAuth(`${API_BASE}/field-rules/${encodeURIComponent(entityType)}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
   async getUsers(): Promise<User[]> {
     return fetchWithAuth(`${API_BASE}/users`);
   },

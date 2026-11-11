@@ -1,6 +1,6 @@
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ExternalLink, Globe, Lock, Database, Code, Plus, Trash2, Play, CheckCircle, AlertCircle, Edit2, Server, Key, Shield, Wifi, Save, Loader2, Table as TableIcon, Filter, Layers } from 'lucide-react';
@@ -24,6 +24,8 @@ export const WebPresenter: React.FC = () => {
    // --- STATE ---
    const [sources, setSources] = useState<any[]>([]);
    const [loading, setLoading] = useState(true);
+   const [schemas, setSchemas] = useState<Record<string, any>>({});
+   useEffect(() => { api.getSchemas().then(x => setSchemas(x || {})).catch(() => {}); }, []);
 
    const [selectedId, setSelectedId] = useState<string | null>(null);
    const [activeTab, setActiveTab] = useState<'config' | 'query' | 'preview'>('config');
@@ -110,10 +112,10 @@ export const WebPresenter: React.FC = () => {
             type: editConfig.type,
             title: editConfig.name,
             content: editConfig.type === 'crm'
-               ? JSON.stringify({ entity: editConfig.crmEntity, filters: editConfig.crmFilters || [] })
+               ? JSON.stringify({ entity: editConfig.crmEntity, filters: editConfig.crmFilters || [], fields: editConfig.crmFields || [] })
                : editConfig.query,
             metadata: editConfig.type === 'crm'
-               ? { crmEntity: editConfig.crmEntity, crmFilters: editConfig.crmFilters, crmParams: editConfig.crmParams }
+               ? { crmEntity: editConfig.crmEntity, crmFilters: editConfig.crmFilters, crmParams: editConfig.crmParams, crmFields: editConfig.crmFields || [] }
                : { endpoint: editConfig.endpoint, method: editConfig.method, authType: editConfig.authType }
          });
          setIsDirty(false);
@@ -167,7 +169,8 @@ export const WebPresenter: React.FC = () => {
                   return true;
                });
             });
-            setQueryResult(filtered);
+            const shared: string[] = editConfig.crmFields || [];
+            setQueryResult(shared.length ? filtered.map(r => Object.fromEntries([['id', r.id], ...shared.map(f => [f, r[f] ?? null])])) : []);
          } else if (editConfig.type === 'json' || editConfig.type === 'api') {
             // If it's a static JSON content
             try {
@@ -456,6 +459,26 @@ export const WebPresenter: React.FC = () => {
                                        )}
                                     </div>
                                  </Card>
+
+                                 {editConfig.type === 'crm' && (
+                                    <Card title="Fields to share">
+                                       <p className="text-xs text-gray-500 mb-3">The public link returns only these fields (plus the record id). Nothing is shared until you pick at least one.</p>
+                                       <div className="flex flex-wrap gap-2">
+                                          {(schemas[editConfig.crmEntity || 'lead']?.fields || []).filter((f: any) => !['image', 'iframe', 'attachment'].includes(f.type)).map((f: any) => {
+                                             const on = (editConfig.crmFields || []).includes(f.name);
+                                             return (
+                                                <button key={f.name} type="button"
+                                                   onClick={() => handleChange('crmFields', on ? (editConfig.crmFields || []).filter((x: string) => x !== f.name) : [...(editConfig.crmFields || []), f.name])}
+                                                   className={`px-2.5 py-1 rounded-full text-xs font-medium border ${on ? 'bg-accent/10 border-accent/40 text-accent-deep' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                                                >{f.label}</button>
+                                             );
+                                          })}
+                                       </div>
+                                       {editConfig.slug && (
+                                          <p className="text-xs text-gray-500 mt-3 break-all">Public link: <span className="font-mono">/api/web-content/{editConfig.slug}/data?page=1&amp;pageSize=25</span>{(editConfig.crmParams || []).filter((p: any) => p.name).map((p: any) => <span key={p.name} className="font-mono">&amp;{p.name}=…</span>)} · add <span className="font-mono">&amp;sort=field&amp;dir=desc</span> to sort.</p>
+                                       )}
+                                    </Card>
+                                 )}
 
                                  {editConfig.type === 'crm' && (
                                     <Card title="Filter Rules">

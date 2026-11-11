@@ -38,11 +38,45 @@ export function hasAnyAccess(req) {
 /** Role scope "own": only records the user owns (records.owner_id). */
 export const isOwnOnly = (req, entity) => !isAdminUser(req) && modulePerms(req, entity)?.scope === 'own';
 
-/** "team" has no meaning yet (no teams exist), so it is treated like "own" rather than silently like "all". */
+/** Scope "own" or "team" limits which records of a type a user sees (admins always see all). */
 export const isRestrictedScope = (req, entity) => {
     const s = modulePerms(req, entity)?.scope;
     return !isAdminUser(req) && (s === 'own' || s === 'team');
 };
+
+/**
+ * The users whose records this user may see for a type, or null for "all".
+ *   own  -> just me
+ *   team -> me plus everyone who reports to me, at any depth (users.reports_to)
+ * A record counts as someone's when it is assigned to them (owner_id) or they created it (created_by).
+ */
+export async function scopeUserIds(req, entity) {
+    if (!isRestrictedScope(req, entity)) return null;
+    if (modulePerms(req, entity)?.scope !== 'team') return [req.user.id];
+    if (!req._teamIds) {
+        const users = await db.all('SELECT id, reports_to FROM users WHERE tenant_id = ?', req.tenantId);
+        const ids = new Set([req.user.id]);
+        for (let grew = true; grew;) {
+            grew = false;
+            for (const u of users) if (u.reports_to && ids.has(u.reports_to) && !ids.has(u.id)) { ids.add(u.id); grew = true; }
+        }
+        req._teamIds = [...ids];
+    }
+    return req._teamIds;
+}
+
+/** SQL fragment limiting rows to those users; prefix is a table alias ("r.") or "". */
+export function scopeClause(ids, prefix = '') {
+    const marks = ids.map(() => '?').join(', ');
+    return { sql: `(${prefix}owner_id IN (${marks}) OR ${prefix}created_by IN (${marks}))`, args: [...ids, ...ids] };
+}
+
+/** May this user see / change this stored row ({ owner_id, created_by }) under their scope? */
+export async function inScope(req, entity, row) {
+    const ids = await scopeUserIds(req, entity);
+    if (!ids) return true;
+    return !!row && (ids.includes(row.owner_id) || ids.includes(row.created_by));
+}
 
 // ── Field-level rules ───────────────────────────────────────────────────────
 const fieldMap = (req, entity) => (isAdminUser(req) ? null : modulePerms(req, entity)?.fields || null);
@@ -87,8 +121,8 @@ const rec = (action) => async (req, g) => {
     const [entity, id] = g;
     if (!can(req, entity, action)) return DENY(`Insufficient permissions to ${action} ${entity}`);
     if (isRestrictedScope(req, entity)) {
-        const row = await db.get('SELECT owner_id FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
-        if (!row || row.owner_id !== req.user.id) return DENY(`You can only ${action === 'read' ? 'view' : 'change'} ${entity} records you own`);
+        const row = await db.get('SELECT owner_id, created_by FROM records WHERE id = ? AND tenant_id = ?', id, req.tenantId);
+        if (!(await inScope(req, entity, row))) return DENY(`You can only ${action === 'read' ? 'view' : 'change'} ${entity} records you own`);
     }
     return null;
 };
