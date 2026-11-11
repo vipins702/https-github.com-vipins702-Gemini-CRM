@@ -142,6 +142,7 @@ const POLICY = [
     ['DELETE', /^\/notes\/([^/]+)$/,                          viaRow('record_notes', 'edit')],
     ['GET',    /^\/records\/([^/]+)\/([^/]+)\/related-activity$/, rec('read')],
     ['GET',    /^\/audit\/([^/]+)\/([^/]+)$/,                 rec('read')],
+    ['GET',    /^\/journeys\/records\/([^/]+)\/([^/]+)\/runs$/, rec('read')],
     ['GET',    /^\/attachments\/([^/]+)\/([^/]+)$/,           rec('read')],
     ['POST',   /^\/attachments\/([^/]+)\/([^/]+)$/,           rec('edit')],
     ['DELETE', /^\/attachments\/([^/]+)$/,                    viaRow('attachments', 'edit')],

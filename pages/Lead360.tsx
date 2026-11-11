@@ -15,6 +15,8 @@ import {
 } from '../components/Record360';
 import { api } from '../services/api';
 import { LayoutDetails } from '../components/LayoutDetails';
+import { RelatedLists } from '../components/RelatedLists';
+import { JourneyHistory } from '../components/JourneyHistory';
 import { formatCurrency } from '../services/currency';
 import { can } from '../services/permissions';
 import { RelatedActivity, Activity, ViewState, ProcessStage, User } from '../types';
@@ -240,6 +242,8 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
         {/* Right: everything that happened, in one place */}
         <div className="col-span-12 lg:col-span-8 space-y-6">
           <LayoutDetails entityType="lead" record={lead} skip={['firstName', 'lastName', 'status', 'email', 'phone', 'mobile', 'company', 'title', 'source', 'industry', 'website']} />
+          <RelatedLists entityType="lead" recordId={lead.id} onNavigate={onNavigate} skip={['task', 'quote']} />
+          <JourneyHistory entityType="lead" recordId={lead.id} />
           <ActivityTimeline
             timeline={timeline}
             activity={activity}

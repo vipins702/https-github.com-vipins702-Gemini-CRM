@@ -1,6 +1,6 @@
 
 import { getViewAs, setViewAs, isRealAdmin, currentUser } from './permissions';
-import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult, ReportDefinition, RunReportOptions, ReportResult, PackDefinition, PackResult, WaConversation, WaMessage, EmailConversation, EmailMessage, TaskItem, Quote, RelatedActivity, ProcessDefinition, Attachment, CategoryNode, BulkCampaign, IntegrationConfig, Tenant, FieldRule } from '../types';
+import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult, ReportDefinition, RunReportOptions, ReportResult, PackDefinition, PackResult, WaConversation, WaMessage, EmailConversation, EmailMessage, TaskItem, Quote, RelatedActivity, ProcessDefinition, Attachment, CategoryNode, BulkCampaign, IntegrationConfig, Tenant, FieldRule, JourneySummary, JourneyFull, JourneyRun, JourneyTestResult } from '../types';
 
 const API_BASE = '/api';
 
@@ -340,6 +340,27 @@ export const api = {
   },
 
   // --- WORKFLOWS ---
+  // Journeys
+  async getJourneys(): Promise<JourneySummary[]> { return fetchWithAuth(`${API_BASE}/journeys`); },
+  async getJourney(id: string): Promise<JourneyFull> { return fetchWithAuth(`${API_BASE}/journeys/${encodeURIComponent(id)}`); },
+  async saveJourney(j: { id?: string; name: string; nodes: any[]; edges: any[]; isActive?: boolean }): Promise<JourneyFull> {
+    return fetchWithAuth(`${API_BASE}/journeys`, { method: 'POST', body: JSON.stringify(j) });
+  },
+  async setJourneyActive(id: string, active: boolean) {
+    return fetchWithAuth(`${API_BASE}/journeys/${encodeURIComponent(id)}/active`, { method: 'POST', body: JSON.stringify({ active }) });
+  },
+  async deleteJourney(id: string) { return fetchWithAuth(`${API_BASE}/journeys/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
+  async testJourney(id: string, recordId: string): Promise<JourneyTestResult> {
+    return fetchWithAuth(`${API_BASE}/journeys/${encodeURIComponent(id)}/test`, { method: 'POST', body: JSON.stringify({ recordId }) });
+  },
+  async getJourneyRuns(id: string, status?: string): Promise<JourneyRun[]> {
+    return fetchWithAuth(`${API_BASE}/journeys/${encodeURIComponent(id)}/runs${status ? '?status=' + status : ''}`);
+  },
+  async cancelJourneyRun(runId: string) { return fetchWithAuth(`${API_BASE}/journeys/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST' }); },
+  async getRecordJourneyRuns(entityType: string, recordId: string): Promise<JourneyRun[]> {
+    return fetchWithAuth(`${API_BASE}/journeys/records/${encodeURIComponent(entityType)}/${encodeURIComponent(recordId)}/runs`);
+  },
+
   async getWorkflow() {
     return fetchWithAuth(`${API_BASE}/workflows`);
   },

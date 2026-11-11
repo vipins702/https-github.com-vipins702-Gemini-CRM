@@ -28,7 +28,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
 
    // Modal State for New Field
    const [isNewFieldModalOpen, setIsNewFieldModalOpen] = useState(false);
-   const [newFieldConfig, setNewFieldConfig] = useState({ name: '', label: '', type: 'text' as FieldType, formula: '' });
+   const [newFieldConfig, setNewFieldConfig] = useState({ name: '', label: '', type: 'text' as FieldType, formula: '', options: '', unique: false, prefix: '', padding: 4, ratingMax: 5, rollEntity: '', rollField: '', rollFn: 'count', rollTarget: '' });
 
    // Load Initial Data
    useEffect(() => {
@@ -148,6 +148,11 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
          type: newFieldConfig.type,
          required: false,
          ...(newFieldConfig.type === 'formula' ? { formula: newFieldConfig.formula.trim() } : {}),
+         ...(['select', 'multiselect'].includes(newFieldConfig.type) ? { options: newFieldConfig.options.split('\n').map(o => o.trim()).filter(Boolean) } : {}),
+         ...(newFieldConfig.type === 'rating' ? { max: newFieldConfig.ratingMax } : {}),
+         ...(newFieldConfig.type === 'autonumber' ? { prefix: newFieldConfig.prefix.trim(), padding: newFieldConfig.padding } : {}),
+         ...(newFieldConfig.type === 'rollup' ? { rollup: { entity: newFieldConfig.rollEntity, field: newFieldConfig.rollField, fn: newFieldConfig.rollFn as any, ...(newFieldConfig.rollFn !== 'count' ? { target: newFieldConfig.rollTarget } : {}) } } : {}),
+         ...(newFieldConfig.unique && !['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe'].includes(newFieldConfig.type) ? { unique: true } : {}),
       };
 
       setSchemas(prev => ({
@@ -159,7 +164,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
       }));
 
       setIsNewFieldModalOpen(false);
-      setNewFieldConfig({ name: '', label: '', type: 'text', formula: '' });
+      setNewFieldConfig({ name: '', label: '', type: 'text', formula: '', options: '', unique: false, prefix: '', padding: 4, ratingMax: 5, rollEntity: '', rollField: '', rollFn: 'count', rollTarget: '' });
    };
 
    // --- Property Setters ---
@@ -382,6 +387,23 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                   </div>
                   <p className="text-[11px] text-gray-400 mt-1">Use "Edit form" for helper or input fields you do not want on the detail page.</p>
                </div>
+
+               {fieldDef && !['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe', 'attachment'].includes(fieldDef.type) && (
+                  <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                     <input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={!!fieldDef.unique}
+                        onChange={(e) => setSchemas(prev => ({ ...prev, [activeEntity]: { ...prev[activeEntity], fields: prev[activeEntity].fields.map(f => f.name === fieldDef.name ? { ...f, unique: e.target.checked } : f) } }))} />
+                     Unique: no two records may have the same value
+                  </label>
+               )}
+
+               {fieldDef && ['select', 'multiselect'].includes(fieldDef.type) && (
+                  <div>
+                     <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Choices (one per line)</label>
+                     <textarea rows={5} className="w-full text-xs border border-gray-300 rounded p-2"
+                        value={(fieldDef.options || []).join('\n')}
+                        onChange={(e) => setSchemas(prev => ({ ...prev, [activeEntity]: { ...prev[activeEntity], fields: prev[activeEntity].fields.map(f => f.name === fieldDef.name ? { ...f, options: e.target.value.split('\n').map(o => o.trim()).filter(Boolean) } : f) } }))} />
+                  </div>
+               )}
 
                {fieldDef?.type === 'formula' && (
                   <div>
@@ -802,9 +824,99 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                            <option value="iframe">iFrame</option>
                            <option value="image">Image</option>
                            <option value="url">Web address</option>
+                           <option value="multiselect">Multi-select (several choices)</option>
+                           <option value="checkbox">Checkbox (yes / no)</option>
+                           <option value="datetime">Date and time</option>
+                           <option value="percent">Percent</option>
+                           <option value="rating">Rating (stars)</option>
+                           <option value="user">User (pick a person)</option>
+                           <option value="autonumber">Auto-number (UNIT-0001)</option>
+                           <option value="rollup">Roll-up (count / total of linked records)</option>
                            <option value="formula">Formula (worked out from other fields)</option>
                         </select>
                      </div>
+
+                     {['select', 'multiselect'].includes(newFieldConfig.type) && (
+                        <div>
+                           <label className="block text-sm font-medium text-gray-700 mb-1">Choices (one per line)</label>
+                           <textarea rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder={'Available\nHold\nBooked\nSold'} value={newFieldConfig.options} onChange={(e) => setNewFieldConfig(prev => ({ ...prev, options: e.target.value }))} />
+                        </div>
+                     )}
+                     {newFieldConfig.type === 'rating' && (
+                        <div>
+                           <label className="block text-sm font-medium text-gray-700 mb-1">Stars</label>
+                           <input type="number" min={1} max={10} className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newFieldConfig.ratingMax} onChange={(e) => setNewFieldConfig(prev => ({ ...prev, ratingMax: Math.min(10, Math.max(1, Number(e.target.value) || 5)) }))} />
+                        </div>
+                     )}
+                     {newFieldConfig.type === 'autonumber' && (
+                        <div className="grid grid-cols-2 gap-3">
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Prefix</label>
+                              <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" placeholder="UNIT-" value={newFieldConfig.prefix} onChange={(e) => setNewFieldConfig(prev => ({ ...prev, prefix: e.target.value }))} />
+                           </div>
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Digits</label>
+                              <input type="number" min={1} max={12} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newFieldConfig.padding} onChange={(e) => setNewFieldConfig(prev => ({ ...prev, padding: Math.min(12, Math.max(1, Number(e.target.value) || 4)) }))} />
+                           </div>
+                           <p className="col-span-2 text-xs text-gray-500">Next number looks like <span className="font-mono">{(newFieldConfig.prefix || '') + '1'.padStart(newFieldConfig.padding, '0')}</span>. Given once when a record is created and never reused.</p>
+                        </div>
+                     )}
+                     {newFieldConfig.type === 'rollup' && (() => {
+                        const kids = (Object.values(schemas) as any[]).filter(e => e.fields?.some((f: any) => f.type === 'lookup' && f.lookupTarget === activeEntity));
+                        const child = kids.find(e => e.id === newFieldConfig.rollEntity);
+                        const links = child?.fields.filter((f: any) => f.type === 'lookup' && f.lookupTarget === activeEntity) || [];
+                        const nums = child?.fields.filter((f: any) => ['number', 'currency', 'percent', 'rating', 'formula'].includes(f.type)) || [];
+                        return (
+                           <div className="space-y-3">
+                              {kids.length === 0 ? (
+                                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">No record type links to {schemas[activeEntity]?.label} yet. Add a Lookup field to the child type (for example Unit → Project) first.</p>
+                              ) : (
+                                 <>
+                                    <div className="grid grid-cols-2 gap-3">
+                                       <div>
+                                          <label className="block text-xs font-medium text-gray-600 mb-1">Records of</label>
+                                          <select className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm" value={newFieldConfig.rollEntity} onChange={(e) => setNewFieldConfig(prev => ({ ...prev, rollEntity: e.target.value, rollField: '', rollTarget: '' }))}>
+                                             <option value="">— choose —</option>
+                                             {kids.map(k => <option key={k.id} value={k.id}>{k.pluralLabel || k.label}</option>)}
+                                          </select>
+                                       </div>
+                                       <div>
+                                          <label className="block text-xs font-medium text-gray-600 mb-1">Linked through</label>
+                                          <select className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm" value={newFieldConfig.rollField} onChange={(e) => setNewFieldConfig(prev => ({ ...prev, rollField: e.target.value }))}>
+                                             <option value="">— choose —</option>
+                                             {links.map((f: any) => <option key={f.name} value={f.name}>{f.label}</option>)}
+                                          </select>
+                                       </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                       <div>
+                                          <label className="block text-xs font-medium text-gray-600 mb-1">Calculate</label>
+                                          <select className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm" value={newFieldConfig.rollFn} onChange={(e) => setNewFieldConfig(prev => ({ ...prev, rollFn: e.target.value }))}>
+                                             <option value="count">Count</option><option value="sum">Total</option><option value="avg">Average</option><option value="min">Lowest</option><option value="max">Highest</option>
+                                          </select>
+                                       </div>
+                                       {newFieldConfig.rollFn !== 'count' && (
+                                          <div>
+                                             <label className="block text-xs font-medium text-gray-600 mb-1">Of field</label>
+                                             <select className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm" value={newFieldConfig.rollTarget} onChange={(e) => setNewFieldConfig(prev => ({ ...prev, rollTarget: e.target.value }))}>
+                                                <option value="">— choose —</option>
+                                                {nums.map((f: any) => <option key={f.name} value={f.name}>{f.label}</option>)}
+                                             </select>
+                                          </div>
+                                       )}
+                                    </div>
+                                 </>
+                              )}
+                              <p className="text-xs text-gray-500">Worked out every time the list is opened; never typed in. It counts all linked records in the workspace, whoever may open them.</p>
+                           </div>
+                        );
+                     })()}
+                     {!['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe'].includes(newFieldConfig.type) && (
+                        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                           <input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={newFieldConfig.unique} onChange={(e) => setNewFieldConfig(prev => ({ ...prev, unique: e.target.checked }))} />
+                           Unique: no two records may have the same value
+                        </label>
+                     )}
 
                      {newFieldConfig.type === 'formula' && (
                         <div>
@@ -824,7 +936,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
 
                   <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
                      <Button variant="secondary" onClick={() => setIsNewFieldModalOpen(false)}>Cancel</Button>
-                     <Button onClick={handleCreateNewField} disabled={!newFieldConfig.name || !newFieldConfig.label}>
+                     <Button onClick={handleCreateNewField} disabled={!newFieldConfig.name || !newFieldConfig.label || (newFieldConfig.type === 'rollup' && (!newFieldConfig.rollEntity || !newFieldConfig.rollField || (newFieldConfig.rollFn !== 'count' && !newFieldConfig.rollTarget))) || (newFieldConfig.type === 'multiselect' && !newFieldConfig.options.trim())}>
                         Create Field
                      </Button>
                   </div>

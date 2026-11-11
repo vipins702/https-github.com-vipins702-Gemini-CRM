@@ -23,6 +23,9 @@ import { logAudit } from './services/audit.js';
 import { sendEmail, getConversations as getEmailConversations, getThread as getEmailThread, isConfigured as emailConfigured } from './services/email.js';
 import { evaluateWorkflows } from './services/workflow.js';
 import { applyFieldLogic, checkRule, toRow, fromRow, RULE_OPERATORS } from './services/fieldRules.js';
+import { registerJourneyRoutes, saveJourney } from './services/journeysApi.js';
+import { startJourneyScheduler } from './services/journeys.js';
+import { applyAutoNumbers, keepAutoNumbers, stripComputed, uniqueProblems, userFieldProblems, computeRollups, definitionProblems } from './services/fieldTypes.js';
 import { runLeadRule, runAllActiveRules, evaluateRealtimeLeadRules, startLeadRuleScheduler } from './services/leadgen.js';
 import { generateCustomerInsight, isAIEnabled, generateLeadFollowupTasks } from './services/ai.js';
 import { ingestLead, mapPayload } from './services/ingest.js';
@@ -599,6 +602,12 @@ app.get('/api/metadata/schemas', authenticateToken, async (req, res) => {
 
 app.post('/api/metadata/schemas', authenticateToken, requireAdmin, validate(rules.schemas), async (req, res) => {
     const { entityType, config } = req.body;
+    {
+        const rowsAll = await db.all('SELECT entity_type, config FROM entity_definitions WHERE tenant_id = ?', req.tenantId);
+        const all = {}; for (const r of rowsAll) { try { all[r.entity_type] = JSON.parse(r.config); } catch { /* skip */ } }
+        const problems = definitionProblems({ ...config, id: config?.id || entityType }, all);
+        if (problems.length) return res.status(400).json({ error: 'Validation Failed', details: problems.slice(0, 10) });
+    }
     try {
         const id = uuidv4();
         await db.run(`
@@ -1016,6 +1025,14 @@ app.get('/api/data/:entityType', authenticateToken, async (req, res) => {
             const data = JSON.parse(row.data);
             return { ...filterFields(req, entityType, data), id: row.id, created_at: row.created_at, status: row.status };
         });
+        const defRow = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
+        if (defRow) {
+            let def = null; try { def = JSON.parse(defRow.config); } catch { def = null; }
+            if (def?.fields?.some(f => f.type === 'rollup')) {
+                await computeRollups(db, req.tenantId, def, records);
+                for (const f of def.fields) if (f.type === 'rollup') for (const r of records) if (hiddenFields(req, entityType).includes(f.name)) delete r[f.name];
+            }
+        }
         res.json(records);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch records' });
@@ -1067,16 +1084,44 @@ const mapFieldTypeToZod = (field, extraOptions = []) => {
             schema = z.union([z.string().refine(v => v === '' || !Number.isNaN(Date.parse(v)), { message: 'must be a valid date' }), z.date()]);
             break;
         case 'boolean':
-            schema = z.boolean();
+        case 'checkbox':
+            schema = z.union([z.boolean(), z.enum(['true', 'false'])]);
+            break;
+        case 'multiselect': {
+            const listed = (Array.isArray(field.options) ? field.options : []).map(o => (typeof o === 'string' ? o : (o?.value ?? o?.label))).filter(v => typeof v === 'string');
+            let item = z.string().max(MAX_TEXT);
+            if (listed.length) item = item.refine(v => listed.includes(v) || extraOptions.includes(v), { message: `must be among: ${listed.join(', ')}` });
+            schema = z.array(item).max(100);
+            if (field.required) schema = schema.min(1, 'is required');
+            break;
+        }
+        case 'datetime':
+            schema = z.string().refine(v => v === '' || !Number.isNaN(Date.parse(v)), { message: 'must be a valid date and time' });
+            break;
+        case 'percent':
+            schema = z.union([z.number(), z.string().transform(val => Number(val))]).refine(v => Number.isFinite(v) && v >= -100000 && v <= 100000, { message: 'must be a number' });
+            break;
+        case 'rating': {
+            const max = Number.isInteger(field.max) ? field.max : 5;
+            schema = z.union([z.number(), z.string().transform(val => Number(val))]).refine(v => Number.isInteger(v) && v >= 0 && v <= max, { message: `must be a whole number from 0 to ${max}` });
+            break;
+        }
+        case 'user':
+            schema = z.string().max(100);
+            break;
+        case 'autonumber':
+        case 'rollup':
+        case 'formula':
+            schema = z.any();
             break;
         default:
             schema = z.any();
     }
 
-    if (field.required && ['text', 'textarea', 'email', 'phone', 'url', 'select', 'status', 'lookup'].includes(field.type)) {
+    if (field.required && ['text', 'textarea', 'email', 'phone', 'url', 'select', 'status', 'lookup', 'user'].includes(field.type)) {
         schema = schema.refine(v => typeof v === 'string' && v.trim() !== '', { message: 'is required' });
     }
-    if (!field.required) {
+    if (!field.required || ['autonumber', 'rollup', 'formula'].includes(field.type)) {
         schema = schema.optional().nullable().or(z.literal(''));
     }
     return schema;
@@ -1144,6 +1189,13 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             }
         }
 
+        // A user field must name a person of this workspace; a unique field may not repeat another record's value.
+        const fieldProblems = [
+            ...(await userFieldProblems(db, req.tenantId, definition, recordData)),
+            ...(await uniqueProblems(db, req.tenantId, entityType, definition, recordData, recordData.id)),
+        ];
+        if (fieldProblems.length) return res.status(400).json({ error: 'Validation Failed', details: fieldProblems });
+
         // Use validated data (sanitized)
         const validData = validationResult.data;
         const id = recordData.id || uuidv4();
@@ -1169,6 +1221,7 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             let oldData = {}; try { oldData = JSON.parse(oldRecord.data); } catch { oldData = {}; }
             protectFields(req, entityType, jsonData, oldData);
             for (const k of Object.keys(oldData)) if (k.startsWith('_')) jsonData[k] = oldData[k]; // keep what the server stored
+            keepAutoNumbers(definition, jsonData, oldData);   // numbers are given once; roll-ups are never stored
             // Field triggers, then formula fields (server/services/fieldRules.js)
             await applyFieldLogic(db, req.tenantId, entityType, definition, jsonData, oldData);
 
@@ -1196,7 +1249,8 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
                 tenantId: req.tenantId,
                 entityType,
                 triggerType: 'update',
-                record: recordData,
+                record: { ...jsonData, id },
+                oldRecord: { ...oldData, id, status: oldData.status ?? oldRecord.status },
                 actorId
             });
 
@@ -1204,6 +1258,8 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             // Create
             // Auto-score leads before insert
             let finalData = protectFields(req, entityType, { ...jsonData });
+            stripComputed(definition, finalData);
+            await applyAutoNumbers(db, req.tenantId, entityType, definition, finalData);
             await applyFieldLogic(db, req.tenantId, entityType, definition, finalData, null);
             if (entityType === 'lead') {
                 try {
@@ -1359,6 +1415,10 @@ app.post('/api/data/:entityType/:id/status', authenticateToken, async (req, res)
             status, JSON.stringify(data), id, req.tenantId
         );
         await logAudit({ tenantId: req.tenantId, entityType, recordId: id, action: 'status', actorId: req.user.id, details: { from: prevStatus, to: status, note: String(note || '').trim() || undefined, _via: 'pipeline' } });
+
+        if (prevStatus !== status) {
+            await evaluateWorkflows({ tenantId: req.tenantId, entityType, triggerType: 'update', record: { ...data, id }, oldRecord: { ...data, id, status: prevStatus }, actorId: req.user.id });
+        }
 
         // Fire the stage's entry actions (create task / email / webhook) — best-effort.
         if (targetStage && prevStatus !== status) {
@@ -3109,82 +3169,13 @@ app.post('/api/lead-rules/run-all', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/workflows', authenticateToken, async (req, res) => {
-    try {
-        const row = await db.get('SELECT flow_data FROM workflows WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 1', req.tenantId);
-        if (row && row.flow_data) {
-            res.json(JSON.parse(row.flow_data));
-        } else {
-            res.json({ nodes: [], edges: [] });
-        }
-    } catch (error) {
-        console.error('Fetch workflows error:', error);
-        res.status(500).json({ error: 'Failed to fetch workflows' });
-    }
-});
-
+// Journeys (services/journeys.js, journeysApi.js). /api/workflows stays as the older single-journey doorway.
+registerJourneyRoutes(app, { authenticateToken, requireAdmin });
 app.post('/api/workflows', authenticateToken, requireAdmin, validate(rules.workflows), async (req, res) => {
     try {
-        const { nodes, edges } = req.body;
-        
-        const triggerNode = nodes.find(n => n.type === 'trigger' || n.data?.type === 'trigger');
-        let entityType = 'lead';
-        let triggerType = 'create';
-        let name = 'Automated Journey';
-        let conditions = {};
-
-        if (triggerNode) {
-            const cfg = triggerNode.data?.config || {};
-            const label = triggerNode.data?.label || '';
-            // Prefer explicit config; fall back to label heuristic
-            if (cfg.entityType) entityType = cfg.entityType;
-            else if (label.toLowerCase().includes('customer')) entityType = 'customer';
-            else if (label.toLowerCase().includes('case')) entityType = 'case';
-
-            if (cfg.triggerType) triggerType = cfg.triggerType;
-            else if (label.toLowerCase().includes('update')) triggerType = 'update';
-            else if (label.toLowerCase().includes('delete')) triggerType = 'delete';
-
-            if (cfg.conditions) conditions = cfg.conditions;
-            name = cfg.name || label || name;
-        }
-
-        const actions = [];
-        const actionNodes = nodes.filter(n => n.type === 'action' || n.data?.type === 'action');
-        actionNodes.forEach(node => {
-            const cfg = node.data?.config;
-            // Structured action config wins
-            if (cfg && cfg.type) {
-                actions.push(cfg);
-                return;
-            }
-            // Fallback: infer from the node label
-            const label = (node.data?.label || '').toLowerCase();
-            if (label.includes('email')) {
-                actions.push({ type: 'email', to: '{email}', subject: 'Automated Notification', body: `Hi, this is an automated email regarding: ${node.data?.label || ''}` });
-            } else if (label.includes('task')) {
-                actions.push({ type: 'create_task', subject: 'Follow up' });
-            } else if (label.includes('lead')) {
-                actions.push({ type: 'create_lead', fields: {} });
-            } else {
-                actions.push({ type: 'update_record', fields: {} });
-            }
-        });
-
-        const flowData = JSON.stringify({ nodes, edges });
-
-        await db.run(`
-            INSERT INTO workflows (id, tenant_id, name, entity_type, trigger_type, conditions, actions, is_active, flow_data)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                name = excluded.name,
-                entity_type = excluded.entity_type,
-                trigger_type = excluded.trigger_type,
-                conditions = excluded.conditions,
-                actions = excluded.actions,
-                flow_data = excluded.flow_data
-        `, 'default_workflow', req.tenantId, name, entityType, triggerType, JSON.stringify(conditions), JSON.stringify(actions), flowData);
-        
+        const first = await db.get('SELECT id FROM journeys WHERE tenant_id = ? ORDER BY created_at LIMIT 1', req.tenantId);
+        const out = await saveJourney(req.tenantId, req.user.id, { nodes: req.body.nodes, edges: req.body.edges }, first?.id || null);
+        if (out.errors) return res.status(out.status || 400).json({ error: 'Validation Failed', details: out.errors });
         res.json({ success: true });
     } catch (error) {
         console.error('Save workflow error:', error);
@@ -3591,10 +3582,14 @@ app.post('/api/data/:entityType/import', authenticateToken, csvUpload.single('fi
 
                 mapped._imported_via = 'csv';
                 mapped._imported_at = new Date().toISOString();
+                stripComputed(def, mapped);
+                const dupes = await uniqueProblems(db, req.tenantId, entityType, def, mapped, null);
+                if (dupes.length) throw new Error(dupes.join('; '));
+                await applyAutoNumbers(db, req.tenantId, entityType, def, mapped);
 
                 await db.run(
-                    'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)',
-                    recordId, req.tenantId, entityType, primaryDisplay, status, JSON.stringify(mapped)
+                    'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data, owner_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    recordId, req.tenantId, entityType, primaryDisplay, status, JSON.stringify(mapped), req.user.id, req.user.id
                 );
 
                 await logAudit({ tenantId: req.tenantId, entityType, recordId, action: 'create', actorId: req.user.id, details: { ...mapped, _via: 'csv_import' } });
@@ -3816,6 +3811,7 @@ const server = app.listen(PORT, () => {
     console.log(`FlowCRM Backend running on http://localhost:${PORT}`);
     startLeadRuleScheduler();
     startSequenceScheduler();
+    startJourneyScheduler();
 });
 
 server.on('error', (err) => {

@@ -3,6 +3,7 @@ import { Card } from './ui/Card';
 import { api } from '../services/api';
 import { fieldAccess } from '../services/permissions';
 import { formatCurrency } from '../services/currency';
+import { formatFieldValue } from '../services/fieldFormat';
 import { EntityDefinition, FieldDefinition, LayoutDefinition, LayoutFieldConfig, VisibilityRule } from '../types';
 
 /**
@@ -29,9 +30,14 @@ export const isVisible = (rule: VisibilityRule | undefined, record: Record<strin
 export const showsOn = (cfg: LayoutFieldConfig | undefined, where: 'form' | 'detail', record: Record<string, any>) =>
   !cfg?.hidden && (cfg?.showOn || 'both') !== (where === 'form' ? 'detail' : 'form') && isVisible(cfg?.visibilityRule, record);
 
-const Value: React.FC<{ field: FieldDefinition; value: any; record: Record<string, any> }> = ({ field, value, record }) => {
-  if (value === undefined || value === null || value === '') return <span className="text-gray-400">—</span>;
+const Value: React.FC<{ field: FieldDefinition; value: any; record: Record<string, any>; users?: Record<string, string> }> = ({ field, value, record, users }) => {
+  if (field.type === 'checkbox') return <>{value === true || value === 'true' ? 'Yes' : 'No'}</>;
+  if (value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length)) return <span className="text-gray-400">—</span>;
   switch (field.type) {
+    case 'multiselect':
+      return <span className="flex flex-wrap gap-1">{(Array.isArray(value) ? value : [value]).map((v: string) => <span key={v} className="px-2 py-0.5 rounded-full bg-gray-100 text-xs text-gray-700">{v}</span>)}</span>;
+    case 'rating': return <span className="text-amber-500 tracking-wide" aria-label={`${value} out of ${field.max || 5}`}>{formatFieldValue(field, value)}</span>;
+    case 'datetime': case 'percent': case 'user': case 'rollup': case 'autonumber': return <span className="tabular">{formatFieldValue(field, value, { users })}</span>;
     case 'currency': return <span className="tabular">{formatCurrency(value, record.currency)}</span>;
     case 'number': case 'formula': return <span className="tabular">{typeof value === 'number' ? value.toLocaleString() : String(value)}</span>;
     case 'email': return <a className="text-accent hover:underline" href={`mailto:${value}`}>{String(value)}</a>;
@@ -61,11 +67,16 @@ interface Props {
 export const LayoutDetails: React.FC<Props> = ({ entityType, record, skip = [] }) => {
   const [schema, setSchema] = useState<EntityDefinition | null>(null);
   const [layout, setLayout] = useState<LayoutDefinition | null>(null);
+  const [users, setUsers] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let live = true;
     Promise.all([api.getSchemas(), api.getLayout(entityType).catch(() => null)])
-      .then(([schemas, lay]) => { if (live) { setSchema(schemas?.[entityType] || null); setLayout(lay); } })
+      .then(([schemas, lay]) => {
+        if (!live) return;
+        setSchema(schemas?.[entityType] || null); setLayout(lay);
+        if (schemas?.[entityType]?.fields?.some((f: FieldDefinition) => f.type === 'user')) api.getUsers().then(u => live && setUsers(Object.fromEntries((u || []).map((x: any) => [x.id, x.name || x.email])))).catch(() => {});
+      })
       .catch(() => {});
     return () => { live = false; };
   }, [entityType]);
@@ -95,7 +106,7 @@ export const LayoutDetails: React.FC<Props> = ({ entityType, record, skip = [] }
             {rows.map(f => (
               <div key={f.name} className={`min-w-0 ${f.type === 'textarea' ? 'sm:col-span-2' : ''}`}>
                 <dt className="text-xs font-medium text-gray-500">{layout?.fieldConfigs?.[f.name]?.labelOverride || f.label}</dt>
-                <dd className="mt-0.5 text-sm text-gray-900 break-words"><Value field={f} value={record[f.name]} record={record} /></dd>
+                <dd className="mt-0.5 text-sm text-gray-900 break-words"><Value field={f} value={record[f.name]} record={record} users={users} /></dd>
               </div>
             ))}
           </dl>

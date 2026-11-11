@@ -8,7 +8,7 @@ import { ForcedPasswordChange } from './components/ChangePassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { ModuleView } from './pages/ModuleView';
-import { WorkflowBuilder } from './pages/WorkflowBuilder';
+import { Journeys } from './pages/Journeys';
 import { LayoutBuilder } from './pages/LayoutBuilder';
 import { WebPresenter } from './pages/WebPresenter';
 import { UserManagement } from './pages/UserManagement';
@@ -216,7 +216,7 @@ const App: React.FC = () => {
       case 'dashboard':
         return <Dashboard />;
       case 'autoflow':
-        return <WorkflowBuilder />;
+        return <Journeys />;
       case 'layout':
         return <LayoutBuilder initialEntity={viewParams?.entity} />;
       case 'web-presenter':

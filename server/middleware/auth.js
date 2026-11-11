@@ -15,6 +15,7 @@ export const authenticateToken = async (req, res, next) => {
         const user = jwt.verify(token, JWT_SECRET);
         req.user = user;
         req.tenantId = user.tenantId;
+        req.userId = user.id;         // notifications, note authors and saved reports read this
 
         // A token must stop working the moment the person is deactivated or loses
         // their role, not 24 hours later. Superadmins are checked the same way.

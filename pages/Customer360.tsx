@@ -14,6 +14,8 @@ import {
 } from '../components/Record360';
 import { api } from '../services/api';
 import { LayoutDetails } from '../components/LayoutDetails';
+import { RelatedLists } from '../components/RelatedLists';
+import { JourneyHistory } from '../components/JourneyHistory';
 import { formatCurrency } from '../services/currency';
 import { can } from '../services/permissions';
 import { RelatedActivity, Activity, ViewState, ProcessStage } from '../types';
@@ -285,6 +287,8 @@ export const Customer360: React.FC<Props> = ({ customerId, onBack, onNavigate })
         {/* Right */}
         <div className="col-span-12 lg:col-span-8 space-y-6">
           <LayoutDetails entityType="customer" record={customer} skip={['firstName', 'lastName', 'name', 'status', 'email', 'phone', 'mobile', 'company', 'industry', 'website', 'address', 'segment', 'tier']} />
+          <RelatedLists entityType="customer" recordId={customer.id} onNavigate={onNavigate} skip={['task', 'quote', 'case']} />
+          <JourneyHistory entityType="customer" recordId={customer.id} />
           <ActivityTimeline
             timeline={timeline}
             activity={activity}

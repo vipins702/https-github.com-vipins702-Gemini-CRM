@@ -188,6 +188,117 @@ check('only shared fields returned (no email)', w.j?.data?.every(d => !('email' 
 check('pageSize capped at 100', (await pub('/web-content/' + slug + '/data?co=x&pageSize=5000')).j?.pageSize === 100);
 check('unknown view 404', (await pub('/web-content/nope-' + tag + '/data')).s === 404);
 
+sec('6. Phase 1: AND / OR / NOT gates');
+const R1 = (field, operator, value) => ({ type: 'rule', field, operator, value });
+const G = (op, ...children) => ({ type: 'group', op, children });
+const mkRule = (name, conditions, actions) => call('POST', '/field-rules/lead', A, { name: name + ' ' + tag, conditions, actions });
+const fire = async (extra) => (await one((await call('POST', '/data/lead', A, leadBody(extra))).j?.id)).j || {};
+await mkRule('Gate A', G('and', R1('fl_interested', '==', 'Yes'), G('or', R1('fl_budget', '==', 'Yes'), R1('fl_callback', '==', 'Yes')), G('not', R1('fl_qty', '>', 100))), [{ field: 'fl_priority', value: 'GateHit' }]);
+check('nested gate: A and (B or C) and not D, passes', (await fire({ fl_interested: 'Yes', fl_budget: 'No', fl_callback: 'Yes', fl_qty: 5 })).fl_priority === 'GateHit');
+check('nested gate: fails when neither B nor C', !(await fire({ fl_interested: 'Yes', fl_budget: 'No', fl_callback: 'No', fl_qty: 5 })).fl_priority);
+check('nested gate: NOT blocks when D is true', !(await fire({ fl_interested: 'Yes', fl_budget: 'Yes', fl_qty: 500 })).fl_priority);
+check('nested gate: fails when A is false', !(await fire({ fl_interested: 'No', fl_budget: 'Yes', fl_qty: 5 })).fl_priority);
+const saved6 = ((await call('GET', '/field-rules/lead', A)).j?.rules || []).find(r => r.name === 'Gate A ' + tag);
+check('rule comes back as a gate with the nested groups', saved6?.conditions?.type === 'group' && saved6.conditions.children?.[1]?.op === 'or' && saved6.conditions.children?.[2]?.op === 'not', JSON.stringify(saved6?.conditions));
+const deep = (n) => (n === 0 ? R1('fl_qty', '>', 1) : G('and', deep(n - 1)));
+check('gates nested too deep are refused', (await mkRule('Deep', deep(7), [{ field: 'fl_priority', value: 'x' }])).s === 400);
+check('a group with a bad operator is refused', (await mkRule('Bad', G('and', G('or', R1('fl_qty', 'eval', 1))), [{ field: 'fl_priority', value: 'x' }])).s === 400);
+check('unknown group type is refused', (await mkRule('Bad2', { type: 'group', op: 'xor', children: [R1('fl_qty', '>', 1)] }, [{ field: 'fl_priority', value: 'x' }])).s === 400);
+check('an empty group is refused', (await mkRule('Empty', G('and'), [{ field: 'fl_priority', value: 'x' }])).s === 400);
+// Journey with a gate: set notes when (source is Web OR Referral) AND NOT (qty > 50)
+const wfNodes = [
+    { id: 't', type: 'trigger', data: { type: 'trigger', label: 'Lead created', config: { entityType: 'lead', triggerType: 'create', name: 'Gate journey', conditions: G('and', G('or', R1('source', '==', 'Web'), R1('source', '==', 'Referral')), G('not', R1('fl_qty', '>', 50))) } } },
+    { id: 'a', type: 'action', data: { type: 'action', label: 'Update', config: { type: 'update_record', fields: { notes: 'journey-ran' } } } },
+];
+const wf = await call('POST', '/workflows', A, { nodes: wfNodes, edges: [{ id: 'e', source: 't', target: 'a' }] });
+check('journey with a gate saves', wf.s < 300, JSON.stringify(wf.j));
+check('journey gate passes: Web, qty 5', (await fire({ source: 'Web', fl_qty: 5 })).notes === 'journey-ran');
+check('journey gate passes: Referral via OR', (await fire({ source: 'Referral', fl_qty: 5 })).notes === 'journey-ran');
+check('journey gate blocked by NOT (qty 99)', (await fire({ source: 'Web', fl_qty: 99 })).notes !== 'journey-ran');
+check('journey gate blocked: source Ads', (await fire({ source: 'Ads', fl_qty: 5 })).notes !== 'journey-ran');
+await call('POST', '/workflows', A, { nodes: [{ id: 't', type: 'trigger', data: { type: 'trigger', label: 'x', config: { entityType: 'lead', triggerType: 'delete', conditions: G('and', R1('source', '==', 'never-' + tag)) } } }, { id: 'a', type: 'action', data: { type: 'action', label: 'u', config: { type: 'update_record', fields: {} } } }], edges: [] });
+
+sec('7. Phase 1: new field types, auto-number, unique');
+const p1 = [
+    { name: 'p1_tags', label: 'Tags', type: 'multiselect', options: ['Hot', 'Warm', 'Cold'] },
+    { name: 'p1_vip', label: 'VIP', type: 'checkbox' },
+    { name: 'p1_visit', label: 'Visit at', type: 'datetime' },
+    { name: 'p1_share', label: 'Share', type: 'percent' },
+    { name: 'p1_stars', label: 'Stars', type: 'rating', max: 5 },
+    { name: 'p1_rm', label: 'RM', type: 'user' },
+    { name: 'p1_ref', label: 'Ref', type: 'autonumber', prefix: 'LD-', padding: 4 },
+    { name: 'p1_pan', label: 'PAN', type: 'text', unique: true },
+];
+const lead1 = (await call('GET', '/metadata/schemas', A)).j.lead;
+const sv = await call('POST', '/metadata/schemas', A, { entityType: 'lead', config: { ...lead1, fields: [...lead1.fields.filter(x => !x.name.startsWith('p1_')), ...p1] } });
+check('schema with all new types saves', sv.s < 300, JSON.stringify(sv.j));
+const adminId = ((await call('GET', '/users', A)).j || []).find(u => u.email === 'admin@flowcrm.com')?.id;
+const mk1 = (extra = {}) => call('POST', '/data/lead', A, leadBody({ p1_tags: ['Hot', 'Cold'], p1_vip: true, p1_visit: '2026-12-01T10:30', p1_share: 12.5, p1_stars: 4, p1_rm: adminId, p1_pan: 'ABCDE' + rnd().toUpperCase(), ...extra }));
+let a1 = await mk1();
+check('record with every new type saves', a1.s < 300, JSON.stringify(a1.j));
+let g1 = (await one(a1.j?.id)).j || {};
+check('multiselect kept as a list', Array.isArray(g1.p1_tags) && g1.p1_tags.length === 2 && g1.p1_tags[0] === 'Hot', JSON.stringify(g1.p1_tags));
+check('checkbox kept', g1.p1_vip === true);
+check('percent and rating kept', g1.p1_share === 12.5 && g1.p1_stars === 4);
+check('first auto-number is LD-000N with the prefix', /^LD-\d{4}$/.test(g1.p1_ref || ''), JSON.stringify(g1.p1_ref));
+const a2 = await mk1();
+const g2 = (await one(a2.j?.id)).j || {};
+const n1 = Number((g1.p1_ref || '').slice(3)), n2 = Number((g2.p1_ref || '').slice(3));
+check('auto-numbers count up by one', n2 === n1 + 1, JSON.stringify([g1.p1_ref, g2.p1_ref]));
+await call('POST', '/data/lead', A, { ...g1, id: g1.id, firstName: 'Edited', p1_ref: 'LD-9999' });
+check('an edit never changes the auto-number', ((await one(g1.id)).j || {}).p1_ref === g1.p1_ref);
+const a3 = await mk1({ p1_ref: 'LD-0000' });
+check('a number typed on create is ignored', /^LD-\d{4}$/.test(((await one(a3.j?.id)).j || {}).p1_ref) && ((await one(a3.j?.id)).j || {}).p1_ref !== 'LD-0000');
+check('multiselect refuses a choice that is not listed', (await mk1({ p1_tags: ['Lukewarm'] })).s === 400);
+check('rating above the scale refused', (await mk1({ p1_stars: 9 })).s === 400);
+check('rating that is not whole refused', (await mk1({ p1_stars: 2.5 })).s === 400);
+check('user field refuses a stranger', (await mk1({ p1_rm: 'nobody-' + tag })).s === 400);
+check('datetime refuses text', (await mk1({ p1_visit: 'next tuesday-ish' })).s === 400);
+check('percent refuses text', (await mk1({ p1_share: 'lots' })).s === 400);
+const dupPan = 'DUPE' + rnd().toUpperCase();
+check('unique: first use accepted', (await mk1({ p1_pan: dupPan })).s < 300);
+const dup = await mk1({ p1_pan: dupPan.toLowerCase() });
+check('unique: same value refused (any case)', dup.s === 400 && JSON.stringify(dup.j).includes('already used'), JSON.stringify(dup.j));
+const own = ((await call('GET', '/data/lead', A)).j || []).find(x => x.p1_pan === dupPan);
+check('unique: saving the same record again is fine', (await call('POST', '/data/lead', A, { ...own, id: own.id, firstName: 'Same' })).s < 300);
+const imp = new FormData();
+imp.append('file', new Blob([['firstName,lastName,email,p1_pan', 'Imp,One,imp1.' + tag + '@example.com,IMPPAN' + tag, 'Imp,Two,imp2.' + tag + '@example.com,IMPPAN' + tag].join('\n') + '\n'], { type: 'text/csv' }), 'x.csv');
+const impRes = await fetch(BASE + '/data/lead/import', { method: 'POST', headers: { Authorization: 'Bearer ' + A }, body: imp });
+const impJ = await impRes.json().catch(() => ({}));
+check('import: first row in, duplicate unique row reported', impJ.imported === 1 && (impJ.errors || []).length === 1, JSON.stringify(impJ));
+const imported = ((await call('GET', '/data/lead', A)).j || []).find(x => x.email === 'imp1.' + tag + '@example.com');
+check('imported record got an auto-number', /^LD-\d{4}$/.test(imported?.p1_ref || ''), JSON.stringify(imported?.p1_ref));
+
+sec('8. Phase 1: schema checks and roll-ups');
+const badSave = (fields) => call('POST', '/metadata/schemas', A, { entityType: 'lead', config: { ...lead1, fields: [...lead1.fields, ...fields] } });
+check('multiselect without choices refused', (await badSave([{ name: 'p1_bad', label: 'Bad', type: 'multiselect' }])).s === 400);
+check('rating scale 50 refused', (await badSave([{ name: 'p1_bad', label: 'Bad', type: 'rating', max: 50 }])).s === 400);
+check('autonumber prefix with spaces refused', (await badSave([{ name: 'p1_bad', label: 'Bad', type: 'autonumber', prefix: 'A B' }])).s === 400);
+check('duplicate field names refused', (await badSave([{ name: 'p1_dupe', label: 'A', type: 'text' }, { name: 'p1_dupe', label: 'B', type: 'text' }])).s === 400);
+check('unique on a text area refused', (await badSave([{ name: 'p1_bad', label: 'Bad', type: 'textarea', unique: true }])).s === 400);
+const cust0 = (await call('GET', '/metadata/schemas', A)).j.customer;
+const custWith = (rollup) => call('POST', '/metadata/schemas', A, { entityType: 'customer', config: { ...cust0, fields: [...cust0.fields.filter(x => !x.name.startsWith('p1_')), { name: 'p1_leads', label: 'Leads', type: 'rollup', rollup }] } });
+check('roll-up that links to nothing refused', (await custWith({ entity: 'lead', field: 'email', fn: 'count' })).s === 400);
+check('roll-up sum without a number field refused', (await custWith({ entity: 'lead', field: 'customerId', fn: 'sum' })).s === 400);
+check('roll-up with an unknown type refused', (await custWith({ entity: 'nope', field: 'customerId', fn: 'count' })).s === 400);
+await call('POST', '/metadata/schemas', A, { entityType: 'customer', config: { ...cust0, fields: [...cust0.fields.filter(x => !x.name.startsWith('p1_')),
+    { name: 'p1_leads', label: 'Leads', type: 'rollup', rollup: { entity: 'lead', field: 'customerId', fn: 'count' } },
+    { name: 'p1_new', label: 'New leads', type: 'rollup', rollup: { entity: 'lead', field: 'customerId', fn: 'count', where: [{ field: 'status', value: 'New' }] } },
+    { name: 'p1_score', label: 'Score total', type: 'rollup', rollup: { entity: 'lead', field: 'customerId', fn: 'sum', target: 'score' } },
+    { name: 'p1_best', label: 'Best score', type: 'rollup', rollup: { entity: 'lead', field: 'customerId', fn: 'max', target: 'score' } }] } });
+const cust = (await call('POST', '/data/customer', A, { name: 'Rollup Co ' + tag, email: 'ru.' + rnd() + '@example.com', status: 'Active' })).j?.id;
+const emptyRoll = ((await call('GET', '/data/customer', A)).j || []).find(x => x.id === cust) || {};
+check('roll-up on a record with no children: count 0, sum 0', emptyRoll.p1_leads === 0 && emptyRoll.p1_score === 0, JSON.stringify([emptyRoll.p1_leads, emptyRoll.p1_score]));
+for (const [st, sc] of [['New', 10], ['New', 25], ['Contacted', 5]]) await call('POST', '/data/lead', A, leadBody({ customerId: cust, status: st, score: sc }));
+const rolled = ((await call('GET', '/data/customer', A)).j || []).find(x => x.id === cust) || {};
+check('roll-up counts linked leads', rolled.p1_leads === 3, JSON.stringify(rolled.p1_leads));
+check('roll-up count with a filter', rolled.p1_new === 2, JSON.stringify(rolled.p1_new));
+check('roll-up total', rolled.p1_score >= 40, JSON.stringify(rolled.p1_score));
+check('roll-up highest', rolled.p1_best >= 25, JSON.stringify(rolled.p1_best));
+await call('POST', '/data/customer', A, { ...rolled, id: cust, p1_leads: 999, name: 'Rollup Co edited ' + tag });
+check('a typed roll-up value is ignored and never stored', ((await call('GET', '/data/customer', A)).j || []).find(x => x.id === cust)?.p1_leads === 3);
+await call('POST', '/metadata/schemas', A, { entityType: 'customer', config: cust0 });
+
 // tidy: remove test rules and fields
 for (const rr of (await call('GET', '/field-rules/lead', A)).j?.rules || []) if (rr.name.endsWith(tag)) await call('DELETE', `/field-rules/lead/${rr.id}`, A);
 await call('POST', '/metadata/schemas', A, { entityType: 'lead', config: lead });

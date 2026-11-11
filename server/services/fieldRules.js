@@ -12,6 +12,7 @@
 //    No code is ever executed: numbers go through the small parser below, never eval().
 
 import { v4 as uuidv4 } from 'uuid';
+import { normalizeGate, evaluateGate, checkGate } from './conditions.js';
 
 const OPERATORS = new Set(['==', '!=', '>', '<', '>=', '<=', 'contains', 'empty', 'not_empty', 'changed']);
 export const RULE_OPERATORS = [...OPERATORS];
@@ -71,12 +72,10 @@ export async function applyFieldLogic(db, tenantId, entityType, definition, data
     const rules = await db.all('SELECT * FROM field_rules WHERE tenant_id = ? AND entity_type = ? AND active = 1 ORDER BY sort_order, created_at', tenantId, entityType).catch(() => []);
     const fired = [];
     for (const r of rules) {
-        let conditions = [], actions = [];
-        try { conditions = JSON.parse(r.conditions || '[]'); actions = JSON.parse(r.actions || '[]'); } catch { continue; }
-        if (!conditions.length || !actions.length) continue;
-        const results = conditions.map(c => conditionMet(c, data, old));
-        const ok = r.match === 'any' ? results.some(Boolean) : results.every(Boolean);
-        if (!ok) continue;
+        let gate = null, actions = [];
+        try { gate = normalizeGate(JSON.parse(r.conditions || '[]'), r.match); actions = JSON.parse(r.actions || '[]'); } catch { continue; }
+        if (!gate || !gate.children?.length || !actions.length) continue;
+        if (!evaluateGate(gate, (c) => conditionMet(c, data, old))) continue;
         for (const a of actions) if (fieldNames.has(a.field)) data[a.field] = fillTemplate(a.value, data);
         fired.push(r.name);
     }
@@ -98,15 +97,18 @@ export function checkRule(body, fields) {
     const errs = [];
     if (typeof body.name !== 'string' || !body.name.trim() || body.name.length > 120) errs.push('name is required (up to 120 characters)');
     if (body.match !== undefined && !['all', 'any'].includes(body.match)) errs.push('match must be "all" or "any"');
-    const conds = Array.isArray(body.conditions) ? body.conditions : null;
     const acts = Array.isArray(body.actions) ? body.actions : null;
-    if (!conds || !conds.length || conds.length > 20) errs.push('add 1 to 20 conditions');
+    const gate = normalizeGate(body.conditions, body.match);
+    if (!gate || !gate.children?.length) errs.push('add at least one condition');
+    else {
+        errs.push(...checkGate(gate, (c, path) => {
+            if (!c || !names.has(c.field)) return 'pick a field of this record type';
+            if (!OPERATORS.has(c.operator)) return 'unknown operator';
+            if (c.value !== undefined && typeof c.value !== 'string' && typeof c.value !== 'number' && typeof c.value !== 'boolean') return 'value must be text or a number';
+            return null;
+        }));
+    }
     if (!acts || !acts.length || acts.length > 20) errs.push('add 1 to 20 actions');
-    (conds || []).forEach((c, i) => {
-        if (!c || !names.has(c.field)) errs.push(`condition ${i + 1}: pick a field of this record type`);
-        else if (!OPERATORS.has(c.operator)) errs.push(`condition ${i + 1}: unknown operator`);
-        else if (c.value !== undefined && typeof c.value !== 'string' && typeof c.value !== 'number' && typeof c.value !== 'boolean') errs.push(`condition ${i + 1}: value must be text or a number`);
-    });
     (acts || []).forEach((a, i) => {
         const f = a && fields.find(x => x.name === a.field);
         if (!f) errs.push(`action ${i + 1}: pick a field of this record type`);
@@ -120,12 +122,16 @@ export function checkRule(body, fields) {
 export const toRow = (tenantId, entityType, b, id = uuidv4()) => ({
     id, tenant_id: tenantId, entity_type: entityType, name: b.name.trim(), active: b.active === false ? 0 : 1,
     match: b.match === 'any' ? 'any' : 'all',
-    conditions: JSON.stringify(b.conditions.map(c => ({ field: c.field, operator: c.operator, value: c.value ?? '' }))),
+    conditions: JSON.stringify(cleanGate(normalizeGate(b.conditions, b.match))),
     actions: JSON.stringify(b.actions.map(a => ({ field: a.field, value: String(a.value) }))),
     sort_order: Number.isInteger(b.sortOrder) ? b.sortOrder : 0,
 });
 
+const cleanGate = (n) => (n.type === 'rule'
+    ? { type: 'rule', field: n.field, operator: n.operator, value: n.value ?? '' }
+    : { type: 'group', op: n.op, children: (n.children || []).map(cleanGate) });
+
 export const fromRow = r => ({
     id: r.id, entityType: r.entity_type, name: r.name, active: !!r.active, match: r.match,
-    conditions: JSON.parse(r.conditions || '[]'), actions: JSON.parse(r.actions || '[]'), sortOrder: r.sort_order,
+    conditions: normalizeGate(JSON.parse(r.conditions || '[]'), r.match) || { type: 'group', op: 'and', children: [] }, actions: JSON.parse(r.actions || '[]'), sortOrder: r.sort_order,
 });

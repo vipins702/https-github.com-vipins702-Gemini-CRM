@@ -4,7 +4,8 @@ import { api } from '../services/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
-import { EntityDefinition, FieldRule, FieldRuleCondition, RuleOperator } from '../types';
+import { EntityDefinition, FieldRule, RuleOperator } from '../types';
+import { GateBuilder, emptyGate, toGate, describeGate } from '../components/GateBuilder';
 
 // Configuration → Field Triggers: rules that set field values BEFORE a record is saved.
 // e.g. WHEN Interested = Yes AND Budget = No AND Callback = Yes  THEN  Priority = "Nurture".
@@ -24,7 +25,7 @@ const OPS: { v: RuleOperator; label: string; needsValue: boolean }[] = [
   { v: 'changed', label: 'was changed (edits only)', needsValue: false },
 ];
 
-const blank = (): FieldRule => ({ name: '', active: true, match: 'all', conditions: [{ field: '', operator: '==', value: '' }], actions: [{ field: '', value: '' }] });
+const blank = (): FieldRule => ({ name: '', active: true, conditions: emptyGate(), actions: [{ field: '', value: '' }] });
 const input = 'h-9 rounded-lg border border-gray-200 bg-surface px-2.5 text-sm text-gray-900 min-w-0';
 
 export const FieldTriggers: React.FC = () => {
@@ -90,33 +91,8 @@ export const FieldTriggers: React.FC = () => {
             <input className={`${input} w-full`} placeholder="Name, e.g. Mark hot callbacks" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />
 
             <div>
-              <div className="flex items-center gap-2 text-sm text-gray-700 mb-2">
-                <span className="eyebrow">When</span>
-                <select className={input} value={draft.match} onChange={e => setDraft({ ...draft, match: e.target.value as 'all' | 'any' })}>
-                  <option value="all">all of these are true</option>
-                  <option value="any">any of these is true</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                {draft.conditions.map((c, i) => {
-                  const op = OPS.find(o => o.v === c.operator);
-                  const set = (patch: Partial<FieldRuleCondition>) => setDraft({ ...draft, conditions: draft.conditions.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
-                  return (
-                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_11rem_minmax(0,1fr)_auto] items-center gap-2">
-                      <select className={`${input} w-full`} value={c.field} onChange={e => set({ field: e.target.value, value: '' })}>
-                        <option value="">— field —</option>
-                        {fields.map(f => <option key={f.name} value={f.name}>{f.label}</option>)}
-                      </select>
-                      <select className={`${input} w-full`} value={c.operator} onChange={e => set({ operator: e.target.value as RuleOperator })}>
-                        {OPS.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
-                      </select>
-                      {op?.needsValue ? <ValueInput field={c.field} value={String(c.value ?? '')} onChange={v => set({ value: v })} /> : <span className="hidden sm:block" />}
-                      <button aria-label="Remove condition" disabled={draft.conditions.length === 1} onClick={() => setDraft({ ...draft, conditions: draft.conditions.filter((_, j) => j !== i) })} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  );
-                })}
-                <button className="text-sm font-medium text-accent hover:underline" onClick={() => setDraft({ ...draft, conditions: [...draft.conditions, { field: '', operator: '==', value: '' }] })}>+ Add condition</button>
-              </div>
+              <span className="eyebrow block mb-2">When</span>
+              <GateBuilder value={toGate(draft.conditions)} onChange={g => setDraft({ ...draft, conditions: g })} fields={fields.map(f => ({ name: f.name, label: f.label, options: f.options }))} operators={OPS} />
             </div>
 
             <div>
@@ -167,9 +143,7 @@ export const FieldTriggers: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 flex items-center gap-2">{r.name}{!r.active && <span className="status-pill bg-gray-100 text-gray-500">Off</span>}</p>
                   <p className="text-sm text-gray-500 mt-0.5 flex flex-wrap items-center gap-1.5">
-                    {r.conditions.map((c, i) => (
-                      <span key={i}>{i > 0 && <b className="text-gray-400 font-medium mr-1.5">{r.match === 'any' ? 'or' : 'and'}</b>}{label(c.field)} {OPS.find(o => o.v === c.operator)?.label} {OPS.find(o => o.v === c.operator)?.needsValue && <q>{String(c.value)}</q>}</span>
-                    ))}
+                    <span>{describeGate(toGate(r.conditions, r.match), label, o => OPS.find(x => x.v === o)?.label || o)}</span>
                     <ArrowRight className="w-3.5 h-3.5 text-gray-400" aria-hidden="true" />
                     {r.actions.map((a, i) => <span key={i} className="text-gray-700">{label(a.field)} = <q>{a.value}</q>{i < r.actions.length - 1 ? ',' : ''}</span>)}
                   </p>

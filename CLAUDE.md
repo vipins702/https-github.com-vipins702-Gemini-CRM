@@ -65,6 +65,14 @@ npm run build
 - Other server settings: `CORS_ORIGINS` (comma-separated web app origins; empty allows any), `NODE_ENV=production`.
 - Tests: `server/test/*.mjs` (see each file's header). `reset-and-site.mjs` also checks every marketing page (title, description, one h1, links, structured data).
 
+## Configuration engines
+
+- **Field Triggers** (`server/services/fieldRules.js`): rules that set fields BEFORE a record is saved. **Formula fields** are worked out in the same pass. **Field types** beyond text and number (multi-select, checkbox, date-time, percent, rating, user, auto-number, roll-up, unique) are in `server/services/fieldTypes.js`.
+- **Conditions** (`server/services/conditions.js`, `components/GateBuilder.tsx`): nested AND / OR / NOT gates shared by Field Triggers and Journeys.
+- **Journeys** (`server/services/journeys.js`, `journeysApi.js`, `pages/Journeys.tsx`, `pages/WorkflowBuilder.tsx`): graph automations that run AFTER a save. Waits are rows in `journey_runs` resumed by the scheduler; each run keeps a copy of the graph it started with. Tests move the clock with `POST /api/journeys/process-due { asOf }`.
+- **Record scope**: `scope: own | team | all` per role and record type; `team` follows `users.reports_to`. Lists, search, reports and dashboards all use `scopeUserIds` / `scopeClause` (`server/middleware/access.js`).
+- Plans and status: `CONFIGURATION_ROADMAP.md`, `INDUSTRY_PACKS_PLAN.md`.
+
 ## Architecture
 
 ### Frontend Structure

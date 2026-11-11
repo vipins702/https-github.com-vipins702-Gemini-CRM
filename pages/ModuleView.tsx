@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { showsOn } from '../components/LayoutDetails';
+import { RelatedLists } from '../components/RelatedLists';
+import { JourneyHistory } from '../components/JourneyHistory';
+import { formatFieldValue, ratingMax } from '../services/fieldFormat';
 import { EntityType, LayoutDefinition, EntityDefinition, CRMRecord, FieldDefinition, VisibilityRule, LayoutFieldConfig, Activity, RelatedActivity } from '../types';
 import { formatCurrency, getCurrencySymbol } from '../services/currency';
 import { Card } from '../components/ui/Card';
@@ -62,6 +65,10 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
    // Lookup values state - keyed by lookupId
    const [lookupValues, setLookupValues] = useState<Record<string, { value_id: string; value: string }[]>>({});
+   // People of this workspace, for "user" fields (pick a person) and to show their names in lists.
+   const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
+   useEffect(() => { api.getUsers().then(u => setPeople((u || []).filter((x: any) => x.isActive !== false).map((x: any) => ({ id: x.id, name: x.name || x.email })))).catch(() => setPeople([])); }, []);
+   const peopleMap = React.useMemo(() => Object.fromEntries(people.map(p => [p.id, p.name])), [people]);
 
    // Fetch Data on Entity Change
    useEffect(() => {
@@ -341,13 +348,17 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
    const renderFieldInput = (field: FieldDefinition, value: any, readOnly = false, config: LayoutFieldConfig | undefined, record: CRMRecord) => {
       const baseClasses = `w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-surface ${config?.styles?.textColor || 'text-gray-900'} ${config?.styles?.fontWeight === 'bold' ? 'font-bold' : ''} ${config?.styles?.fontStyle === 'italic' ? 'italic' : ''}`;
 
+      if (field.type === 'autonumber' || field.type === 'rollup') {
+         const shown = formatFieldValue(field, value, { users: peopleMap });
+         return <div className="py-2 text-sm text-gray-900 font-medium border-b border-gray-100 flex items-center justify-between gap-2"><span>{shown || '-'}</span><span className="text-xs font-normal text-gray-400">{field.type === 'autonumber' ? 'Assigned on save' : 'Calculated'}</span></div>;
+      }
       if (field.type === 'formula') {
          return <div className="py-2 text-sm text-gray-900 font-medium border-b border-gray-100 flex items-center justify-between gap-2"><span>{value === '' || value == null ? '-' : String(value)}</span><span className="text-xs font-normal text-gray-400">Calculated on save</span></div>;
       }
       if (readOnly) {
          const display = field.type === 'currency' && value !== '' && value != null
             ? formatCurrency(value, record?.currency)
-            : (value || '-');
+            : (formatFieldValue(field, value, { users: peopleMap }) || '-');
          return <div className="py-2 text-sm text-gray-900 font-medium border-b border-gray-100">{display}</div>;
       }
       const handleChange = (e: any) => updateRecordField(field.name, e.target.value);
@@ -469,6 +480,56 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                      </p>
                   </div>
                </div>
+            );
+         case 'checkbox':
+            return (
+               <label className="flex items-center gap-2 py-2 text-sm text-gray-700 cursor-pointer">
+                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={value === true || value === 'true'} onChange={e => updateRecordField(field.name, e.target.checked)} />
+                  Yes
+               </label>
+            );
+         case 'multiselect': {
+            const chosen: string[] = Array.isArray(value) ? value : [];
+            return (
+               <div className="flex flex-wrap gap-1.5 py-1">
+                  {(field.options || []).map(opt => {
+                     const on = chosen.includes(opt);
+                     return (
+                        <button key={opt} type="button" aria-pressed={on}
+                           onClick={() => updateRecordField(field.name, on ? chosen.filter(x => x !== opt) : [...chosen, opt])}
+                           className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${on ? 'bg-accent/10 border-accent/40 text-accent-deep' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                        >{opt}</button>
+                     );
+                  })}
+               </div>
+            );
+         }
+         case 'datetime':
+            return <input type="datetime-local" className={baseClasses} value={value ? String(value).slice(0, 16) : ''} onChange={handleChange} />;
+         case 'percent':
+            return (
+               <div className="relative">
+                  <input type="number" step="any" className={`${baseClasses} pr-9`} value={value ?? ''} onChange={e => updateRecordField(field.name, e.target.value === '' ? '' : Number(e.target.value))} />
+                  <span className="absolute right-3 top-2 text-gray-500 text-sm">%</span>
+               </div>
+            );
+         case 'rating': {
+            const max = ratingMax(field), n = Number(value) || 0;
+            return (
+               <div className="flex items-center gap-0.5 py-1" role="radiogroup" aria-label={field.label}>
+                  {Array.from({ length: max }, (_, i) => i + 1).map(i => (
+                     <button key={i} type="button" role="radio" aria-checked={n === i} aria-label={`${i} of ${max}`} onClick={() => updateRecordField(field.name, n === i ? 0 : i)}
+                        className={`text-xl leading-none ${i <= n ? 'text-amber-500' : 'text-gray-300 hover:text-amber-300'}`}>★</button>
+                  ))}
+               </div>
+            );
+         }
+         case 'user':
+            return (
+               <select className={baseClasses} value={value || ''} onChange={handleChange}>
+                  <option value="">- Select a person -</option>
+                  {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+               </select>
             );
          case 'lookup':
             const options = lookupValues[field.name] || [];
@@ -714,6 +775,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
                   {detailTab === 'related' && (
                      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                        {selectedRecord.id && <RelatedLists entityType={entityType} recordId={selectedRecord.id} onNavigate={onNavigate} />}
+                        {selectedRecord.id && <JourneyHistory entityType={entityType} recordId={selectedRecord.id} />}
                         {selectedRecord.id && (
                            <Card title="Attachments">
                               <Attachments entityType={entityType} recordId={selectedRecord.id} />
@@ -869,7 +932,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
       const fields = schema.fields.filter(f => fieldAccess(entityType, f.name).read);
       // A cell starting with = + - @ would run as a formula when opened in a spreadsheet; prefix it with a quote.
       const cell = (v: unknown) => {
-         let t = v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+         let t = v === null || v === undefined ? '' : Array.isArray(v) ? v.join('; ') : typeof v === 'object' ? JSON.stringify(v) : String(v);
          if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
          return '"' + t.replace(/"/g, '""') + '"';
       };
@@ -1230,7 +1293,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                                        ) : col.type === 'email' ? (
                                           <span className="text-slate-500 text-sm">{record[col.name]}</span>
                                        ) : (
-                                          <span className="text-slate-600 text-sm">{record[col.name] || '-'}</span>
+                                          <span className="text-slate-600 text-sm">{formatFieldValue(col, record[col.name], { users: peopleMap }) || '-'}</span>
                                        )}
                                     </td>
                                  ))}

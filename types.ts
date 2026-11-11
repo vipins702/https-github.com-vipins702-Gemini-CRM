@@ -4,7 +4,7 @@ import { Edge, Node } from 'reactflow';
 
 export type EntityType = 'lead' | 'customer' | 'case' | 'task' | 'product' | string;
 
-export type FieldType = 'text' | 'number' | 'currency' | 'email' | 'phone' | 'select' | 'status' | 'textarea' | 'lookup' | 'attachment' | 'image' | 'iframe' | 'date' | 'cascade' | 'url' | 'formula';
+export type FieldType = 'text' | 'number' | 'currency' | 'email' | 'phone' | 'select' | 'status' | 'textarea' | 'lookup' | 'attachment' | 'image' | 'iframe' | 'date' | 'cascade' | 'url' | 'formula' | 'multiselect' | 'checkbox' | 'datetime' | 'percent' | 'rating' | 'user' | 'autonumber' | 'rollup';
 
 export interface CategoryNode {
   name: string;
@@ -33,6 +33,17 @@ export interface FieldDefinition {
   categorySet?: string; // for type 'cascade' — which category tree to use
   /** For type 'formula': worked out by the server on every save, e.g. "{firstName} {lastName}" or "{amount} * {quantity}". */
   formula?: string;
+  /** No two records of the type may hold the same value. */
+  unique?: boolean;
+  /** rating: top of the scale (default 5). */
+  max?: number;
+  /** autonumber: UNIT- + 0001 (padding 4), optional year, optional first number. */
+  prefix?: string;
+  padding?: number;
+  includeYear?: boolean;
+  start?: number;
+  /** rollup: count / sum / avg / min / max of the records of another type that link back to this one. */
+  rollup?: { entity: string; field: string; fn: 'count' | 'sum' | 'avg' | 'min' | 'max'; target?: string; where?: { field: string; value: string }[] };
 }
 
 export interface EntityDefinition {
@@ -772,8 +783,31 @@ export interface FieldRule {
   entityType?: string;
   name: string;
   active: boolean;
-  match: 'all' | 'any';
-  conditions: FieldRuleCondition[];
+  match?: 'all' | 'any';
+  /** AND / OR / NOT gate; older rules saved as a list are returned as a gate by the server. */
+  conditions: any;
   actions: FieldRuleAction[];
   sortOrder?: number;
 }
+
+// Journeys: automations that run after a record is saved (Configuration → Journeys).
+export type JourneyTrigger = 'create' | 'update' | 'delete' | 'status_change' | 'field_change' | 'date_arrives' | 'inactive';
+export interface JourneySummary {
+  id: string;
+  name: string;
+  entityType: string;
+  triggerType: JourneyTrigger;
+  trigger: string;
+  isActive: boolean;
+  steps: number;
+  runs: { running: number; waiting: number; done: number; failed: number; cancelled: number };
+  updatedAt?: string;
+}
+export interface JourneyFull { id: string; name: string; entityType: string; isActive: boolean; nodes: any[]; edges: any[] }
+export interface JourneyStep { at?: string; node?: string; label: string; type: string; result: string; note?: string }
+export interface JourneyRun {
+  id: string; journeyId?: string; journeyName?: string; recordId?: string; recordName?: string;
+  status: 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
+  error?: string | null; dueAt?: string | null; steps: JourneyStep[]; createdAt?: string; updatedAt?: string;
+}
+export interface JourneyTestResult { startsHere: boolean; steps: JourneyStep[]; ended: boolean }
