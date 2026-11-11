@@ -98,7 +98,7 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto">
+      <div className="page-shell space-y-6">
         <Skeleton variant="card" className="h-56" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[0, 1, 2, 3].map(i => <Skeleton key={i} variant="card" className="h-20" />)}</div>
         <div className="grid grid-cols-12 gap-6">
@@ -126,7 +126,7 @@ export const Lead360: React.FC<Props> = ({ leadId, onBack, onNavigate }) => {
   const subtitle = [lead.title, lead.company].filter(Boolean).join(' · ');
 
   return (
-    <div className="p-6 lg:p-8 font-sans panel-rise">
+    <div className="page-shell font-sans panel-rise">
       <button onClick={onBack} className="flex items-center gap-1 text-sm font-medium text-accent hover:text-accent-deep transition-colors mb-4">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>

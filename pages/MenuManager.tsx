@@ -183,7 +183,7 @@ export const MenuManager: React.FC = () => {
           </div>
        </div>
 
-       <div className="flex-1 overflow-hidden p-8 flex gap-8">
+       <div className="flex-1 overflow-hidden px-4 py-6 sm:px-6 lg:px-8 flex gap-8">
           {/* Tree View */}
           <div className="w-1/3 bg-surface border border-gray-200 rounded-xl shadow-sm flex flex-col">
              <div className="p-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">

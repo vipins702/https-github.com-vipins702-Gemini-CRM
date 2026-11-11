@@ -277,7 +277,7 @@ export const Pipeline: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="p-6 lg:p-8 font-sans h-[calc(100vh-64px)] flex flex-col">
+    <div className="page-shell font-sans h-[calc(100vh-64px)] flex flex-col">
       <div className="flex items-center justify-between mb-5 shrink-0">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">

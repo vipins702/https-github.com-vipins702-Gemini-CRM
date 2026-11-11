@@ -93,10 +93,10 @@ export const ScoringRules: React.FC = () => {
   const totalMax = rules.filter(r => r.is_active && r.points > 0).reduce((s, r) => s + r.points, 0);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen">
       {/* Header */}
       <div className="bg-surface border-b border-slate-200">
-        <div className="max-w-5xl mx-auto px-6 py-5">
+        <div className="page-x py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
@@ -116,7 +116,7 @@ export const ScoringRules: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-6 space-y-4">
+      <div className="page-x py-6 space-y-4">
         {/* Info Banner */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
           <HelpCircle className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />

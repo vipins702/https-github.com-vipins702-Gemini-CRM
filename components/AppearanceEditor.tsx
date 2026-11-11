@@ -38,7 +38,7 @@ export const AppearanceEditor: React.FC<Props> = ({ settings, activeTheme, patch
     const p = THEME_PRESETS.find(x => x.id === id);
     if (p) patch({ ...p.values, customColor: settings.customColor, themePreset: id });
   };
-  const reset = () => patch({ ...DEFAULT_APPEARANCE, themePreset: 'maison', fontSize: 'md', density: 'comfortable' });
+  const reset = () => patch({ ...DEFAULT_APPEARANCE, themePreset: 'harbour', fontSize: 'md', density: 'comfortable' });
   // Any manual tweak means it no longer matches a named preset.
   const tweak = (changes: Partial<SystemSettings>) => patch({ ...changes, themePreset: 'custom' });
 

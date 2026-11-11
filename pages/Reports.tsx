@@ -20,8 +20,8 @@ import {
 } from 'lucide-react';
 
 // ─── Colour palette ──────────────────────────────────────────────────────────
-const TRI = ['#0A84FF', '#30D158', '#FF9F0A', '#BF5AF2', '#FF375F', '#40C8E0'];
-const ACCENT: Record<string, string> = { blue: '#0A84FF', green: '#30D158', orange: '#FF9F0A' };
+const TRI = ['#2A7AB0', '#F4A621', '#2FA37A', '#8B6CD9', '#E0607E', '#3DB4C8'];
+const ACCENT: Record<string, string> = { blue: '#2A7AB0', green: '#2FA37A', orange: '#F4A621' };
 const axisTick = { fill: '#8E8E93', fontSize: 12, fontWeight: 500 };
 const tipStyle = { backgroundColor: 'rgba(29, 29, 31, 0.92)', border: 'none', borderRadius: '12px', color: '#fff' } as React.CSSProperties;
 
@@ -244,7 +244,7 @@ const VIZ_ICONS: Record<string, React.ReactNode> = {
   pie: <PieIcon className="w-4 h-4" />,
   metric: <Eye className="w-4 h-4" />,
 };
-const CHART_COLORS = ['#0A84FF', '#30D158', '#FF9F0A', '#BF5AF2', '#FF375F', '#40C8E0'];
+const CHART_COLORS = ['#2A7AB0', '#F4A621', '#2FA37A', '#8B6CD9', '#E0607E', '#3DB4C8'];
 const FILTER_OPS = ['eq', 'neq', 'contains', 'gt', 'lt'] as const;
 const blankReport = (): SavedReport => ({ name: '', entityType: 'lead', columns: [], filters: [], groupBy: [], sortBy: [], vizType: 'table' });
 
@@ -714,7 +714,7 @@ export const Reports: React.FC<Props> = ({ schemas }) => {
   const [tab, setTab] = useState<'standard' | 'builder'>('standard');
 
   return (
-    <div className="p-6 lg:p-8 font-sans">
+    <div className="page-shell font-sans">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">

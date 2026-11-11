@@ -21,8 +21,9 @@ import { formatCurrency } from '../services/currency';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 // Apple system colours: vivid enough to read on white and on graphite.
-const TRI   = ['#0A84FF', '#30D158', '#FF9F0A', '#BF5AF2', '#FF375F', '#40C8E0'];
-const ACCENT = { blue: '#0A84FF', green: '#30D158', orange: '#FF9F0A' } as Record<string, string>;
+// Chart series: harbour blue, saffron, then calm supporting hues (readable in light and dark).
+const TRI   = ['#2A7AB0', '#F4A621', '#2FA37A', '#8B6CD9', '#E0607E', '#3DB4C8'];
+const ACCENT = { blue: '#2A7AB0', green: '#2FA37A', orange: '#F4A621' } as Record<string, string>;
 const ICON_BG = { blue: 'bg-accent-50 text-accent-700', green: 'bg-green-50 text-green-700', orange: 'bg-orange-50 text-orange-700' } as Record<string, string>;
 const KPI_ICON = { currency: DollarSign, percent: Percent, number: Users } as Record<string, React.ElementType>;
 const axisTick = { fill: '#8E8E93', fontSize: 12, fontWeight: 500 };
@@ -450,7 +451,7 @@ export const Dashboard: React.FC = () => {
 
   const greeting = () => {
     const h = new Date().getHours();
-    return h < 12 ? 'Good Morning' : h < 18 ? 'Good Afternoon' : 'Good Evening';
+    return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
   };
 
   // ── Content renderer ───────────────────────────────────────────────────────
@@ -485,7 +486,7 @@ export const Dashboard: React.FC = () => {
     .sort((a, b) => a.order - b.order);
 
   return (
-    <div className="p-6 lg:p-8 font-sans animate-in fade-in duration-500">
+    <div className="page-shell font-sans animate-in fade-in duration-500">
       {/* ── Hero ── */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-7 panel-rise">
         <div>
@@ -493,7 +494,7 @@ export const Dashboard: React.FC = () => {
             <Calendar className="w-4 h-4" aria-hidden="true" />
             {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
-          <h1 className="font-heading text-[34px] leading-tight font-bold tracking-tight text-gray-900 mt-1">
+          <h1 className="h-display text-[28px] sm:text-[32px] leading-tight text-gray-900 mt-1">
             {greeting()}, {userName.split(' ')[0]}
           </h1>
         </div>

@@ -105,7 +105,7 @@ export const CalendarTasks: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="p-6 lg:p-8 font-sans">
+    <div className="page-shell font-sans">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>

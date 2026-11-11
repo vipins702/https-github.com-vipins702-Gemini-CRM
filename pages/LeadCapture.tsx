@@ -82,9 +82,9 @@ export const LeadCapture: React.FC = () => {
   const inputCls = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none';
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="page-shell space-y-6">
       <div className="flex items-center gap-3">
-        <div className="p-2.5 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/30"><Inbox className="w-6 h-6 text-white" /></div>
+        <div className="p-2.5 bg-accent/10 rounded-xl"><Inbox className="w-6 h-6 text-accent" /></div>
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Lead Capture</h1>
           <p className="text-sm text-slate-500">Capture leads from web forms & webhooks into your Leads table — with dedupe and optional AI cleanup.</p>

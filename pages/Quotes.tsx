@@ -96,7 +96,7 @@ export const Quotes: React.FC<Props> = () => {
   }
 
   return (
-    <div className="p-6 lg:p-8 font-sans">
+    <div className="page-shell font-sans">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
@@ -234,7 +234,7 @@ const QuoteBuilder: React.FC<{
   };
 
   return (
-    <div className="p-6 lg:p-8 font-sans max-w-4xl mx-auto">
+    <div className="page-shell page-narrow font-sans">
       <div className="flex items-center justify-between mb-5">
         <button onClick={onCancel} className="flex items-center gap-2 text-sm text-ink-soft hover:text-ink transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to quotes

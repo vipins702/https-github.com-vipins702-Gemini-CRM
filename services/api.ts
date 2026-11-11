@@ -36,7 +36,12 @@ const handleResponse = async (res: Response) => {
     throw new Error(why || 'You do not have permission to do that');
   }
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: 'Unknown error' }));
+    // A reply that is not JSON (an HTML error page, a gateway timeout) means the server is not the one the app expects.
+    const error = await res.json().catch(() => ({
+      error: res.status === 404
+        ? 'The server does not support this action yet. It may be updating: wait a few minutes and try again.'
+        : `The server sent an unexpected reply (${res.status}). Try again in a moment.`,
+    }));
     const errorMessage = error.error || `Request failed with status ${res.status}`;
     const errorDetails = error.details ? ` Details: ${error.details}` : '';
     throw new Error(errorMessage + errorDetails);

@@ -135,9 +135,9 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({ onNavigate }) => {
   const d = match?.data || {};
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="page-shell space-y-6">
       <div className="flex items-center gap-3">
-        <div className="p-2.5 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/30"><PhoneCall className="w-6 h-6 text-white" /></div>
+        <div className="p-2.5 bg-accent/10 rounded-xl"><PhoneCall className="w-6 h-6 text-accent" /></div>
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Agent Console</h1>
           <p className="text-sm text-slate-500">Incoming call → caller identified → log → convert lead → AI upsell.</p>

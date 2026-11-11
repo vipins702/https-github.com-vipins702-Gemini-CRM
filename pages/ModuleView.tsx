@@ -501,7 +501,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
          <div className="min-h-screen animate-in fade-in duration-200">
             {/* TOP HEADER */}
             <div className="bg-surface border-b border-gray-200/80">
-               <div className="max-w-7xl mx-auto px-6 py-6">
+               <div className="page-x py-6">
                   {/* Back button */}
                   <button
                      onClick={() => { setView('list'); setSelectedRecord(null); }}
@@ -580,7 +580,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
             {/* TABS - Sticky below TopBar */}
             <div className="bg-surface/90 backdrop-blur border-b border-slate-200/70 sticky top-16 z-20">
-               <div className="max-w-7xl mx-auto px-6">
+               <div className="page-x">
                   <div className="flex gap-6" role="tablist">
                      {['overview', 'timeline', 'related'].map((tab) => (
                         <button
@@ -600,7 +600,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-12 gap-8">
+            <div className="page-x py-8 grid grid-cols-12 gap-8">
 
                {/* LEFT COLUMN: Quick Info Card */}
                <div className="col-span-12 lg:col-span-3 space-y-6">
@@ -1071,7 +1071,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
          <div className="min-h-screen">
          {/* Page Header */}
          <div className="bg-surface border-b border-slate-200">
-            <div className="max-w-7xl mx-auto px-6 py-5">
+            <div className="page-x py-5">
                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
                      <h1 className="font-heading text-xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">
@@ -1116,7 +1116,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
          {DupBanner}
 
-         <div className="max-w-7xl mx-auto px-6 py-6">
+         <div className="page-x py-6">
             {/* Stats Row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                {listStats.map(({ icon: Icon, label, value, tint }) => (

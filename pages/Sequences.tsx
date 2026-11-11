@@ -89,9 +89,9 @@ export const Sequences: React.FC = () => {
 
   if (editing) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen">
         <div className="bg-surface border-b border-slate-200">
-          <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="page-x py-5 flex items-center justify-between">
             <h1 className="text-xl font-extrabold text-slate-900">
               {editing.id ? 'Edit Sequence' : 'New Drip Sequence'}
             </h1>
@@ -102,7 +102,7 @@ export const Sequences: React.FC = () => {
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-6 py-6 space-y-6">
+        <div className="page-x py-6 space-y-6">
           {/* Meta */}
           <div className="bg-surface rounded-xl border border-slate-200 p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -233,9 +233,9 @@ export const Sequences: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen">
       <div className="bg-surface border-b border-slate-200">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+        <div className="page-x py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
               <Mail className="w-5 h-5 text-blue-600" />
@@ -251,7 +251,7 @@ export const Sequences: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-6 space-y-4">
+      <div className="page-x py-6 space-y-4">
         {loading ? (
           <div className="text-center py-12 text-slate-400">Loading sequences…</div>
         ) : sequences.length === 0 ? (

@@ -523,6 +523,17 @@ h1, h2, h3, h4, .font-heading {
 [data-brand="burgundy"] { --accent-50: var(--burgundy-50); --accent-100: var(--burgundy-100); --accent-200: var(--burgundy-200); --accent-300: var(--burgundy-300); --accent-400: var(--burgundy-400); --accent-500: var(--burgundy-500); --accent-600: var(--burgundy-600); --accent-700: var(--burgundy-700); --accent-800: var(--burgundy-800); --accent-900: var(--burgundy-900); --accent-950: var(--burgundy-950); }
 [data-brand="emerald"] { --accent-50: var(--emerald-50); --accent-100: var(--emerald-100); --accent-200: var(--emerald-200); --accent-300: var(--emerald-300); --accent-400: var(--emerald-400); --accent-500: var(--emerald-500); --accent-600: var(--emerald-600); --accent-700: var(--emerald-700); --accent-800: var(--emerald-800); --accent-900: var(--emerald-900); --accent-950: var(--emerald-950); }
 
+/* Harbour (default brand): deep harbour blue, saffron highlights on the navy sidebar. */
+:root {
+    --harbour-50: 238 245 249; --harbour-100: 216 233 242; --harbour-200: 177 210 228; --harbour-300: 126 178 207; --harbour-400: 70 140 180; --harbour-500: 36 108 152; --harbour-600: 22 84 124; --harbour-700: 17 66 99; --harbour-800: 14 52 78; --harbour-900: 13 43 62; --harbour-950: 7 25 37;
+    --saffron: 244 166 33;
+}
+.dark {
+    --harbour-50: 18 34 46; --harbour-100: 21 44 60; --harbour-200: 26 60 82; --harbour-300: 32 80 110; --harbour-400: 104 170 214; --harbour-500: 84 154 202; --harbour-600: 92 162 210; --harbour-700: 134 190 228; --harbour-800: 170 210 238; --harbour-900: 202 228 246; --harbour-950: 228 241 250;
+}
+[data-brand="harbour"] { --accent-50: var(--harbour-50); --accent-100: var(--harbour-100); --accent-200: var(--harbour-200); --accent-300: var(--harbour-300); --accent-400: var(--harbour-400); --accent-500: var(--harbour-500); --accent-600: var(--harbour-600); --accent-700: var(--harbour-700); --accent-800: var(--harbour-800); --accent-900: var(--harbour-900); --accent-950: var(--harbour-950); }
+.dark[data-brand="harbour"] { --on-accent: 7 25 37; }
+
 /* Bright gold / ivory fills in dark mode need dark text on top. */
 .dark:not([data-brand]), .dark[data-brand="gold"] { --on-accent: 30 22 6; }
 .dark[data-brand="onyx"] { --on-accent: 20 18 14; }
@@ -565,6 +576,7 @@ h1, h2, h3, h4, .font-heading {
 [data-brand="onyx"]     { --sb-500: 226 221 211; --sb-700: 248 245 238; }
 [data-brand="sapphire"] { --sb-500: 96 144 235;  --sb-700: 126 168 246; }
 [data-brand="burgundy"] { --sb-500: 224 100 132; --sb-700: 234 130 158; }
+[data-brand="harbour"]  { --sb-500: 244 166 33; --sb-700: 248 192 96; }
 [data-brand="emerald"]  { --sb-500: 64 190 140;  --sb-700: 110 218 170; }
 
 /* Surface tone: warm (default, ivory) · cool (slate) · neutral (pure grey) */
@@ -609,3 +621,47 @@ h1, h2, h3, h4, .font-heading {
 [data-density="compact"] table td, [data-density="compact"] table th { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; }
 [data-density="compact"] .nav-pill { height: 2rem; }
 [data-density="compact"] .stat-card { padding: 0.875rem; }
+
+/* Harbour sidebar: navy, matching the website and sign-in screens. */
+:root[data-brand="harbour"]:not([data-sidebar="light"]) .app-sidebar {
+    --neutral-50: 20 52 72; --neutral-100: 26 62 85; --neutral-200: 38 78 103; --neutral-300: 56 96 122; --neutral-400: 112 145 166; --neutral-500: 150 177 194; --neutral-600: 176 198 212; --neutral-700: 206 221 230; --neutral-800: 230 238 243; --neutral-900: 246 249 251; --neutral-950: 255 255 255;
+    --c-canvas: 9 32 47; --c-surface: 13 43 62; --c-surface-2: 20 54 76;
+    background-image: linear-gradient(180deg, rgba(244, 166, 33, 0.06), transparent 240px);
+    border-right-color: rgba(255, 255, 255, 0.08) !important;
+}
+.dark[data-brand="harbour"]:not([data-sidebar="light"]) .app-sidebar { --c-surface: 9 30 44; }
+
+/* Shared page rhythm: one header style, one gutter, one card treatment. */
+.page-shell { width: 100%; padding: 1.25rem 1rem 3rem; }
+@media (min-width: 640px) { .page-shell { padding: 1.75rem 1.5rem 3rem; } }
+@media (min-width: 1024px) { .page-shell { padding: 2rem 2rem 3.5rem; } }
+.page-narrow { max-width: 64rem; }
+.page-x { width: 100%; padding-left: 1rem; padding-right: 1rem; }
+@media (min-width: 640px) { .page-x { padding-left: 1.5rem; padding-right: 1.5rem; } }
+@media (min-width: 1024px) { .page-x { padding-left: 2rem; padding-right: 2rem; } }
+
+/* One heading style for every page title, whatever size the page asked for. */
+main h1:not(.h-display) { font-family: var(--font-heading); font-size: 1.5rem; line-height: 1.2; font-weight: 650; letter-spacing: -0.025em; color: rgb(var(--neutral-900)); }
+@media (min-width: 1024px) { main h1:not(.h-display) { font-size: 1.75rem; } }
+main h1 > .tri-ring-sq { display: none; }
+main h1.h-display { font-family: var(--font-heading); font-weight: 650; letter-spacing: -0.03em; }
+.page-title { font-family: var(--font-heading); font-size: 1.625rem; line-height: 1.15; font-weight: 650; letter-spacing: -0.025em; color: rgb(var(--neutral-900)); }
+@media (min-width: 1024px) { .page-title { font-size: 1.875rem; } }
+.page-subtitle { margin-top: 0.25rem; font-size: 0.9375rem; color: rgb(var(--neutral-500)); }
+.eyebrow { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(var(--neutral-500)); }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Navigation: calm pills, clear active state. */
+.app-sidebar .nav-pill { color: rgb(var(--neutral-700)); }
+.app-sidebar .nav-pill:hover { background: rgb(var(--neutral-100)); color: rgb(var(--neutral-900)); }
+.app-sidebar .nav-pill-active, .app-sidebar .nav-pill-active:hover { background: rgb(var(--accent-500) / 0.14); color: rgb(var(--neutral-950)); font-weight: 600; }
+.app-sidebar .nav-pill-active svg { color: rgb(var(--accent-500)) !important; }
+:root[data-sidebar="light"] .app-sidebar .nav-pill-active { color: rgb(var(--accent-700)); }
+
+/* Cards on the cool (Harbour) tone: crisp hairline, very soft lift. */
+:root[data-tone="cool"] :is(.glass-showcase, .surface-card, .card-modern, .stat-card) { border-color: rgb(var(--neutral-200)); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.02); }
+:root[data-tone="cool"] :is(.card-modern, .stat-card, .lift):hover { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 10px 24px -12px rgba(15, 23, 42, 0.18); }
+.dark[data-tone="cool"] :is(.glass-showcase, .surface-card, .card-modern, .stat-card) { border-color: rgb(var(--neutral-200)); box-shadow: none; }
+/* Tables: quiet header row, even rows. */
+main table thead th { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; color: rgb(var(--neutral-500)); }
+main table tbody td { font-variant-numeric: tabular-nums; }

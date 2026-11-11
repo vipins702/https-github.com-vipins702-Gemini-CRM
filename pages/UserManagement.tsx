@@ -247,7 +247,7 @@ export const UserManagement: React.FC = () => {
     <div className="h-screen flex flex-col bg-[var(--surface-muted)] overflow-hidden">
 
       {/* ── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="h-16 bg-[var(--surface)] border-b border-[var(--border)] px-8 flex items-center justify-between shrink-0">
+      <div className="h-16 bg-[var(--surface)] border-b border-[var(--border)] px-4 sm:px-6 lg:px-8 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="tri-ring-sq w-9 h-9 shrink-0">
             <div className="flex items-center justify-center w-full h-full">
@@ -281,7 +281,7 @@ export const UserManagement: React.FC = () => {
       </div>
 
       {/* ── Main content ─────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto page-shell">
         <div className="max-w-7xl mx-auto">
 
           {/* ════════════════════ USERS TAB ════════════════════ */}

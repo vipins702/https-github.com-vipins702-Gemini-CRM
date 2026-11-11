@@ -68,7 +68,7 @@ export const ProcessBuilder: React.FC = () => {
   };
 
   return (
-    <div className="p-6 lg:p-8 font-sans max-w-3xl mx-auto">
+    <div className="page-shell page-narrow font-sans">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink flex items-center gap-2.5">

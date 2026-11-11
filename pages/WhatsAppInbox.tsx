@@ -106,7 +106,7 @@ export const WhatsAppInbox: React.FC<Props> = ({ onNavigate, initialPhone }) => 
   };
 
   return (
-    <div className="p-6 lg:p-8 font-sans h-[calc(100vh-64px)] flex flex-col">
+    <div className="page-shell font-sans h-[calc(100vh-64px)] flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>

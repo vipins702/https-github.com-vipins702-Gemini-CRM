@@ -104,7 +104,7 @@ export const Settings: React.FC = () => {
             </Button>
          </div>
 
-         <div className="flex-1 overflow-hidden p-8 flex gap-8">
+         <div className="flex-1 overflow-hidden px-4 py-6 sm:px-6 lg:px-8 flex gap-8">
             {/* Sidebar */}
             <div className="w-64 space-y-2">
                <button

@@ -67,6 +67,15 @@ const App: React.FC = () => {
     } catch { return 256; }
   });
   const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
+  // Phones: the sidebar becomes a slide-out menu opened from the top bar.
+  const [isPhone, setIsPhone] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [phoneNavOpen, setPhoneNavOpen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const on = () => { setIsPhone(mq.matches); if (!mq.matches) setPhoneNavOpen(false); };
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
   const setSidebarWidth = (w: number) => {
     setSidebarWidthState(w);
     try { localStorage.setItem('flowcrm_sidebar_width', String(w)); } catch { /* private mode */ }
@@ -152,6 +161,7 @@ const App: React.FC = () => {
     setCurrentView(view);
     setBackStack([]);
     setViewParams(null); // Reset params on sidebar click
+    setPhoneNavOpen(false);
   };
 
   // Keep the address bar honest: /app while signed in, /login while signed out.
@@ -169,9 +179,7 @@ const App: React.FC = () => {
     return (
       <div className="h-screen flex items-center justify-center bg-canvas font-sans" role="status" aria-live="polite">
         <div className="flex flex-col items-center gap-4 animate-fadeIn">
-          <div className="w-14 h-14 bg-gradient-to-b from-accent-400 to-accent-600 rounded-2xl flex items-center justify-center shadow-[var(--elev-3)]">
-            <span className="text-white font-semibold text-2xl">F</span>
-          </div>
+          <img src="/site/mark.svg" alt="" width={56} height={56} className="rounded-2xl shadow-[var(--elev-3)]" />
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-accent animate-spin" aria-hidden="true" />
             Loading FlowCRM…
@@ -284,19 +292,25 @@ const App: React.FC = () => {
           onWidthChange={setSidebarWidth}
           onCollapseChange={setIsSidebarCollapsed}
           onDragState={setIsDraggingSidebar}
+          isPhone={isPhone}
+          phoneOpen={phoneNavOpen}
+          onClosePhone={() => setPhoneNavOpen(false)}
           onLogout={() => {
             api.logout();
             setSession(null);
           }}
         />
         <main
-          style={{ marginLeft: isSidebarCollapsed ? 72 : sidebarWidth }}
+          style={{ marginLeft: isPhone ? 0 : isSidebarCollapsed ? 72 : sidebarWidth }}
           className={`flex-1 min-w-0 min-h-screen ${isDraggingSidebar ? '' : 'transition-[margin] duration-300 ease-in-out'}`}
         >
           <ViewAsBanner />
-          <TopBar currentView={currentView} schemas={schemas} onNavigate={handleNavigate} />
+          <TopBar currentView={currentView} schemas={schemas} onNavigate={handleNavigate} onOpenMenu={isPhone ? () => setPhoneNavOpen(true) : undefined} />
           {renderContent()}
         </main>
+        {isPhone && phoneNavOpen && (
+          <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]" onClick={() => setPhoneNavOpen(false)} aria-hidden="true" />
+        )}
       </div>
     </ToastProvider>
   );

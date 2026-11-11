@@ -160,13 +160,13 @@ export const LeadRules: React.FC = () => {
   if (view === 'edit') {
     const conditions = draft.conditions || { match: 'all', rules: [] };
     return (
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="page-shell space-y-6">
         <div className="flex items-center gap-3">
           <button onClick={() => setView('list')} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </button>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/30"><Wand2 className="w-5 h-5 text-white" /></div>
+            <div className="p-2 bg-accent/10 rounded-xl"><Wand2 className="w-5 h-5 text-accent" /></div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">{draft.id ? 'Edit Lead Rule' : 'New Lead Rule'}</h1>
               <p className="text-sm text-slate-500">Auto-generate leads from records that match your criteria</p>
@@ -322,7 +322,7 @@ export const LeadRules: React.FC = () => {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/30"><Zap className="w-6 h-6 text-white" /></div>
+          <div className="p-2.5 bg-accent/10 rounded-xl"><Zap className="w-6 h-6 text-accent" /></div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Lead Generation Rules</h1>
             <p className="text-sm text-slate-500">Automatically create leads from records that match your criteria</p>

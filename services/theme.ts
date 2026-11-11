@@ -22,6 +22,8 @@ const SERIF_FALLBACK = 'Georgia, "Times New Roman", serif';
 
 export const FONT_CATALOG: FontOption[] = [
   { id: 'system', label: 'System (Apple / Segoe)', kind: 'sans', stack: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' },
+  { id: 'figtree', label: 'Figtree', kind: 'sans', stack: `"Figtree", ${SANS_FALLBACK}`, google: 'Figtree:wght@400;500;600;700' },
+  { id: 'bricolage', label: 'Bricolage Grotesque', kind: 'sans', stack: `"Bricolage Grotesque", ${SANS_FALLBACK}`, google: 'Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700' },
   { id: 'inter', label: 'Inter', kind: 'sans', stack: `"Inter", ${SANS_FALLBACK}`, google: 'Inter:wght@400;500;600;700' },
   { id: 'dm-sans', label: 'DM Sans', kind: 'sans', stack: `"DM Sans", ${SANS_FALLBACK}`, google: 'DM+Sans:wght@400;500;600;700' },
   { id: 'manrope', label: 'Manrope', kind: 'sans', stack: `"Manrope", ${SANS_FALLBACK}`, google: 'Manrope:wght@400;500;600;700' },
@@ -57,6 +59,7 @@ function loadFont(font: FontOption | undefined) {
 export interface BrandOption { id: string; label: string; swatch: string }
 
 export const BRAND_OPTIONS: BrandOption[] = [
+  { id: 'harbour', label: 'Harbour Blue', swatch: 'linear-gradient(140deg, rgb(36 108 152), rgb(13 43 62))' },
   { id: 'gold', label: 'Champagne Gold', swatch: 'linear-gradient(140deg, rgb(212 175 84), rgb(146 105 28))' },
   { id: 'onyx', label: 'Onyx', swatch: 'linear-gradient(140deg, rgb(64 60 54), rgb(14 13 11))' },
   { id: 'sapphire', label: 'Sapphire', swatch: 'linear-gradient(140deg, rgb(46 94 190), rgb(22 55 126))' },
@@ -141,6 +144,8 @@ export interface AppearanceValues {
 export interface ThemePreset { id: string; label: string; blurb: string; values: AppearanceValues; preview: { bg: string; side: string; accent: string } }
 
 export const THEME_PRESETS: ThemePreset[] = [
+  { id: 'harbour', label: 'Harbour', blurb: 'Navy and saffron, the FlowCRM look', preview: { bg: '#F5F7F8', side: '#0D2B3E', accent: '#16547C' },
+    values: { primaryColor: 'harbour', neutralTone: 'cool', sidebarStyle: 'dark', radius: 'soft', fontBody: 'figtree', fontHeading: 'bricolage' } },
   { id: 'maison', label: 'Maison', blurb: 'Ivory, obsidian and champagne gold', preview: { bg: '#F7F4EE', side: '#14120F', accent: '#B88F30' },
     values: { primaryColor: 'gold', neutralTone: 'warm', sidebarStyle: 'dark', radius: 'soft', fontBody: 'system', fontHeading: 'same' } },
   { id: 'classic', label: 'Classic', blurb: 'Clean light blue, the original look', preview: { bg: '#F5F5F7', side: '#FFFFFF', accent: '#0A84FF' },

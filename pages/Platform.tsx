@@ -113,7 +113,7 @@ export const Platform: React.FC<Props> = () => {
   const totals = tenants.reduce((a, t) => ({ users: a.users + (t.userCount || 0), records: a.records + (t.recordCount || 0) }), { users: 0, records: 0 });
 
   return (
-    <div className="p-6 lg:p-8 font-sans animate-in fade-in duration-300 max-w-5xl mx-auto">
+    <div className="page-shell font-sans animate-in fade-in duration-300">
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-3">

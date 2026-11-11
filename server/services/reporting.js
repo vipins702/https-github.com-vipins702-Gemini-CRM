@@ -317,8 +317,8 @@ const REPORT_PACKS = {
       trend: {
         id: 'trend', label: 'Leads Over Time', type: 'timeseries', ttlKey: 'timeseries',
         measures: [
-          { key: 'new_leads', label: 'New Leads', type: 'number',   color: '#0A84FF' },
-          { key: 'revenue',   label: 'Revenue',   type: 'currency', color: '#30D158' },
+          { key: 'new_leads', label: 'New Leads', type: 'number',   color: '#2A7AB0' },
+          { key: 'revenue',   label: 'Revenue',   type: 'currency', color: '#F4A621' },
         ],
         async run(tenantId, params) {
           const { clauses, args } = baseWhere(tenantId, 'lead', params);

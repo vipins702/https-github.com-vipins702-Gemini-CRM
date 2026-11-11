@@ -86,10 +86,10 @@ export const AuditLog: React.FC = () => {
     [r.actor_first, r.actor_last].filter(Boolean).join(' ') || r.actor_email || r.actor_id || 'System';
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen">
       {/* Header */}
       <div className="bg-surface border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 py-5">
+        <div className="page-x py-5">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
               <Shield className="w-5 h-5 text-indigo-600" />
@@ -165,7 +165,7 @@ export const AuditLog: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="page-x py-6">
         <div className="bg-surface rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           {loading ? (
             <div className="flex items-center justify-center h-48 text-slate-400">

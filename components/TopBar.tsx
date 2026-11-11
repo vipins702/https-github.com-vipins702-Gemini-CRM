@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Search, ChevronRight, X, Loader2, CornerDownLeft, Bell, CheckCheck, Clock, AlertCircle, Info, Sun, Moon } from 'lucide-react';
+import { Search, ChevronRight, X, Loader2, CornerDownLeft, Bell, CheckCheck, Clock, AlertCircle, Info, Sun, Moon, Menu } from 'lucide-react';
 import { ViewState, EntityDefinition, AppNotification } from '../types';
 import { api } from '../services/api';
 import { isDarkActive, onThemeChange, setPersonalTheme } from '../services/theme';
@@ -9,6 +9,8 @@ interface TopBarProps {
   currentView: ViewState;
   schemas: Record<string, EntityDefinition>;
   onNavigate: (view: ViewState, params?: any) => void;
+  /** Phones only: opens the slide-out navigation. */
+  onOpenMenu?: () => void;
 }
 
 interface SearchResult {
@@ -139,7 +141,7 @@ const NotificationCenter: React.FC<{ onClose: () => void; onNavigate: (v: ViewSt
 };
 
 // ─── TopBar ───────────────────────────────────────────────────────────────────
-export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate }) => {
+export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate, onOpenMenu }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -216,9 +218,14 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, schemas, onNavigate
   const entityLabel = (type: string) => schemas[type]?.label || type;
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-surface/80 backdrop-blur-xl backdrop-saturate-150 border-b border-gray-200/80 flex items-center gap-6 px-5 sm:px-6">
+    <header className="sticky top-0 z-30 h-16 bg-surface/80 backdrop-blur-xl backdrop-saturate-150 border-b border-gray-200/80 flex items-center gap-4 sm:gap-6 px-4 sm:px-6 lg:px-8">
+      {onOpenMenu && (
+        <button onClick={onOpenMenu} aria-label="Open menu" className="shrink-0 -ml-1.5 p-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900">
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-sm shrink-0 min-w-0" aria-label="Breadcrumb">
+      <nav className={`${onOpenMenu ? 'hidden' : 'flex'} items-center gap-1.5 text-sm shrink-0 min-w-0`} aria-label="Breadcrumb">
         <button onClick={() => onNavigate('dashboard')} className="text-slate-500 hover:text-slate-900 font-medium transition-colors">Home</button>
         {currentView !== 'dashboard' && (
           <>

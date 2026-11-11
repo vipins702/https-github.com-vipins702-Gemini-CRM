@@ -228,7 +228,7 @@ export const Integrations: React.FC<Props> = () => {
     .filter(Boolean) as IntegrationConfig[];
 
   return (
-    <div className="p-6 lg:p-8 font-sans animate-in fade-in duration-300 max-w-5xl mx-auto">
+    <div className="page-shell font-sans animate-in fade-in duration-300">
       <div className="flex items-center gap-3 mb-1">
         <span className="tri-ring-sq w-9 h-9 flex items-center justify-center text-accent-deep"><Plug className="w-5 h-5" /></span>
         <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink">Integrations</h1>

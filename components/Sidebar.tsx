@@ -15,6 +15,9 @@ interface SidebarProps {
   onWidthChange: (w: number) => void;
   onCollapseChange: (collapsed: boolean) => void;
   onDragState: (dragging: boolean) => void;
+  isPhone?: boolean;
+  phoneOpen?: boolean;
+  onClosePhone?: () => void;
 }
 
 const MIN_W = 200;
@@ -26,7 +29,8 @@ const MODULE_ICONS: Record<string, string> = { lead: 'Users', customer: 'Buildin
 const iconFor = (item: MenuItem): string | undefined =>
   (!item.icon || item.icon === 'FolderOpen') && item.view && MODULE_ICONS[item.view] ? MODULE_ICONS[item.view] : item.icon;
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isCollapsed, onToggle, onLogout, width, onWidthChange, onCollapseChange, onDragState }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isCollapsed: collapsedProp, onToggle, onLogout, width, onWidthChange, onCollapseChange, onDragState, isPhone = false, phoneOpen = false, onClosePhone }) => {
+  const isCollapsed = isPhone ? false : collapsedProp;
   const [dragging, setDragging] = useState(false);
 
   // Drag the right edge: pull wider (up to 420px), push narrower, and push past
@@ -129,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
       return (
         <div key={item.id} className="mt-6 first:mt-1">
           <div className="px-3 mb-1.5">
-            <span className="text-xs font-semibold text-gray-500">{item.label}</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-400">{item.label}</span>
           </div>
           <div className="space-y-0.5">
             {visibleChildren.map(child => renderItem(child, depth + 1))}
@@ -167,8 +171,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
 
   return (
     <aside
-      style={{ width: isCollapsed ? 72 : width }}
-      className={`app-sidebar bg-surface/80 backdrop-blur-xl backdrop-saturate-150 text-gray-900 flex flex-col h-screen fixed left-0 top-0 border-r border-gray-200/80 z-50 ${dragging ? '' : 'transition-[width] duration-300 ease-in-out'}`}
+      style={{ width: isPhone ? 280 : isCollapsed ? 72 : width }}
+      aria-hidden={isPhone && !phoneOpen ? true : undefined}
+      className={`app-sidebar ${isPhone ? `transition-transform duration-300 ease-out ${phoneOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}` : ''} bg-surface/80 backdrop-blur-xl backdrop-saturate-150 text-gray-900 flex flex-col h-screen fixed left-0 top-0 border-r border-gray-200/80 z-50 ${dragging || isPhone ? '' : 'transition-[width] duration-300 ease-in-out'}`}
     >
       {/* Drag handle on the right edge */}
       <div
@@ -178,30 +183,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isC
         onPointerDown={startDrag}
         onDoubleClick={() => { onCollapseChange(false); onWidthChange(256); }}
         title="Drag to resize · double-click to reset"
-        className="group absolute top-0 -right-1.5 h-full w-3 cursor-col-resize z-[60] flex justify-center"
+        className={`group absolute top-0 -right-1.5 h-full w-3 cursor-col-resize z-[60] justify-center ${isPhone ? 'hidden' : 'flex'}`}
       >
         <span className={`h-full w-0.5 transition-colors ${dragging ? 'bg-accent' : 'bg-transparent group-hover:bg-accent/50'}`} />
       </div>
       {/* Brand Header */}
       <div className={`h-16 px-4 flex items-center shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
         <div className="flex items-center gap-2.5 overflow-hidden">
-          <div className="tri-ring-sq w-9 h-9 shrink-0">
-            <div className="flex items-center justify-center">
-              <Icons.Hexagon className="w-[18px] h-[18px] text-white" strokeWidth={2.4} />
-            </div>
-          </div>
+          <span className="w-9 h-9 shrink-0 rounded-[10px] bg-[#0d2b3e] ring-1 ring-white/10 flex items-center justify-center" aria-hidden="true">
+            <svg viewBox="0 0 32 32" className="w-6 h-6"><path d="M8 10h16M8 16h11M8 22h6" stroke="#f4a621" strokeWidth="3" strokeLinecap="round" fill="none" /></svg>
+          </span>
           {!isCollapsed && (
             <div className="min-w-0">
               <h1 className="font-heading text-[17px] font-semibold tracking-tight text-gray-900 leading-tight">FlowCRM</h1>
-              <p className="text-xs text-gray-500 leading-tight">Workspace</p>
+              <p className="text-xs text-gray-500 leading-tight">Sales workspace</p>
             </div>
           )}
         </div>
 
         {/* Toggle Button */}
         <button
-          onClick={onToggle}
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={isPhone ? onClosePhone : onToggle}
+          aria-label={isPhone ? 'Close menu' : isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           className={`${isCollapsed ? 'absolute -right-3 top-5 bg-surface shadow-[var(--elev-2)] hover:bg-gray-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'} p-1.5 rounded-lg transition-colors z-50`}
         >
           {isCollapsed ? <Icons.ChevronRight className="w-4 h-4 text-gray-600" /> : <Icons.ChevronLeft className="w-4 h-4" />}
