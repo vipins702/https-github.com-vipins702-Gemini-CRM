@@ -5,7 +5,8 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { EntityDefinition, ObjectManagerProps } from '../types';
 import { api } from '../services/api';
-import { Plus, Box, Settings, ArrowRight, Loader2, Database, LayoutTemplate, Network, Link as LinkIcon, X, Check, List, LayoutGrid } from 'lucide-react';
+import { KeysAndJoins } from '../components/KeysAndJoins';
+import { Plus, Box, Settings, ArrowRight, Loader2, Database, LayoutTemplate, Network, Link as LinkIcon, X, Check, List, LayoutGrid, KeyRound } from 'lucide-react';
 import ReactFlow, {
    Node,
    Edge,
@@ -43,7 +44,7 @@ const nodeTypes = {
 };
 
 export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefreshSchemas }) => {
-   const [activeTab, setActiveTab] = useState<'list' | 'graph'>('list');
+   const [activeTab, setActiveTab] = useState<'list' | 'keys' | 'graph'>('list');
    const [objView, setObjView] = useState<'grid' | 'table'>('table');
    const [schemas, setSchemas] = useState<Record<string, EntityDefinition>>({});
    const [loading, setLoading] = useState(true);
@@ -194,9 +195,9 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
    if (loading && Object.keys(schemas).length === 0) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>;
 
    return (
-      <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+      <div className="h-[calc(100dvh-4rem)] flex flex-col overflow-hidden">
          {/* Header */}
-         <div className="h-16 bg-surface border-b border-gray-200 px-8 flex items-center justify-between shrink-0 z-20">
+         <div className="min-h-16 py-2 bg-surface border-b border-gray-200 px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-2 shrink-0 z-20">
             <div>
                <h1 className="text-xl font-bold text-gray-900">Object Manager</h1>
                <p className="text-xs text-gray-500">Manage data schema and relationships.</p>
@@ -209,6 +210,12 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
                   <LayoutTemplate className="w-4 h-4" /> Objects
                </button>
                <button
+                  onClick={() => setActiveTab('keys')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'keys' ? 'bg-surface shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+               >
+                  <KeyRound className="w-4 h-4" /> Keys &amp; joins
+               </button>
+               <button
                   onClick={() => setActiveTab('graph')}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'graph' ? 'bg-surface shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
                >
@@ -219,6 +226,13 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
          </div>
 
          <div className="flex-1 overflow-hidden relative">
+
+            {/* KEYS & JOINS */}
+            {activeTab === 'keys' && (
+               <div className="h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
+                  <div className="max-w-6xl mx-auto"><KeysAndJoins /></div>
+               </div>
+            )}
 
             {/* LIST VIEW */}
             {activeTab === 'list' && (

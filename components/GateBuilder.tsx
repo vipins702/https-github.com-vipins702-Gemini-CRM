@@ -7,7 +7,8 @@ import { Plus, Trash2, FolderPlus } from 'lucide-react';
 export interface GateRule { type: 'rule'; field: string; operator: string; value?: string }
 export interface Gate { type: 'group'; op: 'and' | 'or' | 'not'; children: (GateRule | Gate)[] }
 export type GateNode = GateRule | Gate;
-export interface GateField { name: string; label: string; options?: string[] }
+export type GateOption = string | { value: string; label: string };
+export interface GateField { name: string; label: string; options?: GateOption[] }
 export interface GateOperator { v: string; label: string; needsValue: boolean }
 
 export const MAX_DEPTH = 4;
@@ -85,7 +86,7 @@ const GroupView: React.FC<Props & { depth: number; onRemove?: () => void }> = ({
             (() => {
               const opts = fields.find(f => f.name === c.field)?.options;
               return opts?.length
-                ? <select className={`${sel} w-full`} value={c.value ?? ''} onChange={e => setChild(i, { ...c, value: e.target.value })}><option value="">— choose —</option>{opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
+                ? <select className={`${sel} w-full`} value={c.value ?? ''} onChange={e => setChild(i, { ...c, value: e.target.value })}><option value="">— choose —</option>{opts.map(o => typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}</select>
                 : <input className={`${sel} w-full`} value={c.value ?? ''} placeholder="value" onChange={e => setChild(i, { ...c, value: e.target.value })} />;
             })()
           ) : <span className={compact ? '' : 'hidden sm:block'} />}

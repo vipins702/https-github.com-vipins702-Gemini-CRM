@@ -1,7 +1,8 @@
 import { FieldDefinition } from '../types';
 
 /** One place that turns a stored value into text, for lists, detail pages and CSV export. */
-export interface FormatCtx { users?: Record<string, string> }
+/** labels: the record's _labels from the server, the words people read for lookup codes (10001 → Credit Card). */
+export interface FormatCtx { users?: Record<string, string>; labels?: Record<string, string> }
 
 export const ratingMax = (f: Pick<FieldDefinition, 'max'>) => (Number.isInteger(f.max) && (f.max as number) > 0 ? (f.max as number) : 5);
 
@@ -22,6 +23,7 @@ export function formatFieldValue(field: FieldDefinition, value: any, ctx: Format
       return '★'.repeat(n) + '☆'.repeat(max - n);
     }
     case 'user': return empty ? '' : ctx.users?.[String(value)] || String(value);
+    case 'lookup': return empty ? '' : ctx.labels?.[field.name] || String(value);
     case 'rollup': return empty ? '' : typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(value);
     default: return empty ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
   }

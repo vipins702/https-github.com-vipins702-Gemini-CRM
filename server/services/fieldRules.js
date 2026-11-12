@@ -13,6 +13,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { normalizeGate, evaluateGate, checkGate } from './conditions.js';
+import { expandTokens } from './tokens.js';
 
 const OPERATORS = new Set(['==', '!=', '>', '<', '>=', '<=', 'contains', 'empty', 'not_empty', 'changed']);
 export const RULE_OPERATORS = [...OPERATORS];
@@ -38,7 +39,7 @@ export function conditionMet(c, data, old) {
 }
 
 /** Fill {field} placeholders from the record. */
-export const fillTemplate = (tpl, data) => String(tpl ?? '').replace(/\{([A-Za-z_][\w]*)\}/g, (_, k) => (data[k] === undefined || data[k] === null ? '' : String(data[k])));
+export const fillTemplate = (tpl, data) => expandTokens(tpl, data);
 
 // ── Safe arithmetic: + - * / ( ) and decimals only ──────────────────────────
 function calc(expr) {

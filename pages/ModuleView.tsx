@@ -358,7 +358,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
       if (readOnly) {
          const display = field.type === 'currency' && value !== '' && value != null
             ? formatCurrency(value, record?.currency)
-            : (formatFieldValue(field, value, { users: peopleMap }) || '-');
+            : (formatFieldValue(field, value, { users: peopleMap, labels: record?._labels }) || '-');
          return <div className="py-2 text-sm text-gray-900 font-medium border-b border-gray-100">{display}</div>;
       }
       const handleChange = (e: any) => updateRecordField(field.name, e.target.value);
@@ -937,7 +937,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
          return '"' + t.replace(/"/g, '""') + '"';
       };
       const lines = [fields.map(f => cell(f.label || f.name)).join(',')];
-      filteredData.forEach(r => lines.push(fields.map(f => cell((r as any)[f.name])).join(',')));
+      // Lookup columns export their labels; a file with labels imports back to the same codes.
+      filteredData.forEach(r => lines.push(fields.map(f => cell(f.type === 'lookup' ? ((r as any)._labels?.[f.name] ?? (r as any)[f.name]) : (r as any)[f.name])).join(',')));
       const url = URL.createObjectURL(new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
       const a = document.createElement('a');
       a.href = url;
@@ -1293,7 +1294,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                                        ) : col.type === 'email' ? (
                                           <span className="text-slate-500 text-sm">{record[col.name]}</span>
                                        ) : (
-                                          <span className="text-slate-600 text-sm">{formatFieldValue(col, record[col.name], { users: peopleMap }) || '-'}</span>
+                                          <span className="text-slate-600 text-sm">{formatFieldValue(col, record[col.name], { users: peopleMap, labels: (record as any)._labels }) || '-'}</span>
                                        )}
                                     </td>
                                  ))}

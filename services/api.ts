@@ -513,6 +513,20 @@ export const api = {
     return fetchWithAuth(`${API_BASE}/lookups`);
   },
 
+  // Object keys and joins (Object Manager → Keys & joins). Changes on objects that already hold records come back
+  // as { needsConfirm, message } first; send again with confirm: true to apply.
+  async getKeys(): Promise<any[]> { return fetchWithAuth(`${API_BASE}/metadata/keys`); },
+  async changeKeyOrJoin(path: string, body: any): Promise<{ ok: boolean; status: number; data: any }> {
+    const res = await fetch(`${API_BASE}/metadata/${path}`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  },
+
+  /** Choices of every Lookup field of a record type: { field: [{ value (the saved code), label }] }. */
+  async getLookupOptions(entityType: string): Promise<Record<string, { value: string; label: string }[]>> {
+    return fetchWithAuth(`${API_BASE}/metadata/lookup-options/${encodeURIComponent(entityType)}`);
+  },
+
   async getLookupValues(lookupId: string): Promise<{ id: string; lookup_id: string; value_id: string; value: string; sort_order: number }[]> {
     return fetchWithAuth(`${API_BASE}/lookups/${lookupId}`);
   },

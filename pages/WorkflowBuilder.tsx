@@ -1,5 +1,6 @@
 
 import { GateBuilder, emptyGate, toGate } from '../components/GateBuilder';
+import { FieldMapper, toRows, toObject } from '../components/FieldMapper';
 import React, { useCallback, useState, useEffect } from 'react';
 import ReactFlow, { 
   addEdge, 
@@ -24,18 +25,43 @@ import { api } from '../services/api';
 
 // --- CUSTOM NODE COMPONENTS ---
 
+/** One line under a step's name saying what it does, read from its settings. */
+const stepSummary = (data: FlowNodeData): string => {
+  const c: any = data.config || {};
+  switch (data.type) {
+    case 'trigger': {
+      const when: Record<string, string> = { create: 'is created', update: 'is updated', delete: 'is deleted', status_change: `status changes${c.to ? ` to ${c.to}` : ''}`, field_change: `${c.field || 'a field'} changes`, date_arrives: `${Math.abs(c.offsetDays || 0)} day(s) ${(c.offsetDays || 0) < 0 ? 'before' : 'after'} ${c.field || 'a date'}`, inactive: `${c.days || '?'} days without activity` };
+      return c.entityType ? `When a ${c.entityType} ${when[c.triggerType || 'create'] || ''}` : 'Choose a record type';
+    }
+    case 'wait': return c.amount ? `${c.amount} ${c.unit || 'days'}` : 'Set how long';
+    case 'action':
+      switch (c.type) {
+        case 'email': return c.subject ? `“${c.subject}”` : 'Write the e-mail';
+        case 'whatsapp': return c.body ? `“${String(c.body).slice(0, 40)}”` : 'Write the message';
+        case 'create_task': return c.subject ? `“${c.subject}”${c.dueInDays ? `, due in ${c.dueInDays} day(s)` : ''}` : 'Name the task';
+        case 'update_record': { const k = Object.keys(c.fields || {}).filter(Boolean); return k.length ? `Sets ${k.slice(0, 3).join(', ')}${k.length > 3 ? '…' : ''}` : 'Choose fields to set'; }
+        case 'create_lead': return 'New lead';
+        case 'create_record': return c.entityType ? `New ${c.entityType}` : 'Choose a record type';
+        case 'notify': return c.message ? `“${String(c.message).slice(0, 40)}”` : 'Write the notification';
+        case 'assign_owner': return c.mode === 'rules' ? 'By assignment rules' : c.userId ? 'To a chosen person' : 'Choose who';
+        case 'webhook': return c.url ? String(c.url).replace(/^https?:\/\//, '').slice(0, 36) : 'Enter the address';
+        default: return 'Choose what this step does';
+      }
+    default: return '';
+  }
+};
+
+
 const TriggerNode = ({ data, selected }: NodeProps<FlowNodeData>) => (
-  <div className={`relative group min-w-[200px] transition-all duration-200 ${selected ? 'scale-105' : ''}`}>
-    <div className={`
-       rounded-full px-6 py-3 shadow-lg flex items-center gap-3 justify-center border-2
-       ${selected ? 'bg-indigo-600 border-indigo-400 ring-2 ring-indigo-200' : 'bg-[#1d1d1f] border-[#2c2c2e]'}
-    `}>
-       <div className="p-1.5 bg-indigo-500 rounded-full text-white">
-          <Zap className="w-4 h-4" fill="currentColor" />
+  <div className={`relative group min-w-[230px] max-w-[280px] transition-transform duration-200 ${selected ? 'scale-[1.03]' : ''}`}>
+    <div className={`rounded-2xl px-4 py-3 flex items-center gap-3 border bg-[#0d2b3e] ${selected ? 'border-[#f4a621] ring-2 ring-[#f4a621]/40' : 'border-white/10'} shadow-[0_6px_18px_-8px_rgba(13,43,62,0.6)]`}>
+       <div className="p-2 rounded-xl bg-[#f4a621] text-[#0d2b3e] shrink-0"><Zap className="w-4 h-4" fill="currentColor" /></div>
+       <div className="min-w-0">
+          <div className="text-white font-semibold text-sm leading-tight truncate">{data.label}</div>
+          <div className="text-[11px] text-white/70 leading-snug truncate">{stepSummary(data)}</div>
        </div>
-       <div className="text-white font-bold tracking-wide text-sm">{data.label}</div>
     </div>
-    <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-indigo-500 !border-2 !border-white" />
+    <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-[#f4a621] !border-2 !border-white" />
   </div>
 );
 
@@ -44,7 +70,7 @@ const ActionNode = ({ data, selected }: NodeProps<FlowNodeData>) => (
     <Handle type="target" position={Position.Top} className="!w-3 !h-3 !bg-slate-400 !border-2 !border-white" />
     
     <div className="bg-surface border border-slate-200 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-       <div className="h-1 bg-indigo-500 w-full"></div>
+       <div className="h-1 bg-accent w-full"></div>
        <div className="p-4 flex items-start gap-3">
           <div className={`p-2 rounded-lg shrink-0 ${
              data.icon === 'mail' ? 'bg-blue-50 text-blue-600' : data.icon === 'user-plus' || data.icon === 'user-check' ? 'bg-green-50 text-green-600' : data.icon === 'bell' ? 'bg-amber-50 text-amber-600' : data.icon === 'message-circle' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'
@@ -58,9 +84,9 @@ const ActionNode = ({ data, selected }: NodeProps<FlowNodeData>) => (
              {data.icon === 'message-circle' && <MessageCircle className="w-5 h-5"/>}
              {!['mail', 'user-plus', 'file-text', 'bell', 'user-check', 'globe', 'message-circle'].includes(data.icon || '') && <Settings className="w-5 h-5"/>}
           </div>
-          <div>
-             <div className="text-xs font-bold text-slate-400 mb-0.5">{data.type}</div>
-             <div className="font-semibold text-slate-900 text-sm leading-tight">{data.label}</div>
+          <div className="min-w-0">
+             <div className="font-semibold text-slate-900 text-sm leading-tight truncate">{data.label}</div>
+             <div className="text-[11px] text-slate-500 leading-snug mt-0.5 truncate max-w-[190px]">{stepSummary(data)}</div>
           </div>
        </div>
     </div>
@@ -74,12 +100,13 @@ const ConditionNode = ({ data, selected }: NodeProps<FlowNodeData>) => (
     <Handle type="target" position={Position.Top} className="!w-3 !h-3 !bg-slate-400 !border-2 !border-white" />
     
     <div className={`
-      transform rotate-0 bg-amber-50 border-2 border-amber-200 rounded-lg p-3 shadow-sm text-center
+      bg-amber-50 border-2 border-amber-200 rounded-xl px-4 pt-3 pb-6 shadow-sm text-center
       ${selected ? 'ring-2 ring-amber-400' : ''}
     `}>
        <div className="flex flex-col items-center justify-center gap-1">
           <GitBranch className="w-5 h-5 text-amber-600" />
           <span className="font-bold text-amber-900 text-sm">{data.label}</span>
+          {!(data.config as any)?.conditions?.children?.length && <span className="text-[11px] text-amber-700">Add the condition</span>}
        </div>
     </div>
     
@@ -102,6 +129,7 @@ const WaitNode = ({ data, selected }: NodeProps<FlowNodeData>) => (
     <div className="bg-slate-100 border border-slate-300 rounded-full px-4 py-2 flex items-center justify-center gap-2 shadow-sm">
        <Clock className="w-4 h-4 text-slate-500" />
        <span className="text-sm font-medium text-slate-700">{data.label}</span>
+       <span className="text-xs text-slate-500">· {stepSummary(data)}</span>
     </div>
 
     <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-indigo-500 !border-2 !border-white" />
@@ -229,6 +257,7 @@ export const WorkflowBuilder: React.FC<{ journeyId?: string | null; onBack?: () 
   const [problems, setProblems] = useState<string[]>([]);
   const [savedNote, setSavedNote] = useState('');
   const [panel, setPanel] = useState<null | 'test' | 'runs'>(null);
+  const [lookupOpts, setLookupOpts] = useState<Record<string, { value: string; label: string }[]>>({});
 
   // Load the journey (or a blank one with its Start Trigger)
   useEffect(() => {
@@ -359,6 +388,7 @@ export const WorkflowBuilder: React.FC<{ journeyId?: string | null; onBack?: () 
     { value: 'create_task', label: 'Create Task' },
     { value: 'update_record', label: 'Update Record' },
     { value: 'create_lead', label: 'Create Lead' },
+    { value: 'create_record', label: 'Create Any Record' },
     { value: 'notify', label: 'Notify a User' },
     { value: 'assign_owner', label: 'Assign Owner' },
     { value: 'webhook', label: 'Call Webhook' },
@@ -368,8 +398,10 @@ export const WorkflowBuilder: React.FC<{ journeyId?: string | null; onBack?: () 
   const entityOptions = Object.values(schemas) as any[];
   // The trigger step decides which record type every condition in the journey is about.
   const triggerCfg = ((nodes.find((n) => n.type === 'trigger')?.data?.config) || {}) as any;
+  const triggerEntity = triggerCfg.entityType as string | undefined;
+  useEffect(() => { if (triggerEntity) api.getLookupOptions(triggerEntity).then(setLookupOpts).catch(() => setLookupOpts({})); }, [triggerEntity]);
   const triggerEntityFields = (schemas[selected?.type === 'trigger' ? cfg.entityType : triggerCfg.entityType]?.fields || []) as any[];
-  const gateFields = [{ name: 'status', label: 'Status' }, ...triggerEntityFields.filter((f: any) => f.name !== 'status')].map((f: any) => ({ name: f.name, label: f.label, options: f.options }));
+  const gateFields = [{ name: 'status', label: 'Status' }, ...triggerEntityFields.filter((f: any) => f.name !== 'status')].map((f: any) => ({ name: f.name, label: f.label, options: lookupOpts[f.name]?.length ? lookupOpts[f.name] : f.options }));
   const gateOperators = OPERATORS.map(o => ({ v: o, label: ({ '==': 'is', '!=': 'is not', '>': 'greater than', '<': 'less than', '>=': 'at least', '<=': 'at most', contains: 'contains', not_contains: 'does not contain', is_empty: 'is empty', is_not_empty: 'has a value' } as Record<string, string>)[o] || o, needsValue: !['is_empty', 'is_not_empty'].includes(o) }));
 
   const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-surface outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
@@ -718,21 +750,38 @@ export const WorkflowBuilder: React.FC<{ journeyId?: string | null; onBack?: () 
                        </div>
                     )}
 
-                    {(cfg.type === 'update_record' || cfg.type === 'create_lead') && (
+                    {cfg.type === 'create_record' && (
                        <div>
-                          <label className="block text-xs font-bold text-gray-500 mb-2">
-                             {cfg.type === 'update_record' ? 'Fields to set' : 'Lead fields'}
-                          </label>
-                          <textarea
-                             className={`${inputCls} font-mono`}
-                             rows={4}
-                             value={fieldsToText(cfg.fields)}
-                             onChange={(e) => updateNodeConfig({ fields: textToFields(e.target.value) })}
-                             placeholder={'status = Contacted\nscore = 50'}
-                          />
-                          <p className="text-xs text-gray-400 mt-1.5">One per line: <code>field = value</code>. Use {'{token}'} to pull from the record.</p>
+                          <label className="block text-xs font-bold text-gray-500 mb-2">Record type to create</label>
+                          <select className={inputCls} value={cfg.entityType || ''} onChange={(e) => updateNodeConfig({ entityType: e.target.value, fields: {} })}>
+                             <option value="">Choose…</option>
+                             {entityOptions.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                          </select>
                        </div>
                     )}
+
+                    {(cfg.type === 'update_record' || cfg.type === 'create_lead' || (cfg.type === 'create_record' && cfg.entityType)) && (() => {
+                       const targetType = cfg.type === 'update_record' ? triggerCfg.entityType : cfg.type === 'create_lead' ? 'lead' : cfg.entityType;
+                       const targetFields = ((schemas[targetType]?.fields || []) as any[]).filter((f) => !['formula', 'rollup', 'autonumber', 'image', 'iframe', 'attachment'].includes(f.type));
+                       const same = targetType === triggerCfg.entityType;
+                       return (
+                          <div>
+                             <label className="block text-xs font-bold text-gray-500 mb-2">
+                                {cfg.type === 'update_record' ? 'Fields to set on the record' : `Fields of the new ${schemas[targetType]?.label || 'record'}`}
+                             </label>
+                             {!targetType ? <p className="text-xs text-amber-600">Choose the record type on the Start Trigger first.</p> : (
+                                <FieldMapper
+                                   compact
+                                   value={toRows(cfg.fields)}
+                                   onChange={(rows) => updateNodeConfig({ fields: toObject(rows) })}
+                                   targets={[...(targetFields.some((f) => f.name === 'status') ? [] : [{ name: 'status', label: 'Status', type: 'status' }]), ...targetFields].map((f: any) => ({ name: f.name, label: f.label, type: f.type, options: same && lookupOpts[f.name]?.length ? lookupOpts[f.name] : f.options }))}
+                                   sources={triggerEntityFields.map((f: any) => ({ name: f.name, label: f.label, type: f.type }))}
+                                />
+                             )}
+                             <p className="text-xs text-gray-400 mt-1.5">Pick a field, then give it a value, copy another field of the record, or use a date such as today plus 3 days.</p>
+                          </div>
+                       );
+                    })()}
 
                     {!cfg.type && (
                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">

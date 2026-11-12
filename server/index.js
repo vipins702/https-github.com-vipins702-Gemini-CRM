@@ -25,6 +25,8 @@ import { evaluateWorkflows } from './services/workflow.js';
 import { applyFieldLogic, checkRule, toRow, fromRow, RULE_OPERATORS } from './services/fieldRules.js';
 import { registerJourneyRoutes, saveJourney } from './services/journeysApi.js';
 import { startJourneyScheduler } from './services/journeys.js';
+import { registerKeyRoutes } from './services/keys.js';
+import { lookupOptions, labelMapsFor, attachLabels, codeFor } from './services/lookups.js';
 import { applyAutoNumbers, keepAutoNumbers, stripComputed, uniqueProblems, userFieldProblems, computeRollups, definitionProblems } from './services/fieldTypes.js';
 import { runLeadRule, runAllActiveRules, evaluateRealtimeLeadRules, startLeadRuleScheduler } from './services/leadgen.js';
 import { generateCustomerInsight, isAIEnabled, generateLeadFollowupTasks } from './services/ai.js';
@@ -1001,6 +1003,16 @@ app.post('/api/saved-reports/run', authenticateToken, async (req, res) => {
         let rows = await db.all(sql, ...params);
         // Raw mode without columns returns the whole record: drop the hidden fields.
         if (hidden.size) rows = rows.map(r => (r.data ? { ...r, data: JSON.stringify(filterFields(req, entityType, JSON.parse(r.data))) } : r));
+        // Lookup columns show their labels (grouping and filtering still work on the saved codes).
+        {
+            const defRow = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
+            const def = defRow ? JSON.parse(defRow.config) : null;
+            if (def?.fields?.some(f => f.type === 'lookup')) {
+                const maps = await labelMapsFor(req.tenantId, entityType, def);
+                const shown = Object.keys(maps).filter(n => used.includes(n));
+                if (shown.length) rows = rows.map(r => { const o = { ...r }; for (const n of shown) if (o[n] != null && maps[n].has(String(o[n]))) o[n] = maps[n].get(String(o[n])); return o; });
+            }
+        }
         res.json({ rows, total: rows.length });
     } catch (e) {
         console.error('Report Run Error:', e);
@@ -1032,6 +1044,8 @@ app.get('/api/data/:entityType', authenticateToken, async (req, res) => {
                 await computeRollups(db, req.tenantId, def, records);
                 for (const f of def.fields) if (f.type === 'rollup') for (const r of records) if (hiddenFields(req, entityType).includes(f.name)) delete r[f.name];
             }
+            // Lookup fields keep their saved code; _labels carries the words people read (never saved: "_" keys are dropped on save).
+            if (def?.fields?.some(f => f.type === 'lookup')) attachLabels(records, await labelMapsFor(req.tenantId, entityType, def));
         }
         res.json(records);
     } catch (error) {
@@ -1621,60 +1635,30 @@ app.get('/api/lookups/import-sources', authenticateToken, async (req, res) => {
     }
 });
 
-// Get all lookup values for a specific lookup_id (checks for live source first)
+// Get all lookup values for a specific lookup_id (a live source is read fresh; see services/lookups.js)
 app.get('/api/lookups/:lookupId', authenticateToken, async (req, res) => {
-    const { lookupId } = req.params;
     try {
-        // Check for live source configuration first
-        const liveSource = await db.get(
-            'SELECT * FROM lookup_sources WHERE tenant_id = ? AND lookup_id = ? AND is_active = 1', req.tenantId, lookupId
-        );
-
-        if (liveSource) {
-            // Query the source table directly for live values
-            let rows = [];
-
-            if (liveSource.source_type === 'users') {
-                rows = await db.all(`
-                    SELECT id as value_id, 
-                           COALESCE(first_name || ' ' || last_name, email) as value 
-                    FROM users WHERE tenant_id = ?
-                `, req.tenantId);
-            } else if (liveSource.source_type === 'records') {
-                rows = await db.all(`
-                    SELECT id as value_id, 
-                           COALESCE(primary_display, id) as value 
-                    FROM records WHERE tenant_id = ? AND entity_type = ?
-                `, req.tenantId, liveSource.source_entity);
-            } else if (liveSource.source_type === 'sql' && liveSource.sql_query) {
-                // Admin-configured custom SQL, run in the tenant sandbox
-                const sqlRows = await runTenantQuery(req.tenantId, liveSource.sql_query);
-                rows = sqlRows.map(r => ({
-                    value_id: String(r[liveSource.value_field] || r.id || r.value_id),
-                    value: String(r[liveSource.label_field] || r.name || r.value || 'Unnamed')
-                }));
-            }
-
-            // Transform to standard lookup format
-            const result = rows.map((r, i) => ({
-                id: `live_${i}`,
-                lookup_id: lookupId,
-                value_id: r.value_id,
-                value: r.value,
-                sort_order: i,
-                is_live: true
-            }));
-            return res.json(result);
-        }
-
-        // Fallback to static lookup_values
-        const rows = await db.all(
-            'SELECT * FROM lookup_values WHERE tenant_id = ? AND lookup_id = ? AND is_active = 1 ORDER BY sort_order', req.tenantId, lookupId
-        );
-        res.json(rows);
+        res.json(await lookupOptions(req.tenantId, req.params.lookupId));
     } catch (error) {
         console.error('Get lookup values error:', error);
         res.status(500).json({ error: 'Failed to fetch lookup values' });
+    }
+});
+
+// Choices of every Lookup field of one record type, for the screens that build conditions and field mappings:
+// { fieldName: [{ value (the code that is saved), label (what people read) }] }
+app.get('/api/metadata/lookup-options/:entity', authenticateToken, async (req, res) => {
+    try {
+        const row = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', req.tenantId, req.params.entity);
+        if (!row) return res.status(404).json({ error: 'Unknown record type' });
+        const def = JSON.parse(row.config);
+        const maps = await labelMapsFor(req.tenantId, req.params.entity, def);
+        const out = {};
+        for (const [name, map] of Object.entries(maps)) out[name] = [...map].slice(0, 500).map(([value, label]) => ({ value, label }));
+        res.json(out);
+    } catch (error) {
+        console.error('Lookup options error:', error);
+        res.status(500).json({ error: 'Failed to fetch lookup options' });
     }
 });
 
@@ -3171,6 +3155,7 @@ app.post('/api/lead-rules/run-all', authenticateToken, async (req, res) => {
 
 // Journeys (services/journeys.js, journeysApi.js). /api/workflows stays as the older single-journey doorway.
 registerJourneyRoutes(app, { authenticateToken, requireAdmin });
+registerKeyRoutes(app, { authenticateToken, requireAdmin });
 app.post('/api/workflows', authenticateToken, requireAdmin, validate(rules.workflows), async (req, res) => {
     try {
         const first = await db.get('SELECT id FROM journeys WHERE tenant_id = ? ORDER BY created_at LIMIT 1', req.tenantId);
@@ -3519,6 +3504,7 @@ app.post('/api/data/:entityType/import', authenticateToken, csvUpload.single('fi
         // Get entity definition for field types
         const defRow = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', req.tenantId, entityType);
         const def = defRow ? JSON.parse(defRow.config) : { fields: [] };
+        const importMaps = await labelMapsFor(req.tenantId, entityType, def);   // a file may hold labels ("Credit Card"); the record stores the code
 
         let imported = 0, skipped = 0;
         const errors = [];
@@ -3583,6 +3569,7 @@ app.post('/api/data/:entityType/import', authenticateToken, csvUpload.single('fi
                 mapped._imported_via = 'csv';
                 mapped._imported_at = new Date().toISOString();
                 stripComputed(def, mapped);
+                for (const n of Object.keys(importMaps)) if (mapped[n] !== undefined) mapped[n] = codeFor(importMaps[n], mapped[n]);
                 const dupes = await uniqueProblems(db, req.tenantId, entityType, def, mapped, null);
                 if (dupes.length) throw new Error(dupes.join('; '));
                 await applyAutoNumbers(db, req.tenantId, entityType, def, mapped);

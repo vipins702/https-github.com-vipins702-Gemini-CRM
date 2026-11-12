@@ -2,7 +2,7 @@
 // is readable by anyone who may read that record (see the policy table in middleware/access.js).
 import db from '../database.js';
 import { v4 as uuidv4 } from 'uuid';
-import { checkJourney, triggerOf, rowToJourney, summarizeTrigger, testJourney, processDue, scanTimeTriggers, TRIGGERS } from './journeys.js';
+import { checkJourney, triggerOf, rowToJourney, summarizeTrigger, testJourney, processDue, scanTimeTriggers, recordWithLabels, TRIGGERS } from './journeys.js';
 import { logAudit } from './audit.js';
 
 const MAX_JOURNEYS = 50;
@@ -124,7 +124,7 @@ export function registerJourneyRoutes(app, { authenticateToken, requireAdmin }) 
         const rec = await db.get('SELECT id, status, data, owner_id FROM records WHERE id = ? AND tenant_id = ? AND entity_type = ?', req.body.recordId, req.tenantId, row.entity_type);
         if (!rec) return res.status(404).json({ error: 'That record was not found' });
         const data = parse(rec.data, {});
-        res.json(testJourney(parse(row.graph, { nodes: [], edges: [] }), { ...data, id: rec.id, status: data.status ?? rec.status, owner_id: rec.owner_id }));
+        res.json(testJourney(parse(row.graph, { nodes: [], edges: [] }), await recordWithLabels(req.tenantId, row.entity_type, { ...data, id: rec.id, status: data.status ?? rec.status, owner_id: rec.owner_id })));
     });
 
     app.get('/api/journeys/:id/runs', ...admin, async (req, res) => {

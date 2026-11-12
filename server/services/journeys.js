@@ -17,6 +17,8 @@ import db from '../database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { normalizeGate, evaluateGate, checkGate } from './conditions.js';
 import { runAction, evaluateCondition, interpolate } from './workflow.js';
+import { tokensIn } from './tokens.js';
+import { labelMapsFor, attachLabels } from './lookups.js';
 
 export const TRIGGERS = ['create', 'update', 'delete', 'status_change', 'field_change', 'date_arrives', 'inactive'];
 export const ACTIONS = ['email', 'update_record', 'create_task', 'create_lead', 'create_record', 'notify', 'assign_owner', 'webhook', 'whatsapp'];
@@ -105,6 +107,16 @@ export function checkJourney(graph, schemas) {
             if (c.type === 'notify' && !String(c.message || '').trim()) errs.push(`"${label}": the notification needs a message`);
             if (c.type === 'assign_owner' && !c.userId && c.mode !== 'rules') errs.push(`"${label}": choose who to assign to`);
             if (c.type === 'create_record' && !schemas?.[c.entityType]) errs.push(`"${label}": choose the record type to create`);
+            // Field mapping: every field being set must exist on the record type that is changed or created,
+            // and every {field} copied into a value must exist on the record type that started the journey.
+            const targetType = c.type === 'update_record' ? t.entityType : c.type === 'create_task' ? 'task' : c.type === 'create_lead' ? 'lead' : c.type === 'create_record' ? c.entityType : null;
+            if (targetType && c.fields && typeof c.fields === 'object' && !Array.isArray(c.fields)) {
+                const targetNames = new Set((schemas?.[targetType]?.fields || []).map(f => f.name).concat(['status']));
+                for (const [k, v] of Object.entries(c.fields)) {
+                    if (schemas?.[targetType] && !targetNames.has(k)) errs.push(`"${label}": "${k}" is not a field of ${schemas[targetType].label}`);
+                    for (const used of tokensIn(v)) if (!fieldNames.has(used)) errs.push(`"${label}": {${used}} is not a field of ${schema?.label || 'the trigger record'}`);
+                }
+            } else if (c.fields !== undefined && targetType) errs.push(`"${label}": the fields to set must be a list of field = value`);
             if (c.type === 'webhook') {
                 let u; try { u = new URL(String(c.url || '')); } catch { u = null; }
                 if (!u || !['http:', 'https:'].includes(u.protocol)) errs.push(`"${label}": the webhook needs a full http(s) address`);
@@ -175,11 +187,21 @@ const nextOf = (graph, id, handle) => {
     return es[0]?.target || null;
 };
 
+export async function recordWithLabels(tenantId, entityType, rec) {
+    try {
+        const d = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', tenantId, entityType);
+        const def = d ? safeJson(d.config, null) : null;
+        if (def?.fields?.some(f => f.type === 'lookup')) attachLabels([rec], await labelMapsFor(tenantId, entityType, def));
+    } catch (e) { console.warn('[journeys] labels skipped:', e.message); }
+    return rec;
+}
+
 async function loadRecord(tenantId, id) {
-    const r = await db.get('SELECT id, status, data, owner_id, updated_at FROM records WHERE id = ? AND tenant_id = ?', id, tenantId);
+    const r = await db.get('SELECT id, entity_type, status, data, owner_id, updated_at FROM records WHERE id = ? AND tenant_id = ?', id, tenantId);
     if (!r) return null;
     const data = safeJson(r.data, {});
-    return { ...data, id: r.id, status: data.status ?? r.status, owner_id: r.owner_id, _updated_at: r.updated_at };
+    // _labels: the words people read for lookup codes. Messages use them; conditions and field mapping use the codes.
+    return recordWithLabels(tenantId, r.entity_type, { ...data, id: r.id, status: data.status ?? r.status, owner_id: r.owner_id, _updated_at: r.updated_at });
 }
 
 export function describeAction(c, record = {}) {

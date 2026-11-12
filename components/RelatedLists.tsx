@@ -71,7 +71,7 @@ export const RelatedLists: React.FC<Props> = ({ entityType, recordId, onNavigate
                     <tr key={r.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => onNavigate?.(schema.id, { editId: r.id })}>
                       {shown.map((f, i) => (
                         <td key={f.name} className={`px-4 py-2.5 whitespace-nowrap ${i === 0 ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
-                          {f.type === 'status' ? <Badge status={r[f.name]} variant="dot" /> : (formatFieldValue(f, r[f.name]) || <span className="text-gray-300">—</span>)}
+                          {f.type === 'status' ? <Badge status={r[f.name]} variant="dot" /> : (formatFieldValue(f, r[f.name], { labels: (r as any)._labels }) || <span className="text-gray-300">—</span>)}
                         </td>
                       ))}
                       <td className="pr-3 text-gray-300"><ChevronRight className="w-4 h-4" aria-hidden="true" /></td>

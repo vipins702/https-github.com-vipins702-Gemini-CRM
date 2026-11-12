@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import { EntityDefinition, FieldRule, RuleOperator } from '../types';
 import { GateBuilder, emptyGate, toGate, describeGate } from '../components/GateBuilder';
+import { FieldMapper } from '../components/FieldMapper';
 
 // Configuration → Field Triggers: rules that set field values BEFORE a record is saved.
 // e.g. WHEN Interested = Yes AND Budget = No AND Callback = Yes  THEN  Priority = "Nurture".
@@ -36,6 +37,9 @@ export const FieldTriggers: React.FC = () => {
   const [draft, setDraft] = useState<FieldRule | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Lookup fields: pick the label people know; the code is what gets saved and compared.
+  const [lookups, setLookups] = useState<Record<string, { value: string; label: string }[]>>({});
+  useEffect(() => { if (entity) api.getLookupOptions(entity).then(setLookups).catch(() => setLookups({})); }, [entity]);
 
   useEffect(() => { api.getSchemas().then(s => { setSchemas(s || {}); if (s && !s[entity]) setEntity(Object.keys(s)[0] || ''); }).catch(() => {}); }, []);
   const load = () => {
@@ -48,7 +52,7 @@ export const FieldTriggers: React.FC = () => {
   const fields = schemas[entity]?.fields || [];
   const settable = useMemo(() => fields.filter(f => f.type !== 'formula' && !['image', 'iframe', 'attachment'].includes(f.type)), [fields]);
   const label = (n: string) => fields.find(f => f.name === n)?.label || n;
-  const optionsOf = (n: string) => fields.find(f => f.name === n)?.options;
+  const optionsOf = (n: string): (string | { value: string; label: string })[] | undefined => lookups[n]?.length ? lookups[n] : fields.find(f => f.name === n)?.options;
 
   const save = async (rule: FieldRule) => {
     setSaving(true);
@@ -66,7 +70,7 @@ export const FieldTriggers: React.FC = () => {
   const ValueInput: React.FC<{ field: string; value: string; onChange: (v: string) => void; placeholder?: string }> = ({ field, value, onChange, placeholder }) => {
     const opts = optionsOf(field);
     return opts?.length
-      ? <select className={`${input} w-full`} value={value} onChange={e => onChange(e.target.value)}><option value="">— choose —</option>{opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
+      ? <select className={`${input} w-full`} value={value} onChange={e => onChange(e.target.value)}><option value="">— choose —</option>{opts.map(o => typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}</select>
       : <input className={`${input} w-full`} value={value} placeholder={placeholder || 'value'} onChange={e => onChange(e.target.value)} />;
   };
 
@@ -92,28 +96,18 @@ export const FieldTriggers: React.FC = () => {
 
             <div>
               <span className="eyebrow block mb-2">When</span>
-              <GateBuilder value={toGate(draft.conditions)} onChange={g => setDraft({ ...draft, conditions: g })} fields={fields.map(f => ({ name: f.name, label: f.label, options: f.options }))} operators={OPS} />
+              <GateBuilder value={toGate(draft.conditions)} onChange={g => setDraft({ ...draft, conditions: g })} fields={fields.map(f => ({ name: f.name, label: f.label, options: optionsOf(f.name) }))} operators={OPS} />
             </div>
 
             <div>
               <span className="eyebrow block mb-2">Then set</span>
-              <div className="space-y-2">
-                {draft.actions.map((a, i) => {
-                  const set = (patch: any) => setDraft({ ...draft, actions: draft.actions.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
-                  return (
-                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_11rem_minmax(0,1fr)_auto] items-center gap-2">
-                      <select className={`${input} w-full`} value={a.field} onChange={e => set({ field: e.target.value, value: '' })}>
-                        <option value="">— field —</option>
-                        {settable.map(f => <option key={f.name} value={f.name}>{f.label}</option>)}
-                      </select>
-                      <span className="hidden sm:block text-sm text-gray-500 text-center">to</span>
-                      <ValueInput field={a.field} value={a.value} onChange={v => set({ value: v })} placeholder="value, or {otherField}" />
-                      <button aria-label="Remove action" disabled={draft.actions.length === 1} onClick={() => setDraft({ ...draft, actions: draft.actions.filter((_, j) => j !== i) })} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  );
-                })}
-                <button className="text-sm font-medium text-accent hover:underline" onClick={() => setDraft({ ...draft, actions: [...draft.actions, { field: '', value: '' }] })}>+ Add field to set</button>
-              </div>
+              <FieldMapper
+                value={draft.actions}
+                onChange={rows => setDraft({ ...draft, actions: rows })}
+                targets={settable.map(f => ({ name: f.name, label: f.label, type: f.type, options: optionsOf(f.name) }))}
+                sources={fields.map(f => ({ name: f.name, label: f.label, type: f.type }))}
+                addLabel="Add field to set"
+              />
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">

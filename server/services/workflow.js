@@ -7,6 +7,8 @@ import { assignLead } from './assignment.js';
 import { evaluateRealtimeLeadRules } from './leadgen.js';
 import { normalizeGate, evaluateGate } from './conditions.js';
 import { applyAutoNumbers } from './fieldTypes.js';
+import { expandTokens } from './tokens.js';
+import { withLabels } from './lookups.js';
 
 /**
  * Workflow / Journey execution engine.
@@ -71,13 +73,15 @@ function checkConditions(record, conditions) {
 
 export function interpolate(text, record) {
     if (text === undefined || text === null) return '';
-    return String(text).replace(/\{(\w+)\}/g, (_, key) => (record[key] !== undefined ? record[key] : ''));
+    // Text a person reads: lookup codes become their labels ("Credit Card", not 10001).
+    return expandTokens(text, withLabels(record));
 }
 
 function interpolateFields(fields, record) {
     const out = {};
     for (const [k, v] of Object.entries(fields || {})) {
-        out[k] = typeof v === 'string' ? interpolate(v, record) : v;
+        // Values being SAVED into fields keep codes, so copying a lookup field into another lookup field still works.
+        out[k] = typeof v === 'string' ? expandTokens(v, record) : v;
     }
     return out;
 }
@@ -185,7 +189,7 @@ async function runWebhook(action, ctx) {
     const res = await safeFetch(action.url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ journey: ctx.workflowName, entityType: ctx.entityType, record: clean }),
+        body: JSON.stringify({ journey: ctx.workflowName, entityType: ctx.entityType, record: clean, labels: ctx.record?._labels || {} }),
     });
     if (!res.ok) throw new Error(`the webhook answered ${res.status}`);
 }

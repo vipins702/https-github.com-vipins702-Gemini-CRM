@@ -34,6 +34,7 @@ const Value: React.FC<{ field: FieldDefinition; value: any; record: Record<strin
   if (field.type === 'checkbox') return <>{value === true || value === 'true' ? 'Yes' : 'No'}</>;
   if (value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length)) return <span className="text-gray-400">—</span>;
   switch (field.type) {
+    case 'lookup': return <>{record._labels?.[field.name] || String(value)}</>;
     case 'multiselect':
       return <span className="flex flex-wrap gap-1">{(Array.isArray(value) ? value : [value]).map((v: string) => <span key={v} className="px-2 py-0.5 rounded-full bg-gray-100 text-xs text-gray-700">{v}</span>)}</span>;
     case 'rating': return <span className="text-amber-500 tracking-wide" aria-label={`${value} out of ${field.max || 5}`}>{formatFieldValue(field, value)}</span>;
