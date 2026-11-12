@@ -26,8 +26,9 @@ import { applyFieldLogic, checkRule, toRow, fromRow, RULE_OPERATORS } from './se
 import { registerJourneyRoutes, saveJourney } from './services/journeysApi.js';
 import { startJourneyScheduler } from './services/journeys.js';
 import { registerKeyRoutes } from './services/keys.js';
+import { registerPackRoutes } from './services/packs.js';
 import { lookupOptions, labelMapsFor, attachLabels, codeFor } from './services/lookups.js';
-import { applyAutoNumbers, keepAutoNumbers, stripComputed, uniqueProblems, userFieldProblems, computeRollups, definitionProblems } from './services/fieldTypes.js';
+import { applyAutoNumbers, keepAutoNumbers, stripComputed, uniqueProblems, userFieldProblems, addComputed, definitionProblems } from './services/fieldTypes.js';
 import { runLeadRule, runAllActiveRules, evaluateRealtimeLeadRules, startLeadRuleScheduler } from './services/leadgen.js';
 import { generateCustomerInsight, isAIEnabled, generateLeadFollowupTasks } from './services/ai.js';
 import { ingestLead, mapPayload } from './services/ingest.js';
@@ -1041,7 +1042,7 @@ app.get('/api/data/:entityType', authenticateToken, async (req, res) => {
         if (defRow) {
             let def = null; try { def = JSON.parse(defRow.config); } catch { def = null; }
             if (def?.fields?.some(f => f.type === 'rollup')) {
-                await computeRollups(db, req.tenantId, def, records);
+                await addComputed(db, req.tenantId, def, records);
                 for (const f of def.fields) if (f.type === 'rollup') for (const r of records) if (hiddenFields(req, entityType).includes(f.name)) delete r[f.name];
             }
             // Lookup fields keep their saved code; _labels carries the words people read (never saved: "_" keys are dropped on save).
@@ -3156,6 +3157,7 @@ app.post('/api/lead-rules/run-all', authenticateToken, async (req, res) => {
 // Journeys (services/journeys.js, journeysApi.js). /api/workflows stays as the older single-journey doorway.
 registerJourneyRoutes(app, { authenticateToken, requireAdmin });
 registerKeyRoutes(app, { authenticateToken, requireAdmin });
+registerPackRoutes(app, { authenticateToken, requireAdmin });
 app.post('/api/workflows', authenticateToken, requireAdmin, validate(rules.workflows), async (req, res) => {
     try {
         const first = await db.get('SELECT id FROM journeys WHERE tenant_id = ? ORDER BY created_at LIMIT 1', req.tenantId);

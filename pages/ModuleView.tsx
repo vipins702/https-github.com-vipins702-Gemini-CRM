@@ -555,7 +555,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
    // --- 360 DETAIL VIEW ---
    if (view === 'detail' && selectedRecord) {
-      const primaryField = schema.fields[0].name; // e.g. Name
+      const primaryField = (['name', 'title', 'subject', 'firstName'].find(n => schema.fields.some(f => f.name === n))) || schema.fields[0].name; // the field that names the record
 
       // Attempt to find an image field for the avatar
       const imageField = schema.fields.find(f => f.type === 'image');

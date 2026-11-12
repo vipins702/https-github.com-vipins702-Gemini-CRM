@@ -62,7 +62,7 @@ const hasAnyAccess = (): boolean => {
 };
 
 // Screens that are configuration rather than data: left to the menu's own role list.
-const CONFIG_VIEWS = new Set(['autoflow', 'layout', 'settings', 'web-presenter', 'users', 'object-manager', 'menu-manager', 'lookups', 'processes', 'categories', 'integrations', 'platform', 'audit-log', 'lead-rules', 'field-triggers', 'scoring-rules', 'assignment-rules']);
+const CONFIG_VIEWS = new Set(['autoflow', 'layout', 'settings', 'web-presenter', 'users', 'object-manager', 'menu-manager', 'lookups', 'processes', 'categories', 'integrations', 'platform', 'audit-log', 'lead-rules', 'field-triggers', 'packs', 'scoring-rules', 'assignment-rules']);
 
 /**
  * May the user open this screen? true / false, or null when permissions have no opinion

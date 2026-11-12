@@ -71,6 +71,8 @@ npm run build
 - **Conditions** (`server/services/conditions.js`, `components/GateBuilder.tsx`): nested AND / OR / NOT gates shared by Field Triggers and Journeys.
 - **Journeys** (`server/services/journeys.js`, `journeysApi.js`, `pages/Journeys.tsx`, `pages/WorkflowBuilder.tsx`): graph automations that run AFTER a save. Waits are rows in `journey_runs` resumed by the scheduler; each run keeps a copy of the graph it started with. Tests move the clock with `POST /api/journeys/process-due { asOf }`.
 - **Record scope**: `scope: own | team | all` per role and record type; `team` follows `users.reports_to`. Lists, search, reports and dashboards all use `scopeUserIds` / `scopeClause` (`server/middleware/access.js`).
+- **Industry packs** (`server/services/packs.js`, `objects.js`, `server/packs/*.js`, `pages/IndustryPacks.tsx`): a pack is plain data (objects, fields, roles, field triggers, journeys); the installer previews, validates, then ADDS only what is missing. Journeys install switched off.
+- **Lookups** (`server/services/lookups.js`): a Lookup field saves a code (list value) or a record id; `_labels` on each record carries the words to show. Keys, joins and re-pointing: `server/services/keys.js`.
 - Plans and status: `CONFIGURATION_ROADMAP.md`, `INDUSTRY_PACKS_PLAN.md`.
 
 ## Architecture

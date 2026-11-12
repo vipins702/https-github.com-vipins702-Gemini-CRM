@@ -168,8 +168,15 @@ export const api = {
     });
   },
 
-  async createEntity(label: string, pluralLabel: string, icon: string = 'box') {
-    throw new Error("Create Entity via API not fully implemented yet");
+  async createEntity(label: string, pluralLabel: string, _icon: string = 'box') {
+    return fetchWithAuth(`${API_BASE}/metadata/entities`, { method: 'POST', body: JSON.stringify({ label, pluralLabel }) });
+  },
+
+  // Industry packs
+  async getPacks(): Promise<any[]> { return fetchWithAuth(`${API_BASE}/packs`); },
+  async previewPack(id: string): Promise<any> { return fetchWithAuth(`${API_BASE}/packs/${encodeURIComponent(id)}/preview`); },
+  async installPack(id: string): Promise<{ success: boolean; added: Record<string, number> }> {
+    return fetchWithAuth(`${API_BASE}/packs/${encodeURIComponent(id)}/install`, { method: 'POST' });
   },
 
   async createRelation(sourceId: string, targetId: string, fieldName: string, label: string) {

@@ -3,6 +3,7 @@ import { DEFAULT_DASHBOARD } from './services/dashboardDefaults.js';
 import { ensureFieldRulesTable } from './services/fieldRules.js';
 import { ensureAutonumberTable } from './services/fieldTypes.js';
 import { ensureJourneyTables, migrateLegacyWorkflows } from './services/journeys.js';
+import { ensurePackTables } from './services/packs.js';
 import { SQLiteAdapter } from './db/sqlite.js';
 import { PostgresAdapter } from './db/postgres.js';
 import bcrypt from 'bcrypt';
@@ -634,6 +635,7 @@ export async function initDB() {
         await ensureAutonumberTable(dbInstance);
         await ensureJourneyTables(dbInstance);
         await migrateLegacyWorkflows(dbInstance);
+        await ensurePackTables(dbInstance);
 
         // 27. Scoring Rules (auto-score leads based on field values)
         await dbInstance.exec(`

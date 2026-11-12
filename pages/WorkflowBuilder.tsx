@@ -18,7 +18,7 @@ import ReactFlow, {
   Position,
   NodeProps
 } from 'reactflow';
-import { Play, Save, Trash2, Zap, GitBranch, Mail, Clock, UserPlus, FileText, Loader2, CheckCircle, X, Settings, MousePointerClick, AlertCircle, Bell, UserCheck, Globe, MessageCircle, ArrowLeft, History } from 'lucide-react';
+import { Play, Save, Trash2, Zap, GitBranch, Mail, Clock, UserPlus, FileText, Loader2, CheckCircle, X, Settings, MousePointerClick, AlertCircle, Bell, UserCheck, Globe, MessageCircle, ArrowLeft, History, Link2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { FlowNodeData, JourneyRun, JourneyStep, User } from '../types';
 import { api } from '../services/api';
@@ -40,6 +40,7 @@ const stepSummary = (data: FlowNodeData): string => {
         case 'whatsapp': return c.body ? `“${String(c.body).slice(0, 40)}”` : 'Write the message';
         case 'create_task': return c.subject ? `“${c.subject}”${c.dueInDays ? `, due in ${c.dueInDays} day(s)` : ''}` : 'Name the task';
         case 'update_record': { const k = Object.keys(c.fields || {}).filter(Boolean); return k.length ? `Sets ${k.slice(0, 3).join(', ')}${k.length > 3 ? '…' : ''}` : 'Choose fields to set'; }
+        case 'update_linked': { const k = Object.keys(c.fields || {}).filter(Boolean); return c.via ? (k.length ? `Linked record: sets ${k.slice(0, 3).join(', ')}` : 'Linked record: refresh it') : 'Choose the link'; }
         case 'create_lead': return 'New lead';
         case 'create_record': return c.entityType ? `New ${c.entityType}` : 'Choose a record type';
         case 'notify': return c.message ? `“${String(c.message).slice(0, 40)}”` : 'Write the notification';
@@ -79,10 +80,11 @@ const ActionNode = ({ data, selected }: NodeProps<FlowNodeData>) => (
              {data.icon === 'user-plus' && <UserPlus className="w-5 h-5"/>}
              {data.icon === 'file-text' && <FileText className="w-5 h-5"/>}
              {data.icon === 'bell' && <Bell className="w-5 h-5"/>}
+             {data.icon === 'link' && <Link2 className="w-5 h-5"/>}
              {data.icon === 'user-check' && <UserCheck className="w-5 h-5"/>}
              {data.icon === 'globe' && <Globe className="w-5 h-5"/>}
              {data.icon === 'message-circle' && <MessageCircle className="w-5 h-5"/>}
-             {!['mail', 'user-plus', 'file-text', 'bell', 'user-check', 'globe', 'message-circle'].includes(data.icon || '') && <Settings className="w-5 h-5"/>}
+             {!['mail', 'user-plus', 'file-text', 'bell', 'user-check', 'globe', 'message-circle', 'link'].includes(data.icon || '') && <Settings className="w-5 h-5"/>}
           </div>
           <div className="min-w-0">
              <div className="font-semibold text-slate-900 text-sm leading-tight truncate">{data.label}</div>
@@ -347,6 +349,7 @@ export const WorkflowBuilder: React.FC<{ journeyId?: string | null; onBack?: () 
      { label: 'Send Email', category: 'action', icon: 'mail', actionType: 'email' },
      { label: 'Send WhatsApp', category: 'action', icon: 'message-circle', actionType: 'whatsapp' },
      { label: 'Create Task', category: 'action', icon: 'user-plus', actionType: 'create_task' },
+     { label: 'Update Linked Record', category: 'action', icon: 'link', actionType: 'update_linked' },
      { label: 'Notify a User', category: 'action', icon: 'bell', actionType: 'notify' },
      { label: 'Assign Owner', category: 'action', icon: 'user-check', actionType: 'assign_owner' },
      { label: 'Call Webhook', category: 'action', icon: 'globe', actionType: 'webhook' },
@@ -387,6 +390,7 @@ export const WorkflowBuilder: React.FC<{ journeyId?: string | null; onBack?: () 
     { value: 'whatsapp', label: 'Send WhatsApp' },
     { value: 'create_task', label: 'Create Task' },
     { value: 'update_record', label: 'Update Record' },
+    { value: 'update_linked', label: 'Update Linked Record' },
     { value: 'create_lead', label: 'Create Lead' },
     { value: 'create_record', label: 'Create Any Record' },
     { value: 'notify', label: 'Notify a User' },
@@ -482,6 +486,7 @@ export const WorkflowBuilder: React.FC<{ journeyId?: string | null; onBack?: () 
                          {tool.icon === 'user-plus' && <UserPlus className="w-4 h-4"/>}
                          {tool.icon === 'file-text' && <FileText className="w-4 h-4"/>}
                          {tool.icon === 'bell' && <Bell className="w-4 h-4"/>}
+                         {tool.icon === 'link' && <Link2 className="w-4 h-4"/>}
                          {tool.icon === 'user-check' && <UserCheck className="w-4 h-4"/>}
                          {tool.icon === 'globe' && <Globe className="w-4 h-4"/>}
                          {tool.icon === 'message-circle' && <MessageCircle className="w-4 h-4"/>}
@@ -747,6 +752,35 @@ export const WorkflowBuilder: React.FC<{ journeyId?: string | null; onBack?: () 
                           <label className="block text-xs font-bold text-gray-500 mb-2">Address (POST, JSON)</label>
                           <input className={inputCls} value={cfg.url ?? ''} onChange={(e) => updateNodeConfig({ url: e.target.value })} placeholder="https://example.com/hook" />
                           <p className="text-xs text-gray-400 mt-1.5">Sends the journey name, the record type and the record. Internal and private addresses are refused.</p>
+                       </div>
+                    )}
+
+                    {cfg.type === 'update_linked' && (
+                       <div className="space-y-3">
+                          <div>
+                             <label className="block text-xs font-bold text-gray-500 mb-2">Record to update</label>
+                             <select className={inputCls} value={cfg.via || ''} onChange={(e) => updateNodeConfig({ via: e.target.value || undefined, fields: {} })}>
+                                <option value="">The record linked through…</option>
+                                {triggerEntityFields.filter((f: any) => f.type === 'lookup' && f.lookupTarget && schemas[f.lookupTarget]).map((f: any) => <option key={f.name} value={f.name}>{f.label} ({schemas[f.lookupTarget].label})</option>)}
+                             </select>
+                             <p className="text-xs text-gray-400 mt-1.5">Updates the record this one points at. Its own triggers and journeys run afterwards. Leave the fields empty to simply refresh it.</p>
+                          </div>
+                          {(() => {
+                             const via: any = triggerEntityFields.find((f: any) => f.name === cfg.via);
+                             const linkedType = via?.lookupTarget as string | undefined;
+                             if (!linkedType) return null;
+                             const linkedFields = ((schemas[linkedType]?.fields || []) as any[]).filter((f) => !['formula', 'rollup', 'autonumber', 'image', 'iframe', 'attachment'].includes(f.type));
+                             return (
+                                <FieldMapper
+                                   compact
+                                   value={toRows(cfg.fields)}
+                                   onChange={(rows) => updateNodeConfig({ fields: toObject(rows) })}
+                                   targets={[...(linkedFields.some((f) => f.name === 'status') ? [] : [{ name: 'status', label: 'Status', type: 'status' }]), ...linkedFields].map((f: any) => ({ name: f.name, label: f.label, type: f.type, options: f.options }))}
+                                   sources={triggerEntityFields.map((f: any) => ({ name: f.name, label: f.label, type: f.type }))}
+                                   addLabel={`Add a ${schemas[linkedType]?.label || 'linked record'} field to set`}
+                                />
+                             );
+                          })()}
                        </div>
                     )}
 

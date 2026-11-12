@@ -14,6 +14,9 @@
 //
 // Any field may also be marked unique: no two records of the type may hold the same value.
 
+import { evaluateFormula } from './fieldRules.js';
+import { tokensIn } from './tokens.js';
+
 export const NEW_TYPES = ['multiselect', 'checkbox', 'datetime', 'percent', 'rating', 'user', 'autonumber', 'rollup'];
 export const COMPUTED_TYPES = ['rollup', 'formula'];
 const FNS = ['count', 'sum', 'avg', 'min', 'max'];
@@ -146,4 +149,20 @@ export function definitionProblems(config, allSchemas) {
         if (f.unique && ['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe', 'attachment'].includes(f.type)) out.push(`${f.label || f.name}: this type cannot be unique`);
     }
     return out;
+}
+
+/**
+ * Roll-ups, then every formula that uses a roll-up (directly or through another formula), so "hours used / hours
+ * included" is right when a list is opened and when a journey checks a condition. Mutates and returns the records.
+ */
+export async function addComputed(db, tenantId, definition, records) {
+    await computeRollups(db, tenantId, definition, records);
+    const dirty = new Set((definition?.fields || []).filter(f => f.type === 'rollup').map(f => f.name));
+    if (!dirty.size) return records;
+    for (const f of definition.fields) {
+        if (f.type !== 'formula' || !tokensIn(f.formula).some(n => dirty.has(n))) continue;
+        for (const r of records) r[f.name] = evaluateFormula(f.formula, r);
+        dirty.add(f.name);
+    }
+    return records;
 }

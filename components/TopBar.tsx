@@ -35,6 +35,7 @@ const STATIC_LABELS: Record<string, string> = {
   categories: 'Product Categories',
   'lead-rules': 'Lead Rules',
   'field-triggers': 'Field Triggers',
+  packs: 'Industry Packs',
   autoflow: 'Journeys',
   layout: 'Form Designer',
   'web-presenter': 'Web Presenter',

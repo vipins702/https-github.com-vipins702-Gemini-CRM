@@ -9,6 +9,7 @@ import { normalizeGate, evaluateGate } from './conditions.js';
 import { applyAutoNumbers } from './fieldTypes.js';
 import { expandTokens } from './tokens.js';
 import { withLabels } from './lookups.js';
+import { applyFieldLogic } from './fieldRules.js';
 
 /**
  * Workflow / Journey execution engine.
@@ -135,6 +136,8 @@ export async function runAction(action, ctx) {
             return runCreateRecord('lead', action, ctx);
         case 'create_record':
             return runCreateRecord(action.entityType || 'task', action, ctx);
+        case 'update_linked':
+            return runUpdateLinked(action, ctx);
         case 'notify':
             return runNotify(action, ctx);
         case 'assign_owner':
@@ -151,6 +154,33 @@ export async function runAction(action, ctx) {
         default:
             console.warn(`[workflow] Unknown action type: ${action.type}`);
     }
+}
+
+// Update the record this one is linked to (through a Lookup field): a time entry refreshes its retainer, a booking marks
+// its unit as booked. Values may use the fields of THIS record. The linked record's own triggers and journeys then run.
+async function runUpdateLinked(action, ctx) {
+    const { tenantId, entityType, record, actorId } = ctx;
+    const dr = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', tenantId, entityType);
+    const def = dr ? JSON.parse(dr.config) : null;
+    const via = def?.fields?.find(f => f.name === action.via && f.type === 'lookup' && f.lookupTarget);
+    if (!via) throw new Error('the field that links to the other record is not a join (Lookup) field');
+    const linkedId = record?.[via.name];
+    if (!linkedId) return;                                           // nothing linked, nothing to update
+    const row = await db.get('SELECT * FROM records WHERE id = ? AND tenant_id = ? AND entity_type = ?', linkedId, tenantId, via.lookupTarget);
+    if (!row) return;                                                // a broken link is skipped, not an error
+    let old = {}; try { old = JSON.parse(row.data); } catch { old = {}; }
+    const merged = { ...old, ...interpolateFields(action.fields || {}, record || {}) };
+    const td = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', tenantId, via.lookupTarget);
+    if (td) await applyFieldLogic(db, tenantId, via.lookupTarget, JSON.parse(td.config), merged, old);
+    const display = merged.name || merged.title || merged.subject || row.primary_display;
+    await db.run('UPDATE records SET data = ?, primary_display = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?',
+        JSON.stringify(merged), display, merged.status ?? row.status, row.id, tenantId);
+    await logAudit({ tenantId, entityType: via.lookupTarget, recordId: row.id, action: 'update', actorId, details: { ...interpolateFields(action.fields || {}, record || {}), _via: 'journey', _rule: ctx.workflowName } });
+    await evaluateWorkflows({
+        tenantId, entityType: via.lookupTarget, triggerType: 'update',
+        record: { ...merged, id: row.id }, oldRecord: { ...old, id: row.id, status: old.status ?? row.status },
+        actorId, depth: (ctx.depth || 0) + 1,
+    });
 }
 
 async function runNotify(action, ctx) {
@@ -270,13 +300,24 @@ async function runCreateRecord(targetEntity, action, ctx) {
         const dr = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', tenantId, targetEntity);
         if (dr) await applyAutoNumbers(db, tenantId, targetEntity, JSON.parse(dr.config), fields);
     } catch (e) { console.warn('[workflow] auto-number skipped:', e.message); }
+    // The new record belongs to whoever owns the record that started this, so people limited to "own" records can see it.
+    let ownerId = null, creatorId = null;
+    if (record?.id) {
+        const src = await db.get('SELECT owner_id, created_by FROM records WHERE id = ? AND tenant_id = ?', record.id, tenantId);
+        ownerId = src?.owner_id || src?.created_by || null;
+        creatorId = src?.created_by || src?.owner_id || null;
+    }
+    try {
+        const dr2 = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', tenantId, targetEntity);
+        if (dr2) await applyFieldLogic(db, tenantId, targetEntity, JSON.parse(dr2.config), fields, null);   // formulas and triggers of the new type
+    } catch (e) { console.warn('[workflow] field logic skipped:', e.message); }
     const primaryDisplay = fields.name || fields.title || fields.subject ||
         [fields.firstName, fields.lastName].filter(Boolean).join(' ') || `${targetEntity} (auto)`;
     const status = fields.status || 'New';
 
     await db.run(
-        'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)',
-        id, tenantId, targetEntity, primaryDisplay, status, JSON.stringify(fields)
+        'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data, owner_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        id, tenantId, targetEntity, primaryDisplay, status, JSON.stringify(fields), ownerId, creatorId
     );
     await logAudit({
         tenantId, entityType: targetEntity, recordId: id, action: 'create', actorId,

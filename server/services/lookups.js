@@ -22,7 +22,26 @@ export async function lookupOptions(tenantId, lookupId) {
         }
         return rows.map((r, i) => ({ id: `live_${i}`, lookup_id: lookupId, value_id: r.value_id, value: r.value, sort_order: i, is_live: true }));
     }
-    return db.all('SELECT * FROM lookup_values WHERE tenant_id = ? AND lookup_id = ? AND is_active = 1 ORDER BY sort_order', tenantId, lookupId);
+    const own = await db.all('SELECT * FROM lookup_values WHERE tenant_id = ? AND lookup_id = ? AND is_active = 1 ORDER BY sort_order', tenantId, lookupId);
+    if (own.length) return own;
+    // No list of values and no live source: a Lookup field that links to another record type offers those records.
+    const target = await joinTargetOf(tenantId, lookupId);
+    if (!target) return own;
+    const rows = await db.all('SELECT id, COALESCE(primary_display, id) AS label FROM records WHERE tenant_id = ? AND entity_type = ? ORDER BY primary_display LIMIT 1000', tenantId, target);
+    return rows.map((r, i) => ({ id: `live_${i}`, lookup_id: lookupId, value_id: r.id, value: r.label, sort_order: i, is_live: true }));
+}
+
+/** "lead_customerId" → "customer": the record type that Lookup field links to (longest matching object name wins). */
+async function joinTargetOf(tenantId, lookupId) {
+    const rows = await db.all('SELECT entity_type, config FROM entity_definitions WHERE tenant_id = ?', tenantId);
+    let best = null;
+    for (const r of rows) {
+        if (!lookupId.startsWith(r.entity_type + '_') || (best && best.entity_type.length >= r.entity_type.length)) continue;
+        let def; try { def = JSON.parse(r.config); } catch { continue; }
+        const f = (def.fields || []).find(x => x.type === 'lookup' && x.lookupTarget && x.name === lookupId.slice(r.entity_type.length + 1));
+        if (f) best = { entity_type: r.entity_type, target: f.lookupTarget };
+    }
+    return best?.target || null;
 }
 
 /**

@@ -1,6 +1,6 @@
 # Industry packs plan: property (inventory, builders), agencies, and the rest
 
-Status: **Phases 1 and 2 built and tested (sections 6a and 6b); phases 3 to 6 are still plan only.** Builds on `CONFIGURATION_ROADMAP.md` (field triggers, formulas, record scope and layout-driven detail pages are already done and are the foundation).
+Status: **Phases 1 and 2, the pack installer (phase 3) and the Agency pack (phase 5) are built and tested (sections 6a to 6c); the Property pack, other industries and the AI assistant are still plan only.** Builds on `CONFIGURATION_ROADMAP.md` (field triggers, formulas, record scope and layout-driven detail pages are already done and are the foundation).
 
 ## 1. What Journeys (Autoflow) are, where to see them, and what is missing
 
@@ -161,6 +161,21 @@ Not in Phase 1 (moved to Phase 2): roll-ups in reports, roll-up values usable in
 Fixed on the way: **the notification bell never worked** (the server never recorded who the signed-in user was, so every user saw an empty list and notes had no author); an update-triggered journey with an update step looped forever before the loop protection.
 
 Not in Phase 2: "wait until a date" (only a length of time), parallel paths (a step has one way out), retrying a failed step, e-mail templates, and a journey library of ready-made examples (those arrive with the packs).
+
+## 6c. Installer and Agency pack (built)
+
+**Installer** (Configuration → Industry Packs, `server/services/packs.js`): preview shows exactly what would be added and checks all of it (fields, roll-ups, journeys, rules) before anything is written. Install only ADDS: an object, field, role, rule or journey that already exists is left alone, a rename or removal the workspace made is respected, and installing twice adds nothing. Journeys arrive switched OFF. The Object Manager's Create Object button now works too (it never did).
+
+**Agency pack** (`server/packs/agency.js`, plain data):
+- **Objects:** Contact, Opportunity, Project, Deliverable, Retainer, Time entry, Invoice; the existing Customer is the client and gains an Agency section (account lead, health, GSTIN, services bought, contacts, active projects, paid to date).
+- **Worked-out fields:** weighted value, project cost / hours / margin, retainer hours used and usage %, invoice GST and total, client roll-ups; auto-numbers PRJ-, RET-, INV-.
+- **Roles:** Account Manager (own clients), Project Manager (team), Finance.
+- **Field triggers:** won = 100%, lost = 0%, completed project gets an end date, approval stamps the date.
+- **Journeys (9, off):** opportunity won creates the project; proposal follow-up (waits 3 and 4 days, stops when won or lost); deliverable approval chasers; time logged refreshes the retainer; retainer 90% of hours alert; renewals at 30 and 7 days; invoice due soon and overdue.
+
+**Engine additions this needed:** a journey step that updates the linked record (a time entry refreshes its retainer, later a booking marks a unit booked); formulas and journey conditions can use roll-ups (hours used / hours included); join dropdowns list the linked records; records created by a journey keep their owner (so people limited to their own records see them) and run their own formulas and rules; division by zero gives a blank.
+
+Not yet: demo data, uninstalling a pack, versioned pack upgrades, the Property pack.
 
 ## 7. Decisions needed
 

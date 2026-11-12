@@ -45,6 +45,7 @@ const INITIAL_MENU = [
             { id: 'agent-console', label: 'Agent Console', icon: 'PhoneCall', type: 'item', view: 'agent-console', allowedRoles: ['admin'] },
             { id: 'layout', label: 'Form Designer', icon: 'PaintBucket', type: 'item', view: 'layout', allowedRoles: ['admin'] },
             { id: 'field-triggers', label: 'Field Triggers', icon: 'Zap', type: 'item', view: 'field-triggers', allowedRoles: ['admin'] },
+            { id: 'packs', label: 'Industry Packs', icon: 'Package', type: 'item', view: 'packs', allowedRoles: ['admin'] },
             { id: 'web-presenter', label: 'Web Presenter', icon: 'Globe', type: 'item', view: 'web-presenter', allowedRoles: ['admin'] },
             { id: 'users', label: 'Users & Roles', icon: 'Users', type: 'item', view: 'users', allowedRoles: ['admin'] },
         ]
@@ -280,15 +281,24 @@ export async function seedCoreMetadata() {
         // The built-in placeholder menu points at screens (leads / contacts / deals) that have no definition.
         await db.run('UPDATE menus SET config = ? WHERE id = ?', JSON.stringify(INITIAL_MENU), menu.id);
     }
-    // Menus saved before Field Triggers existed: add the entry after Form Designer (every workspace, once).
+    // Menus saved before an entry existed: add it to Configuration (every workspace, once).
+    const NEW_CONFIG_ENTRIES = [
+        { id: 'field-triggers', after: 'layout', item: { id: 'field-triggers', label: 'Field Triggers', icon: 'Zap', type: 'item', view: 'field-triggers', allowedRoles: ['admin'] } },
+        { id: 'packs', after: 'field-triggers', item: { id: 'packs', label: 'Industry Packs', icon: 'Package', type: 'item', view: 'packs', allowedRoles: ['admin'] } },
+    ];
     for (const m of await db.all('SELECT id, config FROM menus')) {
         let cfg; try { cfg = JSON.parse(m.config); } catch { continue; }
-        if (!Array.isArray(cfg) || JSON.stringify(cfg).includes('"field-triggers"')) continue;
+        if (!Array.isArray(cfg)) continue;
         const tools = cfg.find(g => g && g.id === 'tools' && Array.isArray(g.children));
         if (!tools) continue;
-        const at = tools.children.findIndex(x => x && x.id === 'layout');
-        tools.children.splice(at >= 0 ? at + 1 : tools.children.length, 0, { id: 'field-triggers', label: 'Field Triggers', icon: 'Zap', type: 'item', view: 'field-triggers', allowedRoles: ['admin'] });
-        await db.run('UPDATE menus SET config = ? WHERE id = ?', JSON.stringify(cfg), m.id);
+        let changed = false;
+        for (const e of NEW_CONFIG_ENTRIES) {
+            if (JSON.stringify(cfg).includes(`"${e.id}"`)) continue;
+            const at = tools.children.findIndex(x => x && x.id === e.after);
+            tools.children.splice(at >= 0 ? at + 1 : tools.children.length, 0, e.item);
+            changed = true;
+        }
+        if (changed) await db.run('UPDATE menus SET config = ? WHERE id = ?', JSON.stringify(cfg), m.id);
     }
     for (const [key, value] of Object.entries(SCHEMAS)) {
         const has = await db.get('SELECT id FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', TENANT_ID, key);

@@ -1,0 +1,186 @@
+// Industry packs: preview, install, running it twice, and the agency pack working as an agency would use it.
+// Run on a FRESH database (it installs the pack):
+//   JWT_SECRET=x ADMIN_PASSWORD=... node server/index.js
+//   E2E_EMAIL=admin@flowcrm.com E2E_PASSWORD=... node server/test/packs.mjs
+const BASE = process.env.E2E_BASE || 'http://localhost:3015/api';
+const tag = Date.now().toString().slice(-6);
+const call = async (method, path, token, body) => {
+    const headers = token ? { Authorization: 'Bearer ' + token } : {};
+    if (body) headers['Content-Type'] = 'application/json';
+    const res = await fetch(BASE + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    let j = null; try { j = await res.json(); } catch { /* empty */ }
+    return { s: res.status, j };
+};
+const login = async (email, password) => (await call('POST', '/auth/login', null, { email, password })).j?.token;
+const A = await login(process.env.E2E_EMAIL || 'admin@flowcrm.com', process.env.E2E_PASSWORD);
+if (!A) { console.log('Cannot log in as admin'); process.exit(2); }
+const fails = []; let pass = 0;
+const check = (name, ok, detail = '') => { if (ok) pass++; else { fails.push(name); console.log(`FAIL  ${name}${detail ? '  -> ' + detail : ''}`); } };
+const sec = (n) => console.log(`\n== ${n}`);
+const rnd = () => Math.random().toString(36).slice(2, 8);
+const DAY = 86400000;
+const ymd = (t) => new Date(t).toISOString().slice(0, 10);
+const list = async (type, tok = A) => (await call('GET', `/data/${type}`, tok)).j || [];
+const find = async (type, id, tok = A) => (await list(type, tok)).find(x => x.id === id) || {};
+const mk = async (type, body, tok = A) => { const r = await call('POST', `/data/${type}`, tok, body); return r.j?.id; };
+const edit = async (type, id, patch, tok = A) => call('POST', `/data/${type}`, tok, { ...(await find(type, id, tok)), ...patch, id });
+const me = ((await call('GET', '/users', A)).j || []).find(u => u.email === (process.env.E2E_EMAIL || 'admin@flowcrm.com'));
+const turnOn = async (name) => { const j = ((await call('GET', '/journeys', A)).j || []).find(x => x.name === name); if (j) await call('POST', `/journeys/${j.id}/active`, A, { active: true }); return j; };
+
+sec('1. Preview writes nothing');
+const packs = (await call('GET', '/packs', A)).j || [];
+check('the agency pack is listed with its contents', packs.some(p => p.id === 'agency' && p.contents.objects === 7 && p.contents.journeys === 9 && !p.installed), JSON.stringify(packs.map(p => p.id)));
+const plan0 = (await call('GET', '/packs/agency/preview', A)).j;
+check('preview says what it will add', plan0?.errors?.length === 0 && plan0.willAdd.objects === 8 && plan0.willAdd.journeys === 9 && plan0.willAdd.roles === 3, JSON.stringify(plan0?.willAdd));
+check('preview reports the customer (client) as extended, the rest as new', plan0.objects.find(o => o.id === 'customer')?.status === 'extend' && plan0.objects.filter(o => o.status === 'new').length === 7);
+const schemasBefore = (await call('GET', '/metadata/schemas', A)).j;
+check('nothing was created by previewing', !schemasBefore.project && !schemasBefore.invoice);
+check('unknown pack is 404', (await call('GET', '/packs/nope/preview', A)).s === 404 && (await call('POST', '/packs/nope/install', A)).s === 404);
+
+sec('2. Install');
+const inst = await call('POST', '/packs/agency/install', A);
+check('install succeeds', inst.s === 200 && inst.j?.added?.objects === 8, JSON.stringify(inst.j));
+const sc = (await call('GET', '/metadata/schemas', A)).j;
+for (const id of ['contact', 'opportunity', 'project', 'deliverable', 'retainer', 'time_entry', 'invoice']) check(`object "${id}" exists with fields`, (sc[id]?.fields || []).length >= 8, JSON.stringify(sc[id]?.fields?.length));
+check('the client (customer) gained the agency fields', ['accountLead', 'health', 'lifetimeValue', 'openProjects', 'contactCount'].every(n => sc.customer.fields.some(f => f.name === n)));
+check('the customer kept every field it already had', ['name', 'email', 'industry', 'annualRevenue'].every(n => sc.customer.fields.some(f => f.name === n)));
+check('the contact key is its e-mail (unique)', sc.contact.keyField === 'email' && sc.contact.fields.find(f => f.name === 'email').unique === true);
+const keys = ((await call('GET', '/metadata/keys', A)).j || []).find(o => o.id === 'contact');
+check('Keys & joins shows the new object with its join to the client', keys?.keyField === 'email' && keys.joins.some(j => j.field === 'clientId' && j.target === 'customer'), JSON.stringify(keys?.joins));
+const lay = (await call('GET', '/metadata/layouts/invoice', A)).j;
+check('every new object has a form layout holding all its fields', lay?.sections?.flatMap(s => s.columns.flatMap(c => c.fields)).length === sc.invoice.fields.length);
+const custLay = (await call('GET', '/metadata/layouts/customer', A)).j;
+check('the client layout kept its sections and got an Agency section', custLay.sections.some(s => s.title === 'Agency') && custLay.sections.length >= 3);
+const menu = (await call('GET', '/metadata/menu', A)).j;
+const flat = (items) => items.flatMap(i => [i, ...(i.children ? flat(i.children) : [])]);
+check('the sidebar has the new objects', ['contact', 'opportunity', 'project', 'deliverable', 'retainer', 'time_entry', 'invoice'].every(id => flat(menu).some(m => m.id === id && m.view === id)));
+check('and the Industry Packs entry for admins', flat(menu).some(m => m.id === 'packs'));
+const roles = (await call('GET', '/roles', A)).j || [];
+check('three roles were added', ['Account Manager', 'Project Manager', 'Finance'].every(n => roles.some(r => r.name === n)));
+check('field triggers were added', ((await call('GET', '/field-rules/opportunity', A)).j?.rules || []).length === 2 && ((await call('GET', '/field-rules/deliverable', A)).j?.rules || []).length === 1);
+const js = (await call('GET', '/journeys', A)).j || [];
+check('nine journeys were added, all switched OFF', js.length >= 9 && js.filter(j => ['Opportunity won: start the project', 'Proposal sent: follow up', 'Invoice overdue'].includes(j.name)).every(j => j.isActive === false) && js.filter(j => !j.isActive).length >= 9, JSON.stringify(js.map(j => [j.name, j.isActive])));
+check('the pack shows as installed', ((await call('GET', '/packs', A)).j || []).find(p => p.id === 'agency')?.installed?.summary?.objects === 8);
+
+sec('3. Installing again adds nothing');
+const plan1 = (await call('GET', '/packs/agency/preview', A)).j;
+check('a second preview finds nothing to add', Object.values(plan1.willAdd).every(n => n === 0), JSON.stringify(plan1.willAdd));
+const again = await call('POST', '/packs/agency/install', A);
+check('a second install succeeds and adds nothing', again.s === 200 && Object.values(again.j.added).every(n => n === 0), JSON.stringify(again.j));
+check('no duplicate journeys, roles or triggers', ((await call('GET', '/journeys', A)).j || []).length === js.length && ((await call('GET', '/roles', A)).j || []).filter(r => r.name === 'Finance').length === 1 && ((await call('GET', '/field-rules/opportunity', A)).j?.rules || []).length === 2);
+// a change the workspace made must survive a re-install
+const scNow = (await call('GET', '/metadata/schemas', A)).j;
+await call('POST', '/metadata/schemas', A, { entityType: 'project', config: { ...scNow.project, label: 'Engagement', fields: scNow.project.fields.filter(f => f.name !== 'notes') } });
+await call('POST', '/packs/agency/install', A);
+const scAfter = (await call('GET', '/metadata/schemas', A)).j.project;
+check('re-installing keeps a rename the workspace made', scAfter.label === 'Engagement');
+check('but restores a field that was removed (it only adds)', scAfter.fields.some(f => f.name === 'notes'));
+
+sec('4. Pipeline: opportunity to project');
+const client = await mk('customer', { name: 'Shah Creative ' + tag, email: `shah.${rnd()}@example.com`, status: 'Active' });
+const opp = await mk('opportunity', { name: 'Brand refresh ' + tag, clientId: client, value: 200000, probability: 40, status: 'Lead', services: ['Branding', 'Web design'] });
+let o = await find('opportunity', opp);
+check('weighted value = value x probability', o.weightedValue === 80000, JSON.stringify(o.weightedValue));
+check('multi-select services kept', Array.isArray(o.services) && o.services.length === 2);
+check('the client dropdown lists customers (and shows their name)', ((await call('GET', '/lookups/opportunity_clientId', A)).j || []).some(x => x.value_id === client && x.value === 'Shah Creative ' + tag) && o._labels?.clientId === 'Shah Creative ' + tag, JSON.stringify(o._labels));
+await turnOn('Opportunity won: start the project');
+await edit('opportunity', opp, { status: 'Won' });
+o = await find('opportunity', opp);
+check('field trigger: a won opportunity is 100% likely, weighted = full value', o.probability === '100' || o.probability === 100, JSON.stringify(o.probability));
+check('formula follows the trigger (weighted = 200000)', Number(o.weightedValue) === 200000, JSON.stringify(o.weightedValue));
+let projects = (await list('project')).filter(p => p.opportunityId === opp);
+check('journey: winning created a project', projects.length === 1, JSON.stringify(projects.length));
+const proj = projects[0] || {};
+check('the project carries name, client, budget and status from the opportunity', proj.name === 'Brand refresh ' + tag && proj.clientId === client && Number(proj.budget) === 200000 && proj.status === 'Planning', JSON.stringify([proj.name, proj.clientId, proj.budget, proj.status]));
+check('the project got an auto-number', /^PRJ-\d{4}$/.test(proj.ref || ''), JSON.stringify(proj.ref));
+check('a won opportunity does not create a second project when saved again', (await edit('opportunity', opp, { notes: 'x' })).s < 300 && (await list('project')).filter(p => p.opportunityId === opp).length === 1);
+check('the owner was notified', ((await call('GET', '/notifications', A)).j || []).some(n => n.title === 'Project created' && /Brand refresh/.test(n.body)));
+await mk('contact', { firstName: 'Nikhil', lastName: 'Shah', email: `nik.${rnd()}@example.com`, clientId: client });
+check('contact e-mail is unique (key)', (await call('POST', '/data/contact', A, { firstName: 'Dup', lastName: 'Licate', email: (await list('contact'))[0].email, clientId: client })).s === 400);
+let cl = await find('customer', client);
+check('client roll-up: 1 contact', cl.contactCount === 1, JSON.stringify(cl.contactCount));
+await edit('project', proj.id, { status: 'Active' });
+cl = await find('customer', client);
+check('client roll-up: 1 active project', cl.openProjects === 1, JSON.stringify(cl.openProjects));
+await edit('project', proj.id, { status: 'Completed' });
+check('field trigger: a completed project gets its end date', (await find('project', proj.id)).endDate === ymd(Date.now()));
+
+sec('5. Retainer hours');
+const ret = await mk('retainer', { name: 'Monthly SEO ' + tag, clientId: client, monthlyFee: 50000, hoursIncluded: 10, status: 'Active' });
+await turnOn('Time logged: refresh the retainer');
+await turnOn('Retainer: 90% of hours used');
+const te = (hours, billable = true) => mk('time_entry', { subject: 'Work ' + rnd(), hours, billable, rate: 100, retainerId: ret, projectId: proj.id });
+await te(5);
+await te(3, false);
+let r = await find('retainer', ret);
+check('only billable hours count: 5 of 10', r.hoursUsed === 5 && Number(r.usagePercent) === 50, JSON.stringify([r.hoursUsed, r.usagePercent]));
+check('no alert at 50%', !((await call('GET', '/notifications', A)).j || []).some(n => n.title === 'Retainer nearly used up'));
+await te(4.5);
+r = await find('retainer', ret);
+check('9.5 of 10 hours = 95%', r.hoursUsed === 9.5 && Number(r.usagePercent) === 95, JSON.stringify([r.hoursUsed, r.usagePercent]));
+const alerts = async () => ((await call('GET', '/notifications', A)).j || []).filter(n => n.title === 'Retainer nearly used up' && n.body.includes('Monthly SEO ' + tag));
+let al = await alerts();
+check('logging the time raised the over-hours alert (through the linked retainer)', al.length === 1 && /95% of its 10 hours/.test(al[0].body), JSON.stringify(al.map(a => a.body)));
+check('the retainer remembers the alert was sent', (await find('retainer', ret)).overAlertSent === 'true' || (await find('retainer', ret)).overAlertSent === true);
+await te(1);
+al = await alerts();
+check('more time does not raise a second alert', al.length === 1, JSON.stringify(al.length));
+const pr = await find('project', proj.id);
+check('project roll-ups: hours and cost from time entries', pr.hoursUsed === 13.5 && Number(pr.cost) === 1350 && pr.deliverableCount === 0, JSON.stringify([pr.hoursUsed, pr.cost]));
+check('project margin = budget - cost', Number(pr.margin) === 200000 - 1350, JSON.stringify(pr.margin));
+const ret0 = await mk('retainer', { name: 'No hours ' + tag, clientId: client, monthlyFee: 1, hoursIncluded: 0, status: 'Active' });
+check('hours included 0 gives a blank percentage, not text', (await find('retainer', ret0)).usagePercent === '', JSON.stringify((await find('retainer', ret0)).usagePercent));
+
+sec('6. Deliverables and invoices');
+const del = await mk('deliverable', { name: 'Logo set ' + tag, projectId: proj.id, status: 'In progress' });
+await edit('deliverable', del, { status: 'Approved' });
+const dd = await find('deliverable', del);
+check('field trigger: approval stamps the date and ticks client approved', dd.approvedOn === ymd(Date.now()) && (dd.clientApproved === 'true' || dd.clientApproved === true), JSON.stringify([dd.approvedOn, dd.clientApproved]));
+check('project counts its deliverable', (await find('project', proj.id)).deliverableCount === 1);
+const inv = await mk('invoice', { name: 'Brand refresh, stage 1', clientId: client, projectId: proj.id, amount: 1000, gstPercent: 18, status: 'Sent', issueDate: ymd(Date.now()), dueDate: ymd(Date.now()) });
+const iv = await find('invoice', inv);
+check('invoice: GST and total are worked out', Number(iv.gstAmount) === 180 && Number(iv.total) === 1180, JSON.stringify([iv.gstAmount, iv.total]));
+check('invoice gets a number', /^INV-\d{4}$/.test(iv.number || ''), JSON.stringify(iv.number));
+await turnOn('Invoice overdue');
+await call('POST', '/journeys/process-due', A, { asOf: new Date(Date.now() + DAY).toISOString() });
+const iv2 = await find('invoice', inv);
+check('invoice journey: the day after the due date it becomes Overdue', iv2.status === 'Overdue', JSON.stringify(iv2.status));
+check('and the owner is told, with the invoice number', ((await call('GET', '/notifications', A)).j || []).some(n => n.title === 'Invoice overdue' && n.body.includes(iv.number)));
+const inv2 = await mk('invoice', { name: 'Paid one', clientId: client, amount: 500, gstPercent: 0, status: 'Paid' });
+cl = await find('customer', client);
+check('client roll-up: paid to date counts only paid invoices', Number(cl.lifetimeValue) === 500, JSON.stringify(cl.lifetimeValue));
+
+sec('7. Roles');
+const roleId = (n) => roles.find(x => x.name === n)?.id;
+const mkUser = async (label, role) => { const email = `pack.${label}.${tag}@flowcrm.test`; await call('POST', '/users', A, { email, password: 'Pack@12345xx', roleId: roleId(role), name: label }); return { email, token: await login(email, 'Pack@12345xx') }; };
+const am1 = await mkUser('am1', 'Account Manager'), am2 = await mkUser('am2', 'Account Manager'), fin = await mkUser('fin', 'Finance');
+check('the new users can sign in', !!(am1.token && am2.token && fin.token));
+const aOpp = await mk('opportunity', { name: 'AM1 deal ' + tag, status: 'Lead' }, am1.token);
+check('an account manager can create an opportunity', !!aOpp);
+check('a colleague cannot see it (own scope)', !(await list('opportunity', am2.token)).some(x => x.id === aOpp));
+check('admin sees everything', (await list('opportunity', A)).some(x => x.id === aOpp));
+check('an account manager cannot raise invoices', (await call('POST', '/data/invoice', am1.token, { name: 'x', clientId: client, amount: 1, status: 'Draft' })).s === 403);
+check('finance can', (await call('POST', '/data/invoice', fin.token, { name: 'Finance invoice', clientId: client, amount: 100, status: 'Draft' })).s < 300);
+check('finance can read the retainer but not create one', (await list('retainer', fin.token)).length >= 1 && (await call('POST', '/data/retainer', fin.token, { name: 'x', status: 'Active' })).s === 403);
+check('non-admins cannot see or install packs', (await call('GET', '/packs', am1.token)).s === 403 && (await call('POST', '/packs/agency/install', am1.token)).s === 403 && (await call('GET', '/packs/agency/preview', am1.token)).s === 403);
+
+sec('8. Create Object button, and journey link step checks');
+const mkObj = (b, tok = A) => call('POST', '/metadata/entities', tok, b);
+const venue = await mkObj({ label: 'Venue ' + tag, pluralLabel: 'Venues ' + tag });
+const vid = venue.j?.id;
+check('a new object is created', venue.s === 200 && /^venue_/.test(vid || ''), JSON.stringify(venue.j));
+const sc2 = (await call('GET', '/metadata/schemas', A)).j;
+check('with a name field, a layout and a menu entry', sc2[vid]?.fields?.some(f => f.name === 'name' && f.required) && (await call('GET', `/metadata/layouts/${vid}`, A)).j?.sections?.length >= 1 && flat((await call('GET', '/metadata/menu', A)).j).some(m => m.id === vid));
+check('records can be created in it straight away', !!(await mk(vid, { name: 'Taj Hall', status: 'New' })) || (await call('POST', `/data/${vid}`, A, { name: 'Taj Hall' })).s < 300);
+check('the same name again is refused', (await mkObj({ label: 'Venue ' + tag })).s === 409);
+check('a reserved name is refused', (await mkObj({ label: 'User' })).s === 400);
+check('an empty name is refused', (await mkObj({ label: '   ' })).s === 400);
+check('junk is refused', (await mkObj('nope')).s === 400);
+check('non-admins cannot create objects', (await mkObj({ label: 'Sneaky ' + tag }, am1.token)).s === 403);
+const linkJourney = (via, fields) => call('POST', '/journeys', A, { name: 'Link ' + rnd(), nodes: [{ id: 't', type: 'trigger', data: { type: 'trigger', label: 's', config: { entityType: 'time_entry', triggerType: 'create' } } }, { id: 'a', type: 'action', data: { type: 'action', label: 'l', config: { type: 'update_linked', via, fields } } }], edges: [{ id: 'e', source: 't', target: 'a' }] });
+check('a link step must name a join field', (await linkJourney(undefined, {})).s === 400 && (await linkJourney('hours', {})).s === 400);
+check('a link step may only set fields of the linked record', (await linkJourney('retainerId', { nope: 1 })).s === 400 && (await linkJourney('retainerId', { status: 'Paused' })).s < 300);
+for (const j of (await call('GET', '/journeys', A)).j || []) if (j.name.startsWith('Link ')) await call('DELETE', `/journeys/${j.id}`, A);
+
+console.log(`\n=========== ${pass} passed, ${fails.length} failed ===========`);
+process.exit(fails.length ? 1 : 0);

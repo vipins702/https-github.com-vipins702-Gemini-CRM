@@ -25,6 +25,7 @@ import { Integrations } from './pages/Integrations';
 import { Platform } from './pages/Platform';
 import { LeadRules } from './pages/LeadRules';
 import { FieldTriggers } from './pages/FieldTriggers';
+import { IndustryPacks } from './pages/IndustryPacks';
 import { LeadCapture } from './pages/LeadCapture';
 import { AgentConsole } from './pages/AgentConsole';
 import { Reports } from './pages/Reports';
@@ -233,6 +234,8 @@ const App: React.FC = () => {
         return <LookupManager />;
       case 'field-triggers':
         return <FieldTriggers />;
+      case 'packs':
+        return <IndustryPacks />;
       case 'lead-rules':
         return <LeadRules />;
       case 'lead-capture':

@@ -64,6 +64,8 @@ export function evaluateFormula(formula, data) {
     const numeric = formula.replace(/\{([A-Za-z_][\w]*)\}/g, (_, k) => { const n = Number(data[k]); return data[k] === '' || data[k] == null ? '0' : Number.isFinite(n) ? `(${n})` : 'x'; });
     const n = calc(numeric);
     if (n !== null) return n;
+    // Arithmetic that cannot be worked out (divide by zero) is blank, not the formula written out as text.
+    if (/[*\/+]| - /.test(formula) && /^[0-9+\-*/().\s]+$/.test(numeric)) return '';
     return fillTemplate(formula, data).replace(/\s+/g, ' ').trim();
 }
 

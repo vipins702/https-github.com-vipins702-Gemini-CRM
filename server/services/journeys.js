@@ -19,9 +19,10 @@ import { normalizeGate, evaluateGate, checkGate } from './conditions.js';
 import { runAction, evaluateCondition, interpolate } from './workflow.js';
 import { tokensIn } from './tokens.js';
 import { labelMapsFor, attachLabels } from './lookups.js';
+import { addComputed } from './fieldTypes.js';
 
 export const TRIGGERS = ['create', 'update', 'delete', 'status_change', 'field_change', 'date_arrives', 'inactive'];
-export const ACTIONS = ['email', 'update_record', 'create_task', 'create_lead', 'create_record', 'notify', 'assign_owner', 'webhook', 'whatsapp'];
+export const ACTIONS = ['email', 'update_record', 'update_linked', 'create_task', 'create_lead', 'create_record', 'notify', 'assign_owner', 'webhook', 'whatsapp'];
 export const WAIT_UNITS = { minutes: 60 * 1000, hours: 60 * 60 * 1000, days: 24 * 60 * 60 * 1000 };
 export const NODE_TYPES = ['trigger', 'action', 'condition', 'wait'];
 export const RULE_OPS = ['==', '!=', '>', '<', '>=', '<=', 'contains', 'not_contains', 'is_empty', 'is_not_empty'];
@@ -109,7 +110,13 @@ export function checkJourney(graph, schemas) {
             if (c.type === 'create_record' && !schemas?.[c.entityType]) errs.push(`"${label}": choose the record type to create`);
             // Field mapping: every field being set must exist on the record type that is changed or created,
             // and every {field} copied into a value must exist on the record type that started the journey.
-            const targetType = c.type === 'update_record' ? t.entityType : c.type === 'create_task' ? 'task' : c.type === 'create_lead' ? 'lead' : c.type === 'create_record' ? c.entityType : null;
+            let viaTarget = null;
+            if (c.type === 'update_linked') {
+                const via = schema?.fields?.find(f => f.name === c.via && f.type === 'lookup' && f.lookupTarget && schemas?.[f.lookupTarget]);
+                if (!via) errs.push(`"${label}": choose the join field that links to the record to update`);
+                else viaTarget = via.lookupTarget;
+            }
+            const targetType = c.type === 'update_record' ? t.entityType : c.type === 'update_linked' ? viaTarget : c.type === 'create_task' ? 'task' : c.type === 'create_lead' ? 'lead' : c.type === 'create_record' ? c.entityType : null;
             if (targetType && c.fields && typeof c.fields === 'object' && !Array.isArray(c.fields)) {
                 const targetNames = new Set((schemas?.[targetType]?.fields || []).map(f => f.name).concat(['status']));
                 for (const [k, v] of Object.entries(c.fields)) {
@@ -191,6 +198,8 @@ export async function recordWithLabels(tenantId, entityType, rec) {
     try {
         const d = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', tenantId, entityType);
         const def = d ? safeJson(d.config, null) : null;
+        // Roll-ups (and formulas that use them) are worked out here, so conditions and messages can use them.
+        if (def?.fields?.some(f => f.type === 'rollup')) await addComputed(db, tenantId, def, [rec]);
         if (def?.fields?.some(f => f.type === 'lookup')) attachLabels([rec], await labelMapsFor(tenantId, entityType, def));
     } catch (e) { console.warn('[journeys] labels skipped:', e.message); }
     return rec;
@@ -210,6 +219,7 @@ export function describeAction(c, record = {}) {
         case 'email': return `Send e-mail "${say(c.subject)}" to ${say(c.to ?? '{email}')}`;
         case 'whatsapp': return `Send WhatsApp to ${say(c.to ?? '{phone}')}`;
         case 'update_record': return `Set ${Object.keys(c.fields || {}).join(', ') || 'fields'} on the record`;
+        case 'update_linked': return `Update the linked record (${c.via}): ${Object.keys(c.fields || {}).join(', ') || 'touch it'}`;
         case 'create_task': return `Create task "${say(c.subject)}"`;
         case 'create_lead': return 'Create a lead';
         case 'create_record': return `Create a ${c.entityType}`;
@@ -331,6 +341,13 @@ const loadActive = async (tenantId, entityType) => (await db.all('SELECT * FROM 
 export async function triggerJourneys({ tenantId, entityType, triggerType, record, oldRecord = null, depth = 0 }) {
     if (depth > MAX_CASCADE) return;
     const list = await loadActive(tenantId, entityType);
+    if (list.length && record?.id) {
+        try {
+            const d = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', tenantId, entityType);
+            const def = d ? safeJson(d.config, null) : null;
+            if (def?.fields?.some(f => f.type === 'rollup')) await addComputed(db, tenantId, def, [record]);
+        } catch (e) { console.warn('[journeys] roll-ups skipped:', e.message); }
+    }
     for (const j of list) {
         try {
             if (inFlight.has(`${j.id}:${record?.id}`)) continue;      // never re-start a journey on the record it is already working on
