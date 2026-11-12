@@ -272,6 +272,37 @@ const LAYOUTS = {
     }
 };
 
+/**
+ * New Configuration screens (Field Triggers, Industry Packs) for menus that were saved before they existed.
+ * Runs on EVERY start, because existing databases skip the first-start seed. Each entry is offered to a workspace
+ * once: if an admin removes it in the Menu Builder it is not put back (menu_patches remembers what was offered).
+ */
+export async function ensureConfigMenuEntries() {
+    await db.exec('CREATE TABLE IF NOT EXISTS menu_patches (tenant_id TEXT NOT NULL, entry_id TEXT NOT NULL, PRIMARY KEY (tenant_id, entry_id))');
+    const ENTRIES = [
+        { after: 'layout', item: { id: 'field-triggers', label: 'Field Triggers', icon: 'Zap', type: 'item', view: 'field-triggers', allowedRoles: ['admin'] } },
+        { after: 'field-triggers', item: { id: 'packs', label: 'Industry Packs', icon: 'Package', type: 'item', view: 'packs', allowedRoles: ['admin'] } },
+    ];
+    for (const m of await db.all('SELECT id, tenant_id, config FROM menus')) {
+        let cfg; try { cfg = JSON.parse(m.config); } catch { continue; }
+        if (!Array.isArray(cfg)) continue;
+        const tools = cfg.find(g => g && g.id === 'tools' && Array.isArray(g.children));
+        if (!tools) continue;
+        let changed = false;
+        for (const e of ENTRIES) {
+            const offered = await db.get('SELECT entry_id FROM menu_patches WHERE tenant_id = ? AND entry_id = ?', m.tenant_id, e.item.id);
+            if (offered) continue;
+            if (!JSON.stringify(cfg).includes(`"id":"${e.item.id}"`)) {
+                const at = tools.children.findIndex(x => x && x.id === e.after);
+                tools.children.splice(at >= 0 ? at + 1 : tools.children.length, 0, e.item);
+                changed = true;
+            }
+            await db.run('INSERT INTO menu_patches (tenant_id, entry_id) VALUES (?, ?)', m.tenant_id, e.item.id);
+        }
+        if (changed) await db.run('UPDATE menus SET config = ? WHERE id = ?', JSON.stringify(cfg), m.id);
+    }
+}
+
 /** Entity definitions, layouts and (if missing) the menu. Safe to run repeatedly: never overwrites what a tenant has customised. */
 export async function seedCoreMetadata() {
     const menu = await db.get('SELECT id, config FROM menus WHERE tenant_id = ?', TENANT_ID);
@@ -281,25 +312,7 @@ export async function seedCoreMetadata() {
         // The built-in placeholder menu points at screens (leads / contacts / deals) that have no definition.
         await db.run('UPDATE menus SET config = ? WHERE id = ?', JSON.stringify(INITIAL_MENU), menu.id);
     }
-    // Menus saved before an entry existed: add it to Configuration (every workspace, once).
-    const NEW_CONFIG_ENTRIES = [
-        { id: 'field-triggers', after: 'layout', item: { id: 'field-triggers', label: 'Field Triggers', icon: 'Zap', type: 'item', view: 'field-triggers', allowedRoles: ['admin'] } },
-        { id: 'packs', after: 'field-triggers', item: { id: 'packs', label: 'Industry Packs', icon: 'Package', type: 'item', view: 'packs', allowedRoles: ['admin'] } },
-    ];
-    for (const m of await db.all('SELECT id, config FROM menus')) {
-        let cfg; try { cfg = JSON.parse(m.config); } catch { continue; }
-        if (!Array.isArray(cfg)) continue;
-        const tools = cfg.find(g => g && g.id === 'tools' && Array.isArray(g.children));
-        if (!tools) continue;
-        let changed = false;
-        for (const e of NEW_CONFIG_ENTRIES) {
-            if (JSON.stringify(cfg).includes(`"${e.id}"`)) continue;
-            const at = tools.children.findIndex(x => x && x.id === e.after);
-            tools.children.splice(at >= 0 ? at + 1 : tools.children.length, 0, e.item);
-            changed = true;
-        }
-        if (changed) await db.run('UPDATE menus SET config = ? WHERE id = ?', JSON.stringify(cfg), m.id);
-    }
+    await ensureConfigMenuEntries();
     for (const [key, value] of Object.entries(SCHEMAS)) {
         const has = await db.get('SELECT id FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', TENANT_ID, key);
         if (!has) await db.run('INSERT INTO entity_definitions (id, tenant_id, entity_type, config) VALUES (?, ?, ?, ?)', uuidv4(), TENANT_ID, key, JSON.stringify(value));

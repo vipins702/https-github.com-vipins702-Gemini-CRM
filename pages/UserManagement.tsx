@@ -319,7 +319,7 @@ export const UserManagement: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-[var(--border-subtle)]">
                     {users.map(user => {
-                      const roleName = roles.find(r => r.id === user.roleId)?.name || user.roleId;
+                      const roleName = String(roles.find(r => r.id === user.roleId)?.name || user.roleId || 'No role');
                       const initials = (user.name || '?')
                         .split(' ')
                         .map((w: string) => w[0])

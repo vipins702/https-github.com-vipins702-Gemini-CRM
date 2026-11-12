@@ -198,6 +198,7 @@ async function ensureReportsMenuItem() {
     }
 }
 await ensureReportsMenuItem();
+{ const { ensureConfigMenuEntries } = await import('./seed.js'); await ensureConfigMenuEntries(); }
 
 // Idempotent menu patch: ensure existing tenant menus expose the WhatsApp inbox.
 async function ensureWhatsAppMenuItem() {
@@ -2078,7 +2079,7 @@ app.post('/api/settings', authenticateToken, requireAdmin, validateSettings, asy
 app.get('/api/users', authenticateToken, async (req, res) => {
     try {
         const users = await db.all(`
-            SELECT id, email, role as roleId, first_name || ' ' || last_name as name, is_active as isActive, reports_to as "reportsTo"
+            SELECT id, email, role as "roleId", first_name || ' ' || last_name as name, is_active as "isActive", reports_to as "reportsTo"
             FROM users WHERE tenant_id = ?
         `, req.tenantId);
         res.json(users);
