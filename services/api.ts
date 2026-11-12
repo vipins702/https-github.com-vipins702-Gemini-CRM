@@ -709,6 +709,11 @@ export const api = {
   },
 
   // --- INTEGRATIONS (per-tenant credentials) ---
+  /** What is still missing for WhatsApp to work for this workspace. */
+  async getWhatsappSetupCheck(): Promise<{ ready: boolean; checks: { key: string; ok: boolean; label: string; fix: string }[] }> {
+    return fetchWithAuth(`${API_BASE}/integrations/whatsapp/setup-check`);
+  },
+
   async getIntegrations(): Promise<IntegrationConfig[]> {
     return fetchWithAuth(`${API_BASE}/integrations`);
   },

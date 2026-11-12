@@ -36,7 +36,7 @@ import { lookupByPhone, logCall, getRecentCalls, convertLeadToCustomer, handleIn
 import { listReports, runReport, listPacks, runPack, reportEntity } from './services/reporting.js';
 import { reportCache } from './services/reportCache.js';
 import { verifyWebhook, parseWebhookPayload, handleIncomingMessage, sendMessage, getConversations, getThread, isConfigured as waConfigured, authenticateMessages as waAuthenticateMessages } from './services/whatsapp.js';
-import { listForClient as listIntegrations, getForClient as getIntegration, saveIntegration, getIngestKey, rotateIngestKey, resolveTenantByIngestKey, encryptStoredSecrets } from './services/integrations.js';
+import { listForClient as listIntegrations, getForClient as getIntegration, saveIntegration, getIngestKey, rotateIngestKey, resolveTenantByIngestKey, encryptStoredSecrets, whatsappSetupCheck } from './services/integrations.js';
 import { listQuotes, getQuote, saveQuote, setQuoteStatus, emailQuote, convertQuote } from './services/quotes.js';
 import { getProcess, saveProcess, configurableEntities, findStage, missingForStage, runStageEntryActions } from './services/processes.js';
 import { getTree as getCategoryTree, saveTree as saveCategoryTree, ensureDefaultTree } from './services/categories.js';
@@ -2570,9 +2570,12 @@ app.post('/api/reports/packs/:packId/run', authenticateToken, async (req, res) =
 // Public webhook — Meta calls these. Each message routes to the tenant that owns its
 // phone_number_id and must carry a valid X-Hub-Signature-256 for that tenant's app secret.
 app.get('/api/webhooks/whatsapp', async (req, res) => {
+    // Public on purpose (Meta calls it, signed in as nobody). The verify token is the credential, so guessing is limited.
+    if (overBudget('wa-verify:' + req.ip, 60, 60 * 1000)) return res.status(429).type('text/plain').send('Too many requests');
     const challenge = await verifyWebhook(req.query);
-    if (challenge) return res.status(200).send(challenge);
-    res.sendStatus(403);
+    if (!challenge) return res.status(403).type('text/plain').send('Forbidden');
+    // The challenge is echoed as plain text, exactly, and can never be taken for a page.
+    res.status(200).set({ 'Content-Type': 'text/plain; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' }).send(challenge);
 });
 
 app.post('/api/webhooks/whatsapp', async (req, res) => {
@@ -2663,6 +2666,12 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requireSuperadmin, asy
 app.get('/api/integrations', authenticateToken, requireAdmin, async (req, res) => {
     try { res.json(await listIntegrations(req.tenantId)); }
     catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// What is still missing for WhatsApp (admin): enabled, verify token, phone number id, app secret, access token.
+app.get('/api/integrations/whatsapp/setup-check', authenticateToken, requireAdmin, async (req, res) => {
+    try { res.json(await whatsappSetupCheck(req.tenantId)); }
+    catch (e) { res.status(500).json({ error: 'Could not check the set-up' }); }
 });
 
 app.get('/api/integrations/:provider', authenticateToken, requireAdmin, async (req, res) => {

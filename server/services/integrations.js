@@ -163,15 +163,52 @@ export async function resolveTenantByIngestKey(key) {
     return row ? row.tenant_id : null;
 }
 
-/** True if the given verify token matches the env default or any enabled tenant config. */
+const cleanToken = (t) => (typeof t === 'string' ? t.trim() : '');
+/** Compare two tokens without leaking where they differ (hash both, then compare in constant time). */
+function sameToken(a, b) {
+    const x = cleanToken(a), y = cleanToken(b);
+    if (!x || !y) return false;
+    return crypto.timingSafeEqual(crypto.createHash('sha256').update(x).digest(), crypto.createHash('sha256').update(y).digest());
+}
+
+/**
+ * Does this token belong to a WhatsApp set-up that is switched on? Meta's GET handshake carries no workspace, so the
+ * token itself is what identifies the owner. Returns { ok, reason }; the reason is for the server log, never the client.
+ */
+export async function checkVerifyToken(token) {
+    if (!cleanToken(token)) return { ok: false, reason: 'no verify token was sent' };
+    if (WHATSAPP_VERIFY_TOKEN && sameToken(token, WHATSAPP_VERIFY_TOKEN)) return { ok: true, reason: 'matches the server setting' };
+    const rows = await db.all("SELECT enabled, config FROM integrations WHERE provider = 'whatsapp'");
+    let offMatch = false, withToken = 0;
+    for (const r of rows) {
+        let cfg; try { cfg = JSON.parse(r.config || '{}'); } catch { continue; }
+        if (!cleanToken(cfg.verifyToken)) continue;
+        withToken++;
+        if (!sameToken(token, cfg.verifyToken)) continue;
+        if (r.enabled) return { ok: true, reason: 'matches an enabled integration' };
+        offMatch = true;
+    }
+    if (offMatch) return { ok: false, reason: 'the token matches an integration that is switched OFF (turn Enabled on in Integrations and save)' };
+    return { ok: false, reason: withToken ? 'the token does not match any saved verify token' : 'no workspace has saved a WhatsApp verify token (and the server has none)' };
+}
+
+/** True if the given verify token belongs to the server setting or an enabled workspace integration. */
 export async function isValidVerifyToken(token) {
-    if (token && token === WHATSAPP_VERIFY_TOKEN) return true;
-    const rows = await db.all(
-        "SELECT config FROM integrations WHERE provider = 'whatsapp' AND enabled = 1"
-    );
-    return rows.some(r => {
-        try { return JSON.parse(r.config || '{}').verifyToken === token; } catch { return false; }
-    });
+    return (await checkVerifyToken(token)).ok;
+}
+
+/** What is still missing before WhatsApp works for this workspace, in plain words. */
+export async function whatsappSetupCheck(tenantId) {
+    const { enabled, config } = await getStoredConfig(tenantId, 'whatsapp');
+    const has = (k, env) => !!(cleanToken(config[k]) || env);
+    const checks = [
+        { key: 'enabled', ok: !!enabled, label: 'WhatsApp is switched on', fix: 'Turn the Enabled switch on and press Save. While it is off, Meta\'s webhook check and incoming messages are refused.' },
+        { key: 'verifyToken', ok: has('verifyToken', WHATSAPP_VERIFY_TOKEN), label: 'A webhook verify token is saved', fix: 'Enter a long random token here and the same token in Meta (WhatsApp, Configuration, Webhook).' },
+        { key: 'phoneNumberId', ok: has('phoneNumberId', WHATSAPP_PHONE_NUMBER_ID), label: 'Phone number ID is saved', fix: 'Copy it from Meta, WhatsApp, API Setup. Incoming messages are matched to your workspace by it.' },
+        { key: 'appSecret', ok: has('appSecret', WHATSAPP_APP_SECRET), label: 'App secret is saved', fix: 'Copy it from Meta, App settings, Basic. Incoming messages are rejected unless Meta signed them with it.' },
+        { key: 'token', ok: has('token', WHATSAPP_TOKEN), label: 'Access token is saved (to send replies)', fix: 'Create a permanent token for a System User in Meta Business settings and paste it here.' },
+    ];
+    return { ready: checks.every(c => c.ok), checks };
 }
 
 /** Client-safe view of one provider: secrets masked + whether each secret is set. */
@@ -202,6 +239,18 @@ export async function saveIntegration(tenantId, provider, { config = {}, enabled
     const secrets = SECRET_FIELDS[provider] || [];
 
     const merged = { ...existing.config, ...config };
+    if (provider === 'whatsapp') {
+        // Pasted values often carry a trailing space or newline, which makes a token that "looks" identical fail to match.
+        for (const k of ['verifyToken', 'phoneNumberId']) if (typeof merged[k] === 'string') merged[k] = merged[k].trim();
+        if (merged.verifyToken) {
+            if (merged.verifyToken.length < 8) throw new Error('The webhook verify token must be at least 8 characters (use a long random value).');
+            if (/\s/.test(merged.verifyToken)) throw new Error('The webhook verify token cannot contain spaces.');
+            const others = await db.all("SELECT config FROM integrations WHERE provider = 'whatsapp' AND tenant_id <> ?", tenantId);
+            if (others.some(r => { try { return sameToken(JSON.parse(r.config || '{}').verifyToken, merged.verifyToken); } catch { return false; } })) {
+                throw new Error('That verify token is already used by another workspace. Choose a different random value.');
+            }
+        }
+    }
     for (const f of secrets) {
         const incoming = config[f];
         if (incoming === undefined || incoming === '' || isMasked(incoming)) {

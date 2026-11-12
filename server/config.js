@@ -26,7 +26,9 @@ export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 // outbound messages are stored locally and marked 'simulated' instead of hitting Graph API.
 export const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || '';
 export const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
-export const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'flowcrm-wa-verify';
+// No built-in default: a token written in the source is public. Set WHATSAPP_VERIFY_TOKEN, or (better) save a verify
+// token per workspace in Integrations.
+export const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || '';
 // Meta App Secret — inbound webhooks are rejected unless their X-Hub-Signature-256
 // verifies against it (tenant config overrides this). WHATSAPP_ALLOW_UNSIGNED=true
 // accepts unsigned webhooks when no secret is set; local development only.

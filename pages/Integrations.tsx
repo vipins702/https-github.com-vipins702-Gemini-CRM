@@ -24,7 +24,7 @@ const PROVIDER_META: Record<string, {
       { key: 'phoneNumberId', label: 'Phone Number ID', placeholder: '1234567890', help: 'From Meta → WhatsApp → API Setup' },
       { key: 'token', label: 'Permanent Access Token', secret: true, type: 'password', placeholder: 'EAAG…' },
       { key: 'appSecret', label: 'App Secret', secret: true, type: 'password', help: 'From Meta → App settings → Basic. Required: inbound messages are rejected unless signed with it.' },
-      { key: 'verifyToken', label: 'Webhook Verify Token', placeholder: 'flowcrm-wa-verify', help: 'Use this same value in the Meta webhook config' },
+      { key: 'verifyToken', label: 'Webhook Verify Token', placeholder: 'a long random value (press Generate below)', help: 'At least 8 characters, no spaces. Use this exact value in Meta (WhatsApp, Configuration, Webhook, Verify token).' },
     ],
   },
   facebook: {
@@ -73,6 +73,16 @@ const ProviderCard: React.FC<{ data: IntegrationConfig; onSaved: (c: Integration
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [ingestKey, setIngestKey] = useState('');
+  const [waCheck, setWaCheck] = useState<null | { ready: boolean; checks: { key: string; ok: boolean; label: string; fix: string }[] }>(null);
+  const [checking, setChecking] = useState(false);
+  const runWaCheck = async () => {
+    setChecking(true);
+    try { setWaCheck(await api.getWhatsappSetupCheck()); } catch (e: any) { addToast(e?.message || 'Could not check', 'error'); } finally { setChecking(false); }
+  };
+  const generateToken = () => {
+    const b = new Uint8Array(24); crypto.getRandomValues(b);
+    set('verifyToken', Array.from(b, x => x.toString(16).padStart(2, '0')).join(''));
+  };
 
   useEffect(() => {
     if (data.provider === 'facebook') api.getIngestKey().then(r => setIngestKey(r.key)).catch(() => {});
@@ -161,6 +171,45 @@ const ProviderCard: React.FC<{ data: IntegrationConfig; onSaved: (c: Integration
           </div>
         ))}
       </div>
+
+      {data.provider === 'whatsapp' && (
+        <div className="mt-6 p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-3">
+          <h4 className="font-heading font-bold text-emerald-900 text-sm flex items-center gap-2"><MessageCircle className="w-4 h-4 text-emerald-600" /> Connect this to Meta</h4>
+          {!enabled && (
+            <p role="alert" className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              This is switched off. While it is off, Meta&apos;s webhook check is refused (HTTP 403) and incoming messages are ignored. Turn <b>Enabled</b> on and press <b>Save</b>.
+            </p>
+          )}
+          <ol className="text-xs text-emerald-900 list-decimal pl-4 space-y-1">
+            <li>In Meta, open your app, <b>WhatsApp</b>, <b>Configuration</b>, <b>Webhook</b>, and paste the callback URL below.</li>
+            <li>Paste the <b>same verify token</b> you saved here, then press Verify and save.</li>
+            <li>Under <b>Webhook fields</b>, subscribe to <b>messages</b>.</li>
+          </ol>
+          <div>
+            <label className="mono-label text-xs mb-1 block">Callback URL</label>
+            <div className="flex gap-2">
+              <input readOnly value={`${window.location.origin}/api/webhooks/whatsapp`} className="flex-1 min-w-0 px-3 py-2 border border-emerald-200 bg-surface rounded-lg text-xs font-mono text-slate-600" />
+              <Button variant="secondary" size="sm" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/whatsapp`); addToast('Callback URL copied', 'success'); }}>Copy</Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={generateToken}>Generate a verify token</Button>
+            <Button variant="secondary" size="sm" disabled={checking} icon={checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} onClick={runWaCheck}>Check my set-up</Button>
+            <span className="text-xs text-emerald-800">Save first, then check.</span>
+          </div>
+          {waCheck && (
+            <ul className="text-xs space-y-1.5">
+              {waCheck.checks.map(c => (
+                <li key={c.key} className={`flex items-start gap-2 ${c.ok ? 'text-emerald-800' : 'text-red-700'}`}>
+                  <span aria-hidden="true" className="font-bold">{c.ok ? '✓' : '✗'}</span>
+                  <span><b className="font-semibold">{c.label}</b>{!c.ok && <span className="block text-red-600">{c.fix}</span>}</span>
+                </li>
+              ))}
+              {waCheck.ready && <li className="text-emerald-800 font-semibold">Everything is in place on this side. If Meta still refuses, the token there differs from the one saved here.</li>}
+            </ul>
+          )}
+        </div>
+      )}
 
       {data.provider === 'facebook' && (
         <div className="mt-6 p-4 rounded-xl border border-blue-200 bg-blue-50/50">

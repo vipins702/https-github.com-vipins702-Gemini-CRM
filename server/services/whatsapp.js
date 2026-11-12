@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { WHATSAPP_ALLOW_UNSIGNED } from '../config.js';
 import { logAudit } from './audit.js';
 import { lookupByPhone, normalizePhone, createLeadFromCall } from './cti.js';
-import { getResolvedConfig, isValidVerifyToken, resolveTenantByWhatsAppPhoneId } from './integrations.js';
+import { getResolvedConfig, checkVerifyToken, resolveTenantByWhatsAppPhoneId } from './integrations.js';
 
 /**
  * WhatsApp Business Cloud API (Meta) integration.
@@ -26,13 +26,19 @@ export async function isConfigured(tenantId = 'default') {
     return Boolean(cfg.token && cfg.phoneNumberId);
 }
 
-/** Meta webhook verification handshake (GET). Returns the challenge or null. */
+/**
+ * Meta webhook verification handshake (GET). Returns the challenge to echo, or null to refuse.
+ *   hub.mode must be "subscribe"; hub.challenge must be present and a plain token (Meta sends a number); hub.verify_token
+ *   must match a saved, enabled WhatsApp set-up. Why a request was refused goes to the server log (never the token itself).
+ */
 export async function verifyWebhook(query) {
-    const mode = query['hub.mode'];
-    const token = query['hub.verify_token'];
-    const challenge = query['hub.challenge'];
-    if (mode === 'subscribe' && await isValidVerifyToken(token)) return challenge;
-    return null;
+    const refuse = (why) => { console.warn(`[whatsapp] webhook verification refused: ${why}`); return null; };
+    const mode = query?.['hub.mode'], token = query?.['hub.verify_token'], challenge = query?.['hub.challenge'];
+    if (mode !== 'subscribe') return refuse(`hub.mode is ${typeof mode === 'string' ? '"' + mode.slice(0, 20) + '"' : 'missing'}, expected "subscribe"`);
+    if (typeof challenge !== 'string' || !/^[A-Za-z0-9_-]{1,200}$/.test(challenge)) return refuse('hub.challenge is missing or not a plain value');
+    if (typeof token !== 'string') return refuse('hub.verify_token is missing');
+    const checked = await checkVerifyToken(token);
+    return checked.ok ? challenge : refuse(checked.reason);
 }
 
 /** Resolve the owning tenant for an inbound webhook from its phone_number_id, or null if unknown. */
