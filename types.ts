@@ -265,6 +265,14 @@ export interface WaConversation {
   matched_entity?: 'lead' | 'customer';
   matched_id?: string;
   message_count: number;
+  /** A name worth showing: the lead/customer's name, else the profile name, else "WhatsApp +91 ...". */
+  display_name: string;
+  phone_display: string;
+  /** Status of the matched lead/customer (e.g. "New"). */
+  record_status?: string;
+  /** Messages from them since your last reply. */
+  unreplied: number;
+  needs_reply: boolean;
 }
 
 export interface WaMessage {

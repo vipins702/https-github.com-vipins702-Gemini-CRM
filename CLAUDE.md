@@ -73,6 +73,7 @@ npm run build
 - **Record scope**: `scope: own | team | all` per role and record type; `team` follows `users.reports_to`. Lists, search, reports and dashboards all use `scopeUserIds` / `scopeClause` (`server/middleware/access.js`).
 - **Industry packs** (`server/services/packs.js`, `objects.js`, `server/packs/*.js`, `pages/IndustryPacks.tsx`): a pack is plain data (objects, fields, roles, field triggers, journeys); the installer previews, validates, then ADDS only what is missing. Journeys install switched off.
 - **Lookups** (`server/services/lookups.js`): a Lookup field saves a code (list value) or a record id; `_labels` on each record carries the words to show. Keys, joins and re-pointing: `server/services/keys.js`.
+- **WhatsApp Inbox** (`server/services/whatsapp.js`, `pages/WhatsAppInbox.tsx`): a message from an unknown number creates a lead like any other (field rules, score, owner, "created" journeys), named from the profile name, else from "my name is ..." in the message, else "WhatsApp +91 ..."; a lead made from a bare number is renamed when the person says their name. Conversations carry `display_name`, `unreplied` and `needs_reply`. From a chat: create lead, note (timeline), task, convert to customer (`/api/whatsapp/conversations/:phone/{lead,note,task}`). Test: `server/test/whatsapp-inbox.mjs` (run it before `whatsapp-webhook.mjs`).
 - Plans and status: `CONFIGURATION_ROADMAP.md`, `INDUSTRY_PACKS_PLAN.md`.
 
 ## Architecture

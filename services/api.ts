@@ -693,6 +693,15 @@ export const api = {
   async sendWhatsAppMessage(to: string, body: string): Promise<{ id: string; status: string; phone: string }> {
     return fetchWithAuth(`${API_BASE}/whatsapp/send`, { method: 'POST', body: JSON.stringify({ to, body }) });
   },
+  async createWhatsAppLead(phone: string, name?: string): Promise<{ existing: boolean; entityType: string; recordId: string; name: string }> {
+    return fetchWithAuth(`${API_BASE}/whatsapp/conversations/${encodeURIComponent(phone)}/lead`, { method: 'POST', body: JSON.stringify({ name }) });
+  },
+  async addWhatsAppNote(phone: string, text: string): Promise<{ entityType: string; recordId: string }> {
+    return fetchWithAuth(`${API_BASE}/whatsapp/conversations/${encodeURIComponent(phone)}/note`, { method: 'POST', body: JSON.stringify({ text }) });
+  },
+  async addWhatsAppTask(phone: string, task: { subject?: string; priority?: string; dueInDays?: number; notes?: string }): Promise<{ id: string; subject: string; dueDate: string }> {
+    return fetchWithAuth(`${API_BASE}/whatsapp/conversations/${encodeURIComponent(phone)}/task`, { method: 'POST', body: JSON.stringify(task) });
+  },
   async simulateWhatsAppIncoming(from: string, body: string, profileName?: string): Promise<{ ok: boolean; matchedEntity?: string; matchedId?: string; isNewLead?: boolean }> {
     return fetchWithAuth(`${API_BASE}/whatsapp/simulate-incoming`, { method: 'POST', body: JSON.stringify({ from, body, profileName }) });
   },

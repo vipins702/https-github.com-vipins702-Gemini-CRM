@@ -35,7 +35,7 @@ import { ingestLead, mapPayload } from './services/ingest.js';
 import { lookupByPhone, logCall, getRecentCalls, convertLeadToCustomer, handleInboundCall, routeInbound } from './services/cti.js';
 import { listReports, runReport, listPacks, runPack, reportEntity } from './services/reporting.js';
 import { reportCache } from './services/reportCache.js';
-import { verifyWebhook, parseWebhookPayload, handleIncomingMessage, sendMessage, getConversations, getThread, isConfigured as waConfigured, authenticateMessages as waAuthenticateMessages } from './services/whatsapp.js';
+import { verifyWebhook, parseWebhookPayload, handleIncomingMessage, sendMessage, getConversations, getThread, isConfigured as waConfigured, authenticateMessages as waAuthenticateMessages, createLeadForConversation, addConversationNote, addConversationTask } from './services/whatsapp.js';
 import { listForClient as listIntegrations, getForClient as getIntegration, saveIntegration, getIngestKey, rotateIngestKey, resolveTenantByIngestKey, encryptStoredSecrets, whatsappSetupCheck } from './services/integrations.js';
 import { listQuotes, getQuote, saveQuote, setQuoteStatus, emailQuote, convertQuote } from './services/quotes.js';
 import { getProcess, saveProcess, configurableEntities, findStage, missingForStage, runStageEntryActions } from './services/processes.js';
@@ -2625,6 +2625,31 @@ app.post('/api/whatsapp/send', authenticateToken, async (req, res) => {
         const { to, body } = req.body || {};
         const result = await sendMessage(req.tenantId, { to, body }, req.user.id);
         res.json(result);
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// From a conversation: make a lead for a new number, add a note, add a follow-up task.
+// For people limited to their own records, the lead/customer behind the number must be theirs.
+async function waRecordInScope(req, phone) {
+    const m = await lookupByPhone(req.tenantId, phone);
+    if (!m.match || !isRestrictedScope(req, m.entityType)) return true;
+    const row = await db.get('SELECT owner_id, created_by FROM records WHERE id = ? AND tenant_id = ?', m.recordId, req.tenantId);
+    return inScope(req, m.entityType, row);
+}
+app.post('/api/whatsapp/conversations/:phone/lead', authenticateToken, async (req, res) => {
+    try { res.json(await createLeadForConversation(req.tenantId, req.params.phone, { name: req.body?.name, actorId: req.user.id })); }
+    catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post('/api/whatsapp/conversations/:phone/note', authenticateToken, async (req, res) => {
+    try {
+        if (!(await waRecordInScope(req, req.params.phone))) return res.status(403).json({ error: 'You can only add notes to leads and customers you own or that belong to your team' });
+        res.json(await addConversationNote(req.tenantId, req.params.phone, req.body?.text, req.user.id));
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post('/api/whatsapp/conversations/:phone/task', authenticateToken, async (req, res) => {
+    try {
+        if (!(await waRecordInScope(req, req.params.phone))) return res.status(403).json({ error: 'You can only add tasks for leads and customers you own or that belong to your team' });
+        res.json(await addConversationTask(req.tenantId, req.params.phone, req.body || {}, req.user.id));
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 

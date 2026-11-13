@@ -172,6 +172,9 @@ const POLICY = [
     ['GET',    /^\/(whatsapp|email)\/status$/,                access],
     ['POST',   /^\/(whatsapp\/send|email\/send|cti\/log-call|cti\/route)$/, anyOf(LC, 'edit')],
     ['POST',   /^\/whatsapp\/simulate-incoming$/,             adminOnly],
+    ['POST',   /^\/whatsapp\/conversations\/[^/]+\/lead$/,    ent('lead', 'create')],
+    ['POST',   /^\/whatsapp\/conversations\/[^/]+\/task$/,    ent('task', 'create')],
+    ['POST',   /^\/whatsapp\/conversations\/[^/]+\/note$/,    anyOf(LC, 'edit')],
 
     // rules and sequences: readable with lead access, changed by admins
     ['GET',    /^\/(scoring-rules|assignment-rules|lead-rules|sequences)(\/[^/]+)?$/, ent('lead', 'read')],
