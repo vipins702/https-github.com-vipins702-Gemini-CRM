@@ -136,7 +136,8 @@ export function resolveContactName({ profileName, body, phone }) {
 }
 
 /** Lead first / last name. A one-word name gets the number as its last name so two "Chad"s stay apart. */
-function splitName(name, phone) {
+function splitName(name, phone, source) {
+    if (source === 'phone') return { firstName: 'WhatsApp', lastName: formatPhone(phone) || '(WhatsApp)' };
     const words = String(name).trim().split(/\s+/).filter(Boolean);
     if (words.length >= 2) return { firstName: words.slice(0, -1).join(' '), lastName: words[words.length - 1] };
     return { firstName: words[0] || 'WhatsApp', lastName: formatPhone(phone) || '(WhatsApp)' };
@@ -149,7 +150,7 @@ function splitName(name, phone) {
 export async function createLeadFromWhatsApp(tenantId, { phone, profileName, body, name, actorId = 'whatsapp' }) {
     const digits = normalizePhone(phone);
     const who = name ? { name: String(name).trim().slice(0, 80), source: 'manual' } : resolveContactName({ profileName, body, phone: digits });
-    const { firstName, lastName } = splitName(who.name, digits);
+    const { firstName, lastName } = splitName(who.name, digits, who.source);
     const display = `${firstName} ${lastName}`.trim();
     const id = uuidv4();
     const data = {
@@ -185,12 +186,12 @@ export async function createLeadFromWhatsApp(tenantId, { phone, profileName, bod
 
 /** A lead this module made with only a number for a name gets a real one as soon as the person tells us. */
 async function upgradeAutoLeadName(tenantId, match, who) {
-    if (match.entityType !== 'lead' || who.source === 'phone') return;
+    if (match.entityType !== 'lead') return;
     const d = match.data || {};
-    const placeholder = d._via === 'whatsapp' && (d._name_source === 'phone' || !cleanProfileName(match.name));
-    const junk = !cleanProfileName(match.name) && !String(match.name || '').startsWith('WhatsApp ');
-    if (!placeholder && !junk) return;
-    const { firstName, lastName } = splitName(who.name, match.data?.phone || '');
+    const junk = !cleanProfileName(match.name);                       // "~", blank, only symbols: always worth replacing
+    const placeholder = d._via === 'whatsapp' && d._name_source === 'phone';
+    if (!junk && !(placeholder && who.source !== 'phone')) return;   // a real name is never touched
+    const { firstName, lastName } = splitName(who.name, match.data?.phone || '', who.source);
     const display = `${firstName} ${lastName}`.trim();
     const row = await db.get('SELECT data FROM records WHERE id = ? AND tenant_id = ?', match.recordId, tenantId);
     let cur = {}; try { cur = JSON.parse(row?.data || '{}'); } catch { cur = {}; }
@@ -216,7 +217,11 @@ async function storeMessage(tenantId, msg) {
  */
 export async function handleIncomingMessage(tenantId, { from, profileName, body, msgType = 'text', waMessageId }, actorId = 'whatsapp') {
     const phone = normalizePhone(from);
-    if (!phone) return { ok: false, reason: 'no phone' };
+    if (!phone) {
+        // People who use a WhatsApp username may arrive with only a business-scoped user id and no number (not supported yet).
+        console.warn('[whatsapp] inbound message has no phone number (username / BSUID sender); not stored');
+        return { ok: false, reason: 'no phone' };
+    }
 
     // Dedupe: Meta retries webhooks — same wa_message_id must not double-insert.
     if (waMessageId) {

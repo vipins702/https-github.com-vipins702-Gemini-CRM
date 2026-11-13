@@ -2608,14 +2608,30 @@ app.get('/api/whatsapp/status', authenticateToken, async (req, res) => {
     res.json({ configured, mode: configured ? 'live' : 'simulated' });
 });
 
+// People limited to "own" or "team" records see only the chats of leads/customers they may see. A chat with nobody behind
+// it yet (a number you messaged first) is for people who can see everything.
+async function waCanSee(req, entityType, recordId) {
+    const limited = isRestrictedScope(req, 'lead') || isRestrictedScope(req, 'customer');
+    if (!limited) return true;
+    if (!recordId) return false;
+    if (!isRestrictedScope(req, entityType)) return true;
+    const row = await db.get('SELECT owner_id, created_by FROM records WHERE id = ? AND tenant_id = ?', recordId, req.tenantId);
+    return inScope(req, entityType, row);
+}
+
 app.get('/api/whatsapp/conversations', authenticateToken, async (req, res) => {
     try {
-        res.json(await getConversations(req.tenantId));
+        const list = await getConversations(req.tenantId);
+        const seen = [];
+        for (const c of list) if (await waCanSee(req, c.matched_entity, c.matched_id)) seen.push(c);
+        res.json(seen);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/whatsapp/thread/:phone', authenticateToken, async (req, res) => {
     try {
+        const m = await lookupByPhone(req.tenantId, req.params.phone);
+        if (!(await waCanSee(req, m.entityType, m.recordId))) return res.status(403).json({ error: 'You can only open chats of leads and customers you own or that belong to your team' });
         res.json(await getThread(req.tenantId, req.params.phone));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -2623,6 +2639,7 @@ app.get('/api/whatsapp/thread/:phone', authenticateToken, async (req, res) => {
 app.post('/api/whatsapp/send', authenticateToken, async (req, res) => {
     try {
         const { to, body } = req.body || {};
+        if (!(await waRecordInScope(req, to))) return res.status(403).json({ error: 'You can only message leads and customers you own or that belong to your team' });
         const result = await sendMessage(req.tenantId, { to, body }, req.user.id);
         res.json(result);
     } catch (e) { res.status(400).json({ error: e.message }); }

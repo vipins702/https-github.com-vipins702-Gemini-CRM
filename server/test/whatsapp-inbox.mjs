@@ -46,6 +46,7 @@ const P2 = num(2);
 r = await incoming(P2, '~', 'hello');
 l = await lead(r.j?.matchedId);
 check('no usable name anywhere: "WhatsApp +91 ..." (never "~", never blank)', l?.name === `WhatsApp ${fmt(P2)}` && l?._name_source === 'phone', JSON.stringify([l?.name, l?._name_source]));
+check('and its first / last name are "WhatsApp" and the number (not a split of the sentence)', l?.firstName === 'WhatsApp' && l?.lastName === fmt(P2), JSON.stringify([l?.firstName, l?.lastName]));
 const P3 = num(3);
 r = await incoming(P3, 'Priya Sharma', 'is the premium plan available?');
 l = await lead(r.j?.matchedId);
@@ -124,7 +125,39 @@ check('with nothing typed the task still gets a sensible subject', tk2.s === 200
 const related = (await call('GET', `/records/lead/${note.j?.recordId}/related-activity`, A)).j;
 check('the task appears among the lead\'s related items', JSON.stringify(related || {}).includes(tk.j?.id), JSON.stringify(related || {}).slice(0, 160));
 
-sec('7. Sign-in is required');
+sec('7. A lead that was saved with a junk name ("~") is cleaned up on its next message');
+const P9 = num(9);
+const old = await call('POST', '/data/lead', A, { firstName: '~', lastName: '~', email: `old.${tag}@example.com`, phone: fmt(P9), status: 'New' });
+r = await incoming(P9, '~', 'hello again');
+l = await pick('lead', old.j?.id);
+check('the "~" lead is renamed to "WhatsApp +91 ..." and keeps its id', r.j?.isNewLead === false && l?.firstName === 'WhatsApp' && l?.lastName === fmt(P9), JSON.stringify([r.j, l?.firstName, l?.lastName]));
+
+sec('8. People limited to their own records');
+let n = 0;
+const mkUser = async (label, permissions) => {
+    const role = await call('POST', '/roles', A, { name: `${label} ${tag}${n}`, description: label, permissions });
+    const email = `wa.${tag}.${n++}@flowcrm.test`;
+    await call('POST', '/users', A, { email, password: 'Perm@12345x', roleId: role.j?.id, name: 'Wa Rep' });
+    return { token: await login(email, 'Perm@12345x') };
+};
+const own = (extra = {}) => ({ read: true, create: true, edit: true, delete: false, scope: 'own', ...extra });
+const rep = await mkUser('wa own scope', { lead: own(), customer: own(), task: own() });
+const P10 = num(10);
+const mine = await call('POST', '/data/lead', rep.token, { firstName: 'Rep', lastName: 'Own' + tag, email: `rep.${tag}@example.com`, phone: fmt(P10), status: 'New' });
+await incoming(P10, 'Rep Own', 'hi, I am a customer of the rep');
+const repList = (await call('GET', '/whatsapp/conversations', rep.token)).j || [];
+check('the rep sees the chat of their own lead', mine.s === 200 && repList.some(x => x.phone === P10), JSON.stringify([mine.s, repList.map(x => x.phone)]));
+check('the rep does not see other people\'s chats', !repList.some(x => x.phone === P1 || x.phone === P3), `rep sees ${repList.length}`);
+check('the rep does not see chats nobody owns yet', !repList.some(x => !x.matched_id));
+check('an admin still sees everything', (await convs()).length > repList.length);
+check('the rep can open their own thread', (await call('GET', `/whatsapp/thread/${P10}`, rep.token)).s === 200);
+check('the rep cannot open someone else\'s thread', (await call('GET', `/whatsapp/thread/${P1}`, rep.token)).s === 403);
+check('the rep cannot message someone else\'s lead', (await call('POST', '/whatsapp/send', rep.token, { to: '+' + P1, body: 'hi' })).s === 403);
+check('the rep cannot add a note to someone else\'s chat', (await call('POST', `/whatsapp/conversations/${P1}/note`, rep.token, { text: 'x' })).s === 403);
+check('the rep cannot add a task to someone else\'s chat', (await call('POST', `/whatsapp/conversations/${P1}/task`, rep.token, { subject: 'x' })).s === 403);
+check('the rep can add a note to their own chat', (await call('POST', `/whatsapp/conversations/${P10}/note`, rep.token, { text: 'called, call back' })).s === 200);
+
+sec('9. Sign-in is required');
 check('no token: creating a lead is refused', (await call('POST', `/whatsapp/conversations/${P1}/lead`, null, {})).s === 401);
 check('no token: a note is refused', (await call('POST', `/whatsapp/conversations/${P1}/note`, null, { text: 'x' })).s === 401);
 check('no token: a task is refused', (await call('POST', `/whatsapp/conversations/${P1}/task`, null, {})).s === 401);
