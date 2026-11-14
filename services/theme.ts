@@ -1,5 +1,6 @@
 import { SystemSettings } from '../types';
 import { setActiveCurrency } from './currency';
+import { setWorkspaceCountry } from './countries';
 
 // ─── Workspace appearance engine ────────────────────────────────────────────────
 // Everything a workspace can configure about how the app looks lives here:
@@ -319,4 +320,6 @@ export function applySettings(settings: Partial<SystemSettings> | null | undefin
 
   // Currency + locale -> drives currency formatting app-wide
   setActiveCurrency(settings?.defaultCurrency, settings?.locale);
+  // ...and where a new phone number or address starts
+  setWorkspaceCountry(settings?.country, settings?.defaultCurrency, settings?.locale);
 }

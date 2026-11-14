@@ -24,6 +24,8 @@ import { sendEmail, getConversations as getEmailConversations, getThread as getE
 import { evaluateWorkflows } from './services/workflow.js';
 import { applyFieldLogic, checkRule, toRow, fromRow, RULE_OPERATORS } from './services/fieldRules.js';
 import { registerJourneyRoutes, saveJourney } from './services/journeysApi.js';
+import { registerDedupeRoutes, dedupeConfigOf, dedupeProblems, findDuplicates, keysChanged, resolveAutomated } from './services/dedupe.js';
+import { intakeRecord } from './services/recordIntake.js';
 import { startJourneyScheduler } from './services/journeys.js';
 import { registerKeyRoutes } from './services/keys.js';
 import { registerPackRoutes } from './services/packs.js';
@@ -198,7 +200,7 @@ async function ensureReportsMenuItem() {
     }
 }
 await ensureReportsMenuItem();
-{ const { ensureConfigMenuEntries } = await import('./seed.js'); await ensureConfigMenuEntries(); }
+{ const { ensureConfigMenuEntries, ensureFieldUpgrades } = await import('./seed.js'); await ensureConfigMenuEntries(); await ensureFieldUpgrades(); }
 
 // Idempotent menu patch: ensure existing tenant menus expose the WhatsApp inbox.
 async function ensureWhatsAppMenuItem() {
@@ -478,11 +480,9 @@ app.post('/api/public/demo-request', validate(rules.demoRequest), async (req, re
         industry: cut(b.industry, 80), notes: cut(b.message, 2000), source: 'Web', status: 'New',
         _via: 'website_demo_request',
     };
-    const id = uuidv4();
-    await db.run('INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)',
-        id, DEMO_TENANT_ID, 'lead', displayNameOf(data), 'New', JSON.stringify(data));
-    await logAudit({ tenantId: DEMO_TENANT_ID, entityType: 'lead', recordId: id, action: 'create', actorId: null, details: { _via: 'website_demo_request', email } });
-    try { await assignLead(DEMO_TENANT_ID, id, data); } catch { /* unassigned is fine */ }
+    // Same path as every other way in: a repeat request fills the existing lead instead of making a second one.
+    try { await intakeRecord(DEMO_TENANT_ID, 'lead', data, { channel: 'website demo request', actorId: 'website' }); }
+    catch (e) { console.error('[demo-request]', e.message); return res.status(500).json({ error: 'Could not save your request. Please e-mail us.' }); }
     res.json({ success: true });
 });
 
@@ -1079,6 +1079,13 @@ const mapFieldTypeToZod = (field, extraOptions = []) => {
         case 'phone':
             schema = z.string().regex(/^\+?[0-9 ()\-.]{5,40}$/, 'Invalid phone number');
             break;
+        case 'address': {
+            // An address is its parts (street, city, state, postal code, country); older records hold one piece of text.
+            const part = z.string().max(200);
+            schema = z.union([z.string().max(MAX_LONG_TEXT), z.object({ line1: part, line2: part, city: part, state: part, postalCode: part, country: part, countryCode: z.string().max(3) }).partial().strict()]);
+            if (field.required) schema = schema.refine(v => (typeof v === 'string' ? v.trim() !== '' : Object.values(v || {}).some(x => String(x ?? '').trim() !== '')), { message: 'is required' });
+            break;
+        }
         case 'text':
         case 'lookup':
             schema = z.string().max(MAX_TEXT);
@@ -1211,6 +1218,22 @@ app.post('/api/data/:entityType', authenticateToken, async (req, res) => {
             ...(await uniqueProblems(db, req.tenantId, entityType, definition, recordData, recordData.id)),
         ];
         if (fieldProblems.length) return res.status(400).json({ error: 'Validation Failed', details: fieldProblems });
+
+        // Duplicates, as the object's setting says (server/services/dedupe.js): ask first ("warn") or refuse ("block").
+        // An edit is checked only when a field the rules look at has changed.
+        const dedupeCfg = dedupeConfigOf(definition, entityType);
+        const confirmDuplicate = recordData._confirmDuplicate === true;
+        delete recordData._confirmDuplicate;
+        if (dedupeCfg.enabled && (!recordData.id || keysChanged(storedData, recordData, definition, dedupeCfg))) {
+            const dupes = await findDuplicates(req.tenantId, entityType, recordData, { excludeId: recordData.id || null, definition, config: dedupeCfg });
+            if (dupes.length && (dedupeCfg.action === 'block' || !confirmDuplicate)) {
+                const blocked = dedupeCfg.action === 'block';
+                return res.status(409).json({
+                    error: blocked ? `This looks like a ${definition.label || entityType} that already exists` : `This looks like a ${definition.label || entityType} that already exists. Save it anyway?`,
+                    duplicate: true, blocked, needsConfirm: !blocked, duplicates: dupes,
+                });
+            }
+        }
 
         // Use validated data (sanitized)
         const validData = validationResult.data;
@@ -3208,6 +3231,8 @@ app.post('/api/lead-rules/run-all', authenticateToken, async (req, res) => {
 
 // Journeys (services/journeys.js, journeysApi.js). /api/workflows stays as the older single-journey doorway.
 registerJourneyRoutes(app, { authenticateToken, requireAdmin });
+// Duplicate rules per object, the "is this a duplicate?" check, the scan and the merge (services/dedupe.js).
+registerDedupeRoutes(app, { authenticateToken, requireAdmin, can });
 registerKeyRoutes(app, { authenticateToken, requireAdmin });
 registerPackRoutes(app, { authenticateToken, requireAdmin });
 app.post('/api/workflows', authenticateToken, requireAdmin, validate(rules.workflows), async (req, res) => {
@@ -3398,17 +3423,13 @@ app.post('/api/public/form/:campaignId/submit', async (req, res) => {
             }
         }
 
-        // Set primary display
-        const display = entityData.name || `${entityData.firstName || ''} ${entityData.lastName || ''}`.trim()
-            || entityData.email || 'Web Form Submission';
-
-        // Create record
-        const recordId = uuidv4();
-        await db.run(
-            `INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data)
-             VALUES (?,?,?,?,?,?)`,
-            recordId, row.tenant_id, entityType, display, 'New', JSON.stringify(entityData)
-        );
+        // Create the record the way the app would: duplicate rule, field triggers, score, owner, "created" journeys.
+        // The form it came from is kept on the record for source reporting.
+        entityData._via = 'web_form';
+        entityData._campaign_id = row.id;
+        if (entityType === 'lead' && !entityData.source) entityData.source = 'Web';
+        const made = await intakeRecord(row.tenant_id, entityType, entityData, { channel: `web form "${row.name}"`, actorId: 'web-form' });
+        const recordId = made.id;
 
         // Save submission log
         const subId = uuidv4();
@@ -3560,7 +3581,7 @@ app.post('/api/data/:entityType/import', authenticateToken, csvUpload.single('fi
         const def = defRow ? JSON.parse(defRow.config) : { fields: [] };
         const importMaps = await labelMapsFor(req.tenantId, entityType, def);   // a file may hold labels ("Credit Card"); the record stores the code
 
-        let imported = 0, skipped = 0;
+        let imported = 0, skipped = 0, merged = 0;
         const errors = [];
 
         for (let i = 1; i < lines.length; i++) {
@@ -3586,24 +3607,10 @@ app.post('/api/data/:entityType/import', authenticateToken, csvUpload.single('fi
             // Map aliases (for leads)
             const mapped = entityType === 'lead' ? mapPayload(raw) : raw;
 
-            // Dedupe for leads: by email
-            if (entityType === 'lead' && mapped.email) {
-                const existEmail = await db.get(
-                    `SELECT id FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND ${db.json('data', 'email')} = ?`,
-                    req.tenantId, mapped.email
-                );
-                if (existEmail) { skipped++; continue; }
-            }
-
-            // Dedupe for leads: by phone
-            if (entityType === 'lead' && (mapped.phone || mapped.mobile)) {
-                const phone = mapped.phone || mapped.mobile;
-                const existPhone = await db.get(
-                    `SELECT id FROM records WHERE tenant_id = ? AND entity_type = 'lead' AND ${db.json('data', 'phone')} = ?`,
-                    req.tenantId, phone
-                );
-                if (existPhone) { skipped++; continue; }
-            }
+            // Duplicates, by the object's rules (services/dedupe.js): a row that already exists is not created again;
+            // with "update" the blank fields of the existing record are filled from it.
+            const dup = await resolveAutomated(req.tenantId, entityType, mapped, { channel: 'CSV import', actorId: req.user.id, definition: def });
+            if (dup.action !== 'create') { skipped++; if (dup.action === 'updated') merged++; continue; }
 
             try {
                 const recordId = uuidv4();
@@ -3647,7 +3654,7 @@ app.post('/api/data/:entityType/import', authenticateToken, csvUpload.single('fi
         }
 
         reportCache.invalidateTenant(req.tenantId);
-        res.json({ success: true, imported, skipped, errors, total: lines.length - 1 });
+        res.json({ success: true, imported, skipped, merged, errors, total: lines.length - 1 });
     } catch (err) {
         console.error('[import]', err);
         res.status(500).json({ error: err.message });

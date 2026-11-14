@@ -10,6 +10,7 @@
 //   autonumber   UNIT-0001, BKG-2026-0001 ... given once     { prefix, padding } on the field
 //   rollup       count / sum / avg / min / max of child records, worked out when read, never stored
 //                { rollup: { entity, field, fn, target?, where?: [{ field, value }] } }
+//   address      street, city, state, postal code, country        stored as an object (older records: one piece of text)
 //   formula      see fieldRules.js
 //
 // Any field may also be marked unique: no two records of the type may hold the same value.
@@ -17,7 +18,7 @@
 import { evaluateFormula } from './fieldRules.js';
 import { tokensIn } from './tokens.js';
 
-export const NEW_TYPES = ['multiselect', 'checkbox', 'datetime', 'percent', 'rating', 'user', 'autonumber', 'rollup'];
+export const NEW_TYPES = ['multiselect', 'checkbox', 'datetime', 'percent', 'rating', 'user', 'autonumber', 'rollup', 'address'];
 export const COMPUTED_TYPES = ['rollup', 'formula'];
 const FNS = ['count', 'sum', 'avg', 'min', 'max'];
 
@@ -146,7 +147,7 @@ export function definitionProblems(config, allSchemas) {
         if (f.type === 'rating' && f.max !== undefined && (!Number.isInteger(f.max) || f.max < 1 || f.max > 10)) out.push(`${f.label || f.name}: rating scale must be 1 to 10`);
         if (f.type === 'autonumber' && f.prefix !== undefined && cleanPrefix(f.prefix) !== String(f.prefix)) out.push(`${f.label || f.name}: prefix may only use letters, numbers and - / . #`);
         if (f.type === 'rollup') out.push(...rollupProblems(f, { ...allSchemas, [config.id]: config }).map(m => `${f.label || f.name}: ${m}`));
-        if (f.unique && ['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe', 'attachment'].includes(f.type)) out.push(`${f.label || f.name}: this type cannot be unique`);
+        if (f.unique && ['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe', 'attachment', 'address'].includes(f.type)) out.push(`${f.label || f.name}: this type cannot be unique`);
     }
     return out;
 }

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { WebFormTemplate, FormField } from '../types';
 import { Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { PhoneInput } from '../components/ui/PhoneInput';
 
 // Handles /form/campaign/:campaignId (web form submissions)
 // and legacy /form/:id (old public form)
@@ -144,6 +145,8 @@ export const PublicWebForm: React.FC = () => {
                     <option value="">Select an option...</option>
                     {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
+                ) : field.type === 'phone' ? (
+                  <PhoneInput id={`pf-${field.id}`} required={field.required} value={formData[field.id] || ''} onChange={v => handleChange(field, v)} />
                 ) : field.type === 'checkbox' ? (
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input

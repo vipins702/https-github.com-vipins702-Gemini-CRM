@@ -4,8 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { WHATSAPP_ALLOW_UNSIGNED } from '../config.js';
 import { logAudit } from './audit.js';
 import { lookupByPhone, normalizePhone } from './cti.js';
-import { calculateLeadScore } from './scoring.js';
-import { assignLead } from './assignment.js';
+import { intakeRecord } from './recordIntake.js';
 import { applyFieldLogic } from './fieldRules.js';
 import { applyAutoNumbers } from './fieldTypes.js';
 import { getResolvedConfig, checkVerifyToken, resolveTenantByWhatsAppPhoneId } from './integrations.js';
@@ -152,36 +151,14 @@ export async function createLeadFromWhatsApp(tenantId, { phone, profileName, bod
     const who = name ? { name: String(name).trim().slice(0, 80), source: 'manual' } : resolveContactName({ profileName, body, phone: digits });
     const { firstName, lastName } = splitName(who.name, digits, who.source);
     const display = `${firstName} ${lastName}`.trim();
-    const id = uuidv4();
     const data = {
         firstName, lastName, name: display, phone: formatPhone(digits), status: 'New', source: 'WhatsApp',
         notes: body ? `WhatsApp: ${String(body).slice(0, 500)}` : 'Started a WhatsApp chat',
-        _via: 'whatsapp', _name_source: who.source, id,
+        _via: 'whatsapp', _name_source: who.source,
     };
-    try {
-        const dr = await db.get('SELECT config FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', tenantId, 'lead');
-        if (dr) {
-            const def = JSON.parse(dr.config);
-            await applyAutoNumbers(db, tenantId, 'lead', def, data);
-            await applyFieldLogic(db, tenantId, 'lead', def, data, null);
-        }
-    } catch (e) { console.warn('[whatsapp] lead field rules skipped:', e.message); }
-    await db.run(
-        'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)',
-        id, tenantId, 'lead', display, data.status || 'New', JSON.stringify(data)
-    );
-    await logAudit({ tenantId, entityType: 'lead', recordId: id, action: 'create', actorId, details: { ...data, _via: 'whatsapp' } });
-    try {
-        const score = await calculateLeadScore(data, tenantId);
-        if (score > 0) {
-            data.score = score;
-            await db.run('UPDATE records SET data = ? WHERE id = ? AND tenant_id = ?', JSON.stringify(data), id, tenantId);
-        }
-        await assignLead(tenantId, id, data);
-        const { evaluateWorkflows } = await import('./workflow.js');   // loaded here: workflow.js can send WhatsApp messages
-        await evaluateWorkflows({ tenantId, entityType: 'lead', triggerType: 'create', record: { ...data, id }, actorId });
-    } catch (e) { console.warn('[whatsapp] lead follow-up steps failed:', e.message); }
-    return { id, name: display, nameSource: who.source };
+    // The number was already looked up by the caller, so no second duplicate check; everything else is the shared intake path.
+    const made = await intakeRecord(tenantId, 'lead', data, { channel: 'WhatsApp', actorId, dedupe: false });
+    return { id: made.id, name: display, nameSource: who.source };
 }
 
 /** A lead this module made with only a number for a name gets a real one as soon as the person tells us. */

@@ -68,7 +68,7 @@ const SCHEMAS = {
             { name: 'score', label: 'Lead Score', type: 'number' },
             { name: 'source', label: 'Source', type: 'select', options: ['Web', 'Referral', 'Event', 'Ads', 'Cold Call'] },
             { name: 'website', label: 'Website', type: 'url' },
-            { name: 'address', label: 'Address', type: 'textarea' },
+            { name: 'address', label: 'Address', type: 'address' },
             { name: 'notes', label: 'Notes', type: 'textarea' }
         ]
     },
@@ -81,7 +81,7 @@ const SCHEMAS = {
             { name: 'industry', label: 'Industry', type: 'select', options: ['Tech', 'Finance', 'Retail', 'Health', 'Manufacturing', 'Services'] },
             { name: 'status', label: 'Status', type: 'status', required: true, options: ['Active', 'Churned', 'Onboarding', 'Suspended'] },
             { name: 'website', label: 'Website', type: 'url' },
-            { name: 'address', label: 'Billing Address', type: 'textarea' },
+            { name: 'address', label: 'Billing Address', type: 'address' },
             { name: 'annualRevenue', label: 'Annual Revenue', type: 'currency' },
             { name: 'employeeCount', label: 'Employee Count', type: 'number' },
             { name: 'type', label: 'Account Type', type: 'select', options: ['Prospect', 'Customer', 'Partner', 'Vendor'] },
@@ -303,6 +303,33 @@ export async function ensureConfigMenuEntries() {
     }
 }
 
+/**
+ * Fields of the built-in objects that moved to a better type: an address typed into one box becomes street / city /
+ * state / postal code / country. Done once per workspace and only while the field is still the one we shipped (same
+ * name, same old type), so a workspace that changed it keeps what it chose. Stored values are not touched: an address
+ * kept as text still shows, in the first line.
+ */
+export async function ensureFieldUpgrades() {
+    await db.exec('CREATE TABLE IF NOT EXISTS field_patches (tenant_id TEXT NOT NULL, entity_type TEXT NOT NULL, field TEXT NOT NULL, PRIMARY KEY (tenant_id, entity_type, field))');
+    const UPGRADES = [
+        { entity: 'lead', field: 'address', from: 'textarea', to: 'address' },
+        { entity: 'customer', field: 'address', from: 'textarea', to: 'address' },
+    ];
+    for (const u of UPGRADES) {
+        for (const row of await db.all('SELECT id, tenant_id, config FROM entity_definitions WHERE entity_type = ?', u.entity)) {
+            const done = await db.get('SELECT field FROM field_patches WHERE tenant_id = ? AND entity_type = ? AND field = ?', row.tenant_id, u.entity, u.field);
+            if (done) continue;
+            let def; try { def = JSON.parse(row.config); } catch { continue; }
+            const f = (def.fields || []).find(x => x.name === u.field);
+            if (f && f.type === u.from) {
+                f.type = u.to;
+                await db.run('UPDATE entity_definitions SET config = ? WHERE id = ?', JSON.stringify(def), row.id);
+            }
+            await db.run('INSERT INTO field_patches (tenant_id, entity_type, field) VALUES (?, ?, ?)', row.tenant_id, u.entity, u.field);
+        }
+    }
+}
+
 /** Entity definitions, layouts and (if missing) the menu. Safe to run repeatedly: never overwrites what a tenant has customised. */
 export async function seedCoreMetadata() {
     const menu = await db.get('SELECT id, config FROM menus WHERE tenant_id = ?', TENANT_ID);
@@ -317,6 +344,7 @@ export async function seedCoreMetadata() {
         const has = await db.get('SELECT id FROM entity_definitions WHERE tenant_id = ? AND entity_type = ?', TENANT_ID, key);
         if (!has) await db.run('INSERT INTO entity_definitions (id, tenant_id, entity_type, config) VALUES (?, ?, ?, ?)', uuidv4(), TENANT_ID, key, JSON.stringify(value));
     }
+    await ensureFieldUpgrades();
     for (const [key, value] of Object.entries(LAYOUTS)) {
         const has = await db.get('SELECT id FROM layouts WHERE tenant_id = ? AND entity_type = ?', TENANT_ID, key);
         if (!has) await db.run('INSERT INTO layouts (id, tenant_id, entity_type, config) VALUES (?, ?, ?, ?)', uuidv4(), TENANT_ID, key, JSON.stringify(value));

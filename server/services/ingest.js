@@ -1,8 +1,5 @@
-import db from '../database.js';
-import { v4 as uuidv4 } from 'uuid';
-import { logAudit } from './audit.js';
 import { generateLeadNormalization } from './ai.js';
-import { evaluateWorkflows } from './workflow.js';
+import { intakeRecord } from './recordIntake.js';
 
 /**
  * Lead Ingestion Pipeline.
@@ -64,17 +61,8 @@ export async function ingestLead({ tenantId = 'default', source = 'webhook', pay
         }
     }
 
-    // 2. Dedupe by email
-    if (dedupe && normalized.email) {
-        const leadRows = await db.all('SELECT data FROM records WHERE tenant_id = ? AND entity_type = ?', tenantId, 'lead');
-        const exists = leadRows.some((row) => {
-            try { return String(JSON.parse(row.data).email || '').toLowerCase() === String(normalized.email).toLowerCase(); }
-            catch { return false; }
-        });
-        if (exists) return { success: true, deduped: true };
-    }
-
-    // 3. Build + insert lead
+    // 2. One way in for every channel (services/recordIntake.js): the object's duplicate rule, field triggers,
+    //    score, owner (assignment rules / round-robin) and "created" journeys.
     const leadData = {
         ...normalized,
         source: normalized.source || `Capture: ${source}`,
@@ -84,25 +72,8 @@ export async function ingestLead({ tenantId = 'default', source = 'webhook', pay
         _capture_source: source,
         _captured_at: new Date().toISOString(),
     };
-    const primaryDisplay =
-        leadData.name ||
-        [leadData.firstName, leadData.lastName].filter(Boolean).join(' ') ||
-        leadData.email || leadData.company || 'Captured Lead';
-
-    const id = uuidv4();
-    await db.run(
-        'INSERT INTO records (id, tenant_id, entity_type, primary_display, status, data) VALUES (?, ?, ?, ?, ?, ?)',
-        id, tenantId, 'lead', primaryDisplay, leadData.status, JSON.stringify(leadData)
-    );
-    await logAudit({ tenantId, entityType: 'lead', recordId: id, action: 'create', actorId, details: { ...leadData } });
-    console.log(`[ingest] captured lead ${id} from "${source}"${aiUsed ? ' (AI-normalized)' : ''}`);
-
-    // Auto-assignment engine
-    const { assignLead } = await import('./assignment.js');
-    await assignLead(tenantId, id, leadData);
-
-    // 4. Fire create-trigger journeys for the captured lead
-    await evaluateWorkflows({ tenantId, entityType: 'lead', triggerType: 'create', record: { ...leadData, id }, actorId });
-
-    return { success: true, id, deduped: false, primaryDisplay, aiUsed };
+    const out = await intakeRecord(tenantId, 'lead', leadData, { channel: `capture: ${source}`, actorId, dedupe });
+    if (out.action !== 'created') return { success: true, deduped: true, id: out.id };
+    console.log(`[ingest] captured lead ${out.id} from "${source}"${aiUsed ? ' (AI-normalized)' : ''}`);
+    return { success: true, id: out.id, deduped: false, primaryDisplay: out.name, aiUsed };
 }

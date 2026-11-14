@@ -152,7 +152,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
          ...(newFieldConfig.type === 'rating' ? { max: newFieldConfig.ratingMax } : {}),
          ...(newFieldConfig.type === 'autonumber' ? { prefix: newFieldConfig.prefix.trim(), padding: newFieldConfig.padding } : {}),
          ...(newFieldConfig.type === 'rollup' ? { rollup: { entity: newFieldConfig.rollEntity, field: newFieldConfig.rollField, fn: newFieldConfig.rollFn as any, ...(newFieldConfig.rollFn !== 'count' ? { target: newFieldConfig.rollTarget } : {}) } } : {}),
-         ...(newFieldConfig.unique && !['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe'].includes(newFieldConfig.type) ? { unique: true } : {}),
+         ...(newFieldConfig.unique && !['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe', 'address'].includes(newFieldConfig.type) ? { unique: true } : {}),
       };
 
       setSchemas(prev => ({
@@ -388,7 +388,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                   <p className="text-[11px] text-gray-400 mt-1">Use "Edit form" for helper or input fields you do not want on the detail page.</p>
                </div>
 
-               {fieldDef && !['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe', 'attachment'].includes(fieldDef.type) && (
+               {fieldDef && !['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe', 'address', 'attachment'].includes(fieldDef.type) && (
                   <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
                      <input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={!!fieldDef.unique}
                         onChange={(e) => setSchemas(prev => ({ ...prev, [activeEntity]: { ...prev[activeEntity], fields: prev[activeEntity].fields.map(f => f.name === fieldDef.name ? { ...f, unique: e.target.checked } : f) } }))} />
@@ -815,7 +815,8 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                            <option value="text">Text</option>
                            <option value="number">Number</option>
                            <option value="email">Email</option>
-                           <option value="phone">Phone</option>
+                           <option value="phone">Phone (country code + number)</option>
+                           <option value="address">Address (street, city, state, PIN, country)</option>
                            <option value="textarea">Text Area</option>
                            <option value="select">Dropdown</option>
                            <option value="date">Date</option>
@@ -911,7 +912,7 @@ export const LayoutBuilder: React.FC<LayoutBuilderProps> = ({ initialEntity }) =
                            </div>
                         );
                      })()}
-                     {!['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe'].includes(newFieldConfig.type) && (
+                     {!['textarea', 'multiselect', 'checkbox', 'rollup', 'formula', 'image', 'iframe', 'address'].includes(newFieldConfig.type) && (
                         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                            <input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={newFieldConfig.unique} onChange={(e) => setNewFieldConfig(prev => ({ ...prev, unique: e.target.checked }))} />
                            Unique: no two records may have the same value

@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { fieldAccess } from '../services/permissions';
 import { formatCurrency } from '../services/currency';
 import { formatFieldValue } from '../services/fieldFormat';
+import { formatAddress, formatPhone } from '../services/countries';
 import { EntityDefinition, FieldDefinition, LayoutDefinition, LayoutFieldConfig, VisibilityRule } from '../types';
 
 /**
@@ -32,7 +33,7 @@ export const showsOn = (cfg: LayoutFieldConfig | undefined, where: 'form' | 'det
 
 const Value: React.FC<{ field: FieldDefinition; value: any; record: Record<string, any>; users?: Record<string, string> }> = ({ field, value, record, users }) => {
   if (field.type === 'checkbox') return <>{value === true || value === 'true' ? 'Yes' : 'No'}</>;
-  if (value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length)) return <span className="text-gray-400">—</span>;
+  if (value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length) || (field.type === 'address' && !formatAddress(value))) return <span className="text-gray-400">—</span>;
   switch (field.type) {
     case 'lookup': return <>{record._labels?.[field.name] || String(value)}</>;
     case 'multiselect':
@@ -42,7 +43,11 @@ const Value: React.FC<{ field: FieldDefinition; value: any; record: Record<strin
     case 'currency': return <span className="tabular">{formatCurrency(value, record.currency)}</span>;
     case 'number': case 'formula': return <span className="tabular">{typeof value === 'number' ? value.toLocaleString() : String(value)}</span>;
     case 'email': return <a className="text-accent hover:underline" href={`mailto:${value}`}>{String(value)}</a>;
-    case 'phone': return <a className="text-accent hover:underline" href={`tel:${value}`}>{String(value)}</a>;
+    case 'phone': return <a className="text-accent hover:underline tnum" href={`tel:${String(value).replace(/[^+\d]/g, '')}`}>{formatPhone(value)}</a>;
+    case 'address': {
+      const a = formatAddress(value);
+      return a ? <a className="text-accent hover:underline" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a)}`} target="_blank" rel="noopener noreferrer">{a}</a> : <span className="text-gray-400">—</span>;
+    }
     case 'url': {
       const href = /^https?:\/\//i.test(String(value)) ? String(value) : `https://${value}`;
       return <a className="text-accent hover:underline break-all" href={href} target="_blank" rel="noopener noreferrer">{String(value)}</a>;
@@ -105,7 +110,7 @@ export const LayoutDetails: React.FC<Props> = ({ entityType, record, skip = [] }
         <Card key={section.id} title={section.title || 'Details'}>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
             {rows.map(f => (
-              <div key={f.name} className={`min-w-0 ${f.type === 'textarea' ? 'sm:col-span-2' : ''}`}>
+              <div key={f.name} className={`min-w-0 ${f.type === 'textarea' || f.type === 'address' ? 'sm:col-span-2' : ''}`}>
                 <dt className="text-xs font-medium text-gray-500">{layout?.fieldConfigs?.[f.name]?.labelOverride || f.label}</dt>
                 <dd className="mt-0.5 text-sm text-gray-900 break-words"><Value field={f} value={record[f.name]} record={record} users={users} /></dd>
               </div>

@@ -1,4 +1,5 @@
 import { FieldDefinition } from '../types';
+import { formatAddress, formatPhone } from './countries';
 
 /** One place that turns a stored value into text, for lists, detail pages and CSV export. */
 /** labels: the record's _labels from the server, the words people read for lookup codes (10001 → Credit Card). */
@@ -24,6 +25,8 @@ export function formatFieldValue(field: FieldDefinition, value: any, ctx: Format
     }
     case 'user': return empty ? '' : ctx.users?.[String(value)] || String(value);
     case 'lookup': return empty ? '' : ctx.labels?.[field.name] || String(value);
+    case 'address': return formatAddress(value);
+    case 'phone': return empty ? '' : formatPhone(value);
     case 'rollup': return empty ? '' : typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(value);
     default: return empty ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
   }

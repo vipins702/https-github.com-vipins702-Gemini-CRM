@@ -6,7 +6,8 @@ import { Card } from '../components/ui/Card';
 import { EntityDefinition, ObjectManagerProps } from '../types';
 import { api } from '../services/api';
 import { KeysAndJoins } from '../components/KeysAndJoins';
-import { Plus, Box, Settings, ArrowRight, Loader2, Database, LayoutTemplate, Network, Link as LinkIcon, X, Check, List, LayoutGrid, KeyRound } from 'lucide-react';
+import { DuplicateSettings } from '../components/DuplicateSettings';
+import { Plus, Box, Settings, ArrowRight, Loader2, Database, LayoutTemplate, Network, Link as LinkIcon, X, Check, List, LayoutGrid, KeyRound, Copy } from 'lucide-react';
 import ReactFlow, {
    Node,
    Edge,
@@ -44,7 +45,7 @@ const nodeTypes = {
 };
 
 export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefreshSchemas }) => {
-   const [activeTab, setActiveTab] = useState<'list' | 'keys' | 'graph'>('list');
+   const [activeTab, setActiveTab] = useState<'list' | 'keys' | 'dup' | 'graph'>('list');
    const [objView, setObjView] = useState<'grid' | 'table'>('table');
    const [schemas, setSchemas] = useState<Record<string, EntityDefinition>>({});
    const [loading, setLoading] = useState(true);
@@ -216,6 +217,12 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
                   <KeyRound className="w-4 h-4" /> Keys &amp; joins
                </button>
                <button
+                  onClick={() => setActiveTab('dup')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'dup' ? 'bg-surface shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+               >
+                  <Copy className="w-4 h-4" /> Duplicates
+               </button>
+               <button
                   onClick={() => setActiveTab('graph')}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'graph' ? 'bg-surface shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
                >
@@ -231,6 +238,13 @@ export const ObjectManager: React.FC<ObjectManagerProps> = ({ onNavigate, onRefr
             {activeTab === 'keys' && (
                <div className="h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
                   <div className="max-w-6xl mx-auto"><KeysAndJoins /></div>
+               </div>
+            )}
+
+            {/* DUPLICATES */}
+            {activeTab === 'dup' && (
+               <div className="h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
+                  <div className="max-w-5xl mx-auto"><DuplicateSettings /></div>
                </div>
             )}
 

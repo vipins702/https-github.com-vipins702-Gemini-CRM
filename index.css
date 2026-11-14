@@ -301,7 +301,7 @@ h1, h2, h3, h4, .font-heading {
 @layer base {
     :where(input[type="text"], input[type="email"], input[type="password"], input[type="number"],
     input[type="date"], input[type="tel"], input[type="search"], input[type="url"], input[type="time"],
-    input[type="datetime-local"], select, textarea) {
+    input[type="datetime-local"], input:not([type]), select, textarea) {
         appearance: none;
         -webkit-appearance: none;
         width: 100%;
@@ -329,6 +329,8 @@ h1, h2, h3, h4, .font-heading {
         background-size: 1.1em 1.1em;
         padding-right: 2.5rem;
     }
+    :where(input, select, textarea)[aria-invalid="true"] { border-color: rgb(var(--red-500, 239 68 68)); }
+    :where(input, select, textarea)[aria-invalid="true"]:focus { box-shadow: 0 0 0 4px rgb(var(--red-500, 239 68 68) / 0.18); }
     :where(input, select, textarea):disabled {
         background-color: rgb(var(--neutral-50));
         color: rgb(var(--neutral-400));

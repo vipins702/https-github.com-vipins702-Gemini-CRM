@@ -4,7 +4,7 @@ import { Edge, Node } from 'reactflow';
 
 export type EntityType = 'lead' | 'customer' | 'case' | 'task' | 'product' | string;
 
-export type FieldType = 'text' | 'number' | 'currency' | 'email' | 'phone' | 'select' | 'status' | 'textarea' | 'lookup' | 'attachment' | 'image' | 'iframe' | 'date' | 'cascade' | 'url' | 'formula' | 'multiselect' | 'checkbox' | 'datetime' | 'percent' | 'rating' | 'user' | 'autonumber' | 'rollup';
+export type FieldType = 'text' | 'number' | 'currency' | 'email' | 'phone' | 'select' | 'status' | 'textarea' | 'lookup' | 'attachment' | 'image' | 'iframe' | 'date' | 'cascade' | 'url' | 'formula' | 'multiselect' | 'checkbox' | 'datetime' | 'percent' | 'rating' | 'user' | 'autonumber' | 'rollup' | 'address';
 
 export interface CategoryNode {
   name: string;
@@ -44,6 +44,26 @@ export interface FieldDefinition {
   start?: number;
   /** rollup: count / sum / avg / min / max of the records of another type that link back to this one. */
   rollup?: { entity: string; field: string; fn: 'count' | 'sum' | 'avg' | 'min' | 'max'; target?: string; where?: { field: string; value: string }[] };
+}
+
+/** One way to recognise the same person twice: all of these fields must match. */
+export interface DedupeRule { id?: string; label?: string; fields: string[] }
+/** How an object handles duplicates (see server/services/dedupe.js). */
+export interface DedupeConfig {
+  enabled: boolean;
+  /** What a person sees when saving a record that already exists. */
+  action: 'warn' | 'block';
+  /** What web forms, imports, WhatsApp and webhooks do: fill the existing record, skip, or create anyway. */
+  automated: 'update' | 'skip' | 'create';
+  /** Other objects to search too (a new lead may already be a customer). */
+  checkAlso: string[];
+  rules: DedupeRule[];
+}
+export interface DuplicateMatch { id: string; entityType: string; name: string; status?: string; ruleId: string; rule: string; createdAt?: string }
+export interface DuplicateGroup {
+  suggestedKeepId: string;
+  because: string[];
+  records: { id: string; name: string; status?: string; createdAt?: string; ownerId: string | null; fieldsFilled: number; email: string; phone: string }[];
 }
 
 export interface EntityDefinition {

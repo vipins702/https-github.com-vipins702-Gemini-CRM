@@ -1,6 +1,6 @@
 
 import { getViewAs, setViewAs, isRealAdmin, currentUser } from './permissions';
-import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult, ReportDefinition, RunReportOptions, ReportResult, PackDefinition, PackResult, WaConversation, WaMessage, EmailConversation, EmailMessage, TaskItem, Quote, RelatedActivity, ProcessDefinition, Attachment, CategoryNode, BulkCampaign, IntegrationConfig, Tenant, FieldRule, JourneySummary, JourneyFull, JourneyRun, JourneyTestResult } from '../types';
+import { CRMRecord, EntityDefinition, LayoutDefinition, User, AuthSession, SystemSettings, Campaign, MenuItem, WidgetConfig, Activity, Role, Relationship, LeadRule, LeadRuleRunResult, ReportDefinition, RunReportOptions, ReportResult, PackDefinition, PackResult, DedupeConfig, DuplicateMatch, DuplicateGroup, WaConversation, WaMessage, EmailConversation, EmailMessage, TaskItem, Quote, RelatedActivity, ProcessDefinition, Attachment, CategoryNode, BulkCampaign, IntegrationConfig, Tenant, FieldRule, JourneySummary, JourneyFull, JourneyRun, JourneyTestResult } from '../types';
 
 const API_BASE = '/api';
 
@@ -44,7 +44,10 @@ const handleResponse = async (res: Response) => {
     }));
     const errorMessage = error.error || `Request failed with status ${res.status}`;
     const errorDetails = error.details ? ` Details: ${error.details}` : '';
-    throw new Error(errorMessage + errorDetails);
+    // The status and the whole reply travel with the error, so a screen can act on them (e.g. 409: possible duplicate).
+    const failure: Error & { status?: number; body?: any } = new Error(errorMessage + errorDetails);
+    failure.status = res.status; failure.body = error;
+    throw failure;
   }
   return res.json();
 };
@@ -255,6 +258,23 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(record)
     });
+  },
+
+  // --- DUPLICATES (per object) ---
+  async getDedupeConfig(entityType: string): Promise<{ config: DedupeConfig; isDefault: boolean }> {
+    return fetchWithAuth(`${API_BASE}/dedupe/${encodeURIComponent(entityType)}/config`);
+  },
+  async saveDedupeConfig(entityType: string, config: DedupeConfig): Promise<{ success: boolean; config: DedupeConfig }> {
+    return fetchWithAuth(`${API_BASE}/dedupe/${encodeURIComponent(entityType)}/config`, { method: 'POST', body: JSON.stringify(config) });
+  },
+  async checkDuplicates(entityType: string, record: CRMRecord): Promise<{ duplicates: DuplicateMatch[]; action: 'warn' | 'block' }> {
+    return fetchWithAuth(`${API_BASE}/dedupe/${encodeURIComponent(entityType)}/check`, { method: 'POST', body: JSON.stringify({ record }) });
+  },
+  async scanDuplicates(entityType: string): Promise<{ groups: DuplicateGroup[]; total: number; rules: string[] }> {
+    return fetchWithAuth(`${API_BASE}/dedupe/${encodeURIComponent(entityType)}/scan`);
+  },
+  async mergeDuplicates(entityType: string, keepId: string, mergeIds: string[]): Promise<{ keptId: string; merged: number; filledFields: string[]; movedRecords: number }> {
+    return fetchWithAuth(`${API_BASE}/dedupe/${encodeURIComponent(entityType)}/merge`, { method: 'POST', body: JSON.stringify({ keepId, mergeIds }) });
   },
 
   async getRelatedActivity(entityType: string, id: string): Promise<RelatedActivity> {

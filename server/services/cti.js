@@ -235,9 +235,11 @@ async function insertRecord(tenantId, entityType, data, status, primaryDisplay, 
 
 export async function createLeadFromCall(tenantId, phone, actorId = 'system', summary = '') {
     const name = `Caller ${phone}`;
-    const data = { name, phone, status: 'New', source: 'Inbound Call', score: 5, notes: summary, _via: 'inbound_call' };
-    const id = await insertRecord(tenantId, 'lead', data, 'New', name, actorId);
-    return { id, name };
+    const data = { firstName: 'Caller', lastName: String(phone), name, phone, status: 'New', source: 'Inbound Call', score: 5, notes: summary, _via: 'inbound_call' };
+    // Same path as every other way in (field triggers, score, owner, "created" journeys). The caller's number was just looked up.
+    const { intakeRecord } = await import('./recordIntake.js');
+    const made = await intakeRecord(tenantId, 'lead', data, { channel: 'inbound call', actorId, dedupe: false });
+    return { id: made.id, name };
 }
 
 export async function createCaseForContact(tenantId, { recordId, entityType, name, product, summary }, actorId = 'system') {

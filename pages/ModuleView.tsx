@@ -5,7 +5,11 @@ import { showsOn } from '../components/LayoutDetails';
 import { RelatedLists } from '../components/RelatedLists';
 import { JourneyHistory } from '../components/JourneyHistory';
 import { formatFieldValue, ratingMax } from '../services/fieldFormat';
-import { EntityType, LayoutDefinition, EntityDefinition, CRMRecord, FieldDefinition, VisibilityRule, LayoutFieldConfig, Activity, RelatedActivity } from '../types';
+import { EntityType, LayoutDefinition, EntityDefinition, CRMRecord, FieldDefinition, VisibilityRule, LayoutFieldConfig, Activity, RelatedActivity, DuplicateMatch } from '../types';
+import { PhoneInput } from '../components/ui/PhoneInput';
+import { AddressInput } from '../components/ui/AddressInput';
+import { SearchSelect } from '../components/ui/SearchSelect';
+import { formatAddress, formatPhone } from '../services/countries';
 import { formatCurrency, getCurrencySymbol } from '../services/currency';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -61,7 +65,10 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
    const [importStep, setImportStep] = useState<'upload' | 'map' | 'done'>('upload');
 
    // Duplicate check
-   const [dupWarning, setDupWarning] = useState<{ type: string; name: string; id: string } | null>(null);
+   // What the object's duplicate rules found for the record being edited, and the "save anyway?" question on save
+   const [dupWarning, setDupWarning] = useState<{ matches: DuplicateMatch[]; action: 'warn' | 'block' } | null>(null);
+   const [dupConfirm, setDupConfirm] = useState<{ matches: DuplicateMatch[]; blocked: boolean } | null>(null);
+   const [dedupeFields, setDedupeFields] = useState<Set<string>>(new Set());
 
    // Lookup values state - keyed by lookupId
    const [lookupValues, setLookupValues] = useState<Record<string, { value_id: string; value: string }[]>>({});
@@ -86,6 +93,9 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
             setSchema(loadedSchema[entityType] || null);
             setLayout(loadedLayout || null);
             setData(loadedData);
+            api.getDedupeConfig(entityType)
+               .then(r => setDedupeFields(new Set(r.config.enabled ? r.config.rules.flatMap(x => x.fields) : [])))
+               .catch(() => setDedupeFields(new Set()));
             const toEdit = editRecordId && loadedData.find((r: CRMRecord) => r.id === editRecordId);
             if (toEdit) { setSelectedRecord(toEdit); loadActivities(toEdit.id); loadRelatedRecords(toEdit.id); setView('detail'); }
 
@@ -219,9 +229,14 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
    const handleSave = async () => {
       if (!selectedRecord || !schema) return;
       if (!validateForm()) return;
+      await persist(false);
+   };
+
+   const persist = async (confirmDuplicate: boolean) => {
+      if (!selectedRecord || !schema) return;
       setIsSaving(true);
       try {
-         const savedRecord = await api.saveRecord(entityType, selectedRecord);
+         const savedRecord = await api.saveRecord(entityType, confirmDuplicate ? { ...selectedRecord, _confirmDuplicate: true } : selectedRecord);
          // Update local state
          const newData = [...data];
          const idx = newData.findIndex(r => r.id === savedRecord.id);
@@ -230,8 +245,14 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
          setData(newData);
          setSelectedRecord(savedRecord);
+         setDupWarning(null);
          addToast('Record saved successfully!', 'success');
-      } catch (error) {
+      } catch (error: any) {
+         // 409 from the server: a record like this already exists. Show it and let the person decide.
+         if (error?.status === 409 && error?.body?.duplicate) {
+            setDupConfirm({ matches: error.body.duplicates || [], blocked: !!error.body.blocked });
+            return;
+         }
          console.error(error);
          addToast(error instanceof Error && error.message ? error.message : 'Failed to save record.', 'error');
       } finally {
@@ -253,20 +274,12 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
       }
    };
 
-   const handlePhoneBlur = async (phone: string) => {
-      if (!phone || entityType !== 'lead') { setDupWarning(null); return; }
+   // Leaving a field the duplicate rules look at asks the server whether this record already exists.
+   const checkDuplicates = async () => {
+      if (!selectedRecord || !dedupeFields.size) { setDupWarning(null); return; }
       try {
-         const session = localStorage.getItem('flowcrm_session');
-         const token = session ? JSON.parse(session).token : '';
-         const res = await fetch(`/api/leads/check-duplicate?phone=${encodeURIComponent(phone)}`, {
-            headers: { Authorization: `Bearer ${token}` }
-         });
-         const data = await res.json();
-         if (data.duplicate && data.id !== selectedRecord?.id) {
-            setDupWarning({ type: data.type, name: data.name, id: data.id });
-         } else {
-            setDupWarning(null);
-         }
+         const r = await api.checkDuplicates(entityType, selectedRecord);
+         setDupWarning(r.duplicates.length ? { matches: r.duplicates, action: r.action } : null);
       } catch { setDupWarning(null); }
    };
 
@@ -346,7 +359,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
    };
 
    const renderFieldInput = (field: FieldDefinition, value: any, readOnly = false, config: LayoutFieldConfig | undefined, record: CRMRecord) => {
-      const baseClasses = `w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-surface ${config?.styles?.textColor || 'text-gray-900'} ${config?.styles?.fontWeight === 'bold' ? 'font-bold' : ''} ${config?.styles?.fontStyle === 'italic' ? 'italic' : ''}`;
+      // The look of a text box comes from the app's design system (index.css); only what the form designer sets is added.
+      const baseClasses = `w-full ${config?.styles?.textColor || ''} ${config?.styles?.fontWeight === 'bold' ? 'font-bold' : ''} ${config?.styles?.fontStyle === 'italic' ? 'italic' : ''} ${errors[field.name] ? '!border-red-400' : ''}`;
 
       if (field.type === 'autonumber' || field.type === 'rollup') {
          const shown = formatFieldValue(field, value, { users: peopleMap });
@@ -363,23 +377,35 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
       }
       const handleChange = (e: any) => updateRecordField(field.name, e.target.value);
 
-      // Phone field gets blur handler for dup detection (leads only)
-      const isPhoneField = ['phone', 'mobile', 'phoneNumber'].includes(field.name);
-      const phoneBlurProps = (entityType === 'lead' && isPhoneField)
-         ? { onBlur: (e: React.FocusEvent<HTMLInputElement>) => handlePhoneBlur(e.target.value) }
-         : {};
+      // A field the object's duplicate rules look at: leaving it checks for an existing record.
+      const watched = dedupeFields.has(field.name) || (['phone', 'mobile', 'phoneNumber'].includes(field.name) && dedupeFields.has('phone'));
+      const dupBlur = watched ? { onBlur: () => { checkDuplicates(); } } : {};
+      const invalid = !!errors[field.name];
+      const fieldId = `f-${field.name}`;
 
       switch (field.type) {
          case 'textarea':
             return <textarea className={baseClasses} rows={3} value={value || ''} onChange={handleChange} />;
          case 'select':
          case 'status':
+            // Long lists can be searched; short ones stay a plain select.
+            if ((field.options?.length || 0) > 8) {
+               return <SearchSelect id={fieldId} ariaLabel={field.label} invalid={invalid} value={value || ''} emptyLabel="— None —" options={(field.options || []).map(o => ({ value: o, label: o }))} onChange={v => updateRecordField(field.name, v)} />;
+            }
             return (
-               <select className={baseClasses} value={value || ''} onChange={handleChange}>
+               <select id={fieldId} className={baseClasses} value={value || ''} onChange={handleChange}>
                   <option value="">- Select -</option>
                   {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                </select>
             );
+         case 'phone':
+            return <PhoneInput id={fieldId} value={value || ''} invalid={invalid} onChange={v => updateRecordField(field.name, v)} onBlur={watched ? () => { checkDuplicates(); } : undefined} />;
+         case 'address':
+            return <AddressInput id={fieldId} value={value} invalid={invalid} onChange={v => updateRecordField(field.name, v)} />;
+         case 'email':
+            return <input id={fieldId} type="email" inputMode="email" autoComplete="email" placeholder="name@company.com" className={baseClasses} aria-invalid={invalid || undefined} value={value || ''} onChange={handleChange} {...dupBlur} />;
+         case 'url':
+            return <input id={fieldId} type="url" inputMode="url" placeholder="https://" className={baseClasses} aria-invalid={invalid || undefined} value={value || ''} onChange={handleChange} />;
          case 'cascade': {
             const tree = categoryTrees[field.categorySet || 'product'] || [];
             const catVal = value || '';
@@ -525,14 +551,20 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
             );
          }
          case 'user':
+            if (people.length > 8) {
+               return <SearchSelect id={fieldId} ariaLabel={field.label} invalid={invalid} value={value || ''} emptyLabel="— Nobody —" options={people.map(p => ({ value: p.id, label: p.name }))} onChange={v => updateRecordField(field.name, v)} />;
+            }
             return (
-               <select className={baseClasses} value={value || ''} onChange={handleChange}>
+               <select id={fieldId} className={baseClasses} value={value || ''} onChange={handleChange}>
                   <option value="">- Select a person -</option>
                   {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                </select>
             );
          case 'lookup':
             const options = lookupValues[field.name] || [];
+            if (options.length > 8) {
+               return <SearchSelect id={fieldId} ariaLabel={field.label} invalid={invalid} value={value || ''} emptyLabel="— None —" options={options.map(o => ({ value: o.value_id, label: o.value }))} onChange={v => updateRecordField(field.name, v)} />;
+            }
             return (
                <select className={baseClasses} value={value || ''} onChange={handleChange}>
                   <option value="">- Select -</option>
@@ -546,9 +578,68 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
             if (!url) return <div className="text-gray-400 text-sm italic">No URL configured</div>;
             return <div className="w-full h-64 border rounded-lg bg-gray-100"><iframe src={url} className="w-full h-full" title={field.label} /></div>;
          default:
-            return <input type={field.type} className={baseClasses} value={value || ''} onChange={handleChange} {...phoneBlurProps} />;
+            return <input id={fieldId} type={field.type} className={baseClasses} aria-invalid={invalid || undefined} value={value || ''} onChange={handleChange} {...dupBlur} />;
       }
    };
+
+   const matchKind = (m: DuplicateMatch) => (m.entityType === entityType ? (schema?.label || m.entityType) : m.entityType.charAt(0).toUpperCase() + m.entityType.slice(1));
+   const canOpenMatch = (m: DuplicateMatch) => !!onNavigate && (m.entityType === 'lead' || m.entityType === 'customer');
+   const openMatch = (m: DuplicateMatch) => {
+      if (!onNavigate) return;
+      if (m.entityType === 'lead') onNavigate('lead-360', { leadId: m.id });
+      else if (m.entityType === 'customer') onNavigate('customer-360', { customerId: m.id });
+   };
+
+   // Shown above the form as soon as a field the duplicate rules look at is filled in
+   const DupBanner = dupWarning ? (
+      <div role="alert" className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${dupWarning.action === 'block' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+         <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${dupWarning.action === 'block' ? 'text-red-600' : 'text-amber-600'}`} aria-hidden="true" />
+         <div className="flex-1 min-w-0 text-sm">
+            <p className={`font-semibold ${dupWarning.action === 'block' ? 'text-red-800' : 'text-amber-900'}`}>
+               {dupWarning.action === 'block' ? 'This already exists and cannot be saved a second time' : 'This looks like a record that already exists'}
+            </p>
+            <ul className="mt-1 space-y-1">
+               {dupWarning.matches.slice(0, 3).map(m => (
+                  <li key={m.id} className="flex items-center gap-2 flex-wrap text-slate-700">
+                     <span><strong className="font-semibold">{m.name}</strong> <span className="text-slate-500">· {matchKind(m)} · {m.rule.toLowerCase()}</span></span>
+                     {canOpenMatch(m) && <button type="button" onClick={() => openMatch(m)} className="text-accent hover:underline text-xs font-semibold">Open</button>}
+                  </li>
+               ))}
+            </ul>
+         </div>
+         <button type="button" aria-label="Dismiss" onClick={() => setDupWarning(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+      </div>
+   ) : null;
+
+   // The server said a record like this exists when saving: show it and ask (or refuse, when the object does not allow it)
+   const DupConfirm = dupConfirm ? (
+      <div role="dialog" aria-modal="true" aria-label="Possible duplicate" className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setDupConfirm(null)}>
+         <div className="bg-surface rounded-2xl border border-slate-200 shadow-[var(--elev-pop)] w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start gap-3">
+               <span className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${dupConfirm.blocked ? 'bg-red-50' : 'bg-amber-50'}`}><AlertCircle className={`w-5 h-5 ${dupConfirm.blocked ? 'text-red-600' : 'text-amber-600'}`} aria-hidden="true" /></span>
+               <div>
+                  <h2 className="font-heading font-extrabold text-lg text-ink">{dupConfirm.blocked ? 'Already exists' : 'Possible duplicate'}</h2>
+                  <p className="text-sm text-ink-muted mt-1">{dupConfirm.blocked ? 'A matching record is already in the CRM, and this object does not allow a second one.' : 'A matching record is already in the CRM. Open it, or save this one anyway.'}</p>
+               </div>
+            </div>
+            <ul className="mt-4 divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+               {dupConfirm.matches.slice(0, 5).map(m => (
+                  <li key={m.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                     <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-ink truncate">{m.name}</p>
+                        <p className="text-xs text-ink-muted">{matchKind(m)}{m.status ? ` · ${m.status}` : ''} · {m.rule.toLowerCase()}</p>
+                     </div>
+                     {canOpenMatch(m) && <Button size="sm" variant="secondary" onClick={() => { setDupConfirm(null); openMatch(m); }}>Open</Button>}
+                  </li>
+               ))}
+            </ul>
+            <div className="flex justify-end gap-2 mt-5">
+               <Button variant="secondary" onClick={() => setDupConfirm(null)}>{dupConfirm.blocked ? 'Close' : 'Go back'}</Button>
+               {!dupConfirm.blocked && <Button onClick={() => { setDupConfirm(null); persist(true); }}>Save anyway</Button>}
+            </div>
+         </div>
+      </div>
+   ) : null;
 
    if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>;
    if (!schema || !layout) return <div className="p-10 text-red-500">Failed to load module configuration.</div>;
@@ -563,6 +654,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
       return (
          <div className="min-h-screen animate-in fade-in duration-200">
+            {DupConfirm}
             {/* TOP HEADER */}
             <div className="bg-surface border-b border-gray-200/80">
                <div className="page-x py-6">
@@ -672,8 +764,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                      <div className="space-y-3.5">
                         {[
                            { icon: Mail, label: 'Email', value: selectedRecord['email'], tint: 'text-blue-600 bg-blue-50' },
-                           { icon: Phone, label: 'Phone', value: selectedRecord['phone'], tint: 'text-emerald-600 bg-emerald-50' },
-                           { icon: MapPin, label: 'Location', value: selectedRecord['address'] || selectedRecord['location'] || selectedRecord['city'], tint: 'text-violet-600 bg-violet-50' },
+                           { icon: Phone, label: 'Phone', value: formatPhone(selectedRecord['phone']), tint: 'text-emerald-600 bg-emerald-50' },
+                           { icon: MapPin, label: 'Location', value: formatAddress(selectedRecord['address']) || selectedRecord['location'] || selectedRecord['city'], tint: 'text-violet-600 bg-violet-50' },
                         ].map(({ icon: Icon, label, value, tint }) => (
                            <div key={label} className="flex items-center gap-3 text-sm">
                               <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${tint}`}>
@@ -710,6 +802,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
 
                {/* CENTER COLUMN: Dynamic Content */}
                <div className="col-span-12 lg:col-span-9 space-y-6">
+                  {DupBanner}
 
                   {detailTab === 'overview' && (
                      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
@@ -969,22 +1062,6 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
       { icon: Briefcase, label: topStatus ? `Most are "${topStatus[0]}"` : 'No stages yet', value: topStatus ? topStatus[1] : 0, tint: 'text-violet-600 bg-violet-50' },
    ];
 
-   // --- DUPLICATE WARNING BANNER ---
-   const DupBanner = dupWarning ? (
-      <div className="mx-6 mt-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-         <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-         <span className="text-sm text-amber-800">
-            ⚠️ A <strong>{dupWarning.type}</strong> with this phone number already exists: <strong>{dupWarning.name}</strong>
-         </span>
-         <button
-            onClick={() => setDupWarning(null)}
-            className="ml-auto text-amber-500 hover:text-amber-700"
-         >
-            <X className="w-4 h-4" />
-         </button>
-      </div>
-   ) : null;
-
    // --- IMPORT MODAL ---
    const ImportModal = showImportModal ? (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1180,8 +1257,6 @@ export const ModuleView: React.FC<ModuleViewProps> = ({ entityType, onNavigate, 
                </div>
             </div>
          </div>
-
-         {DupBanner}
 
          <div className="page-x py-6">
             {/* Stats Row */}
